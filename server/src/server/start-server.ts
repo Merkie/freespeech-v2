@@ -26,6 +26,15 @@ export default async function StartServer() {
 
 	app.use(await router({ directory: path.join(__dirname, '..', 'routes') }));
 
+	// Production: serve client build
+	if (process.env.NODE_ENV === 'production') {
+		const clientDist = path.resolve(__dirname, '..', '..', '..', 'client', 'dist');
+		app.use(express.static(clientDist));
+		app.get('*', (req, res) => {
+			res.sendFile(path.join(clientDist, 'index.html'));
+		});
+	}
+
 	app.use(HandleErrorMiddleware);
 
 	const server = http.createServer(app);
