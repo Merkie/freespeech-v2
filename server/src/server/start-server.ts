@@ -1,9 +1,9 @@
-import express, { Express } from 'express';
+import express, { type Express } from 'express';
 import 'express-async-errors';
+import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
-import http from 'http';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { router } from 'express-file-routing';
 import HandleErrorMiddleware from '@/middleware/handle-error';
 import LogRequestMiddleware from '@/middleware/log-request';
@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 
 export default async function StartServer() {
 	const app: Express = express();
-	const port = parseInt(PORT);
+	const port = parseInt(PORT, 10);
 
 	app.use(cors());
 	app.options('*', cors());
@@ -30,7 +30,7 @@ export default async function StartServer() {
 	if (process.env.NODE_ENV === 'production') {
 		const clientDist = path.resolve(__dirname, '..', '..', '..', 'client', 'dist');
 		app.use(express.static(clientDist));
-		app.get('*', (req, res) => {
+		app.get('*', (_req, res) => {
 			res.sendFile(path.join(clientDist, 'index.html'));
 		});
 	}

@@ -1,15 +1,15 @@
-export const PORT = process.env.PORT + '';
-export const JWT_SECRET = process.env.JWT_SECRET + '';
-export const SITE_SECRET = process.env.SITE_SECRET + '';
-export const CLIENT_HOST = process.env.CLIENT_HOST + '';
-export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID + '';
-export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET + '';
-export const BRIGHT_DATA_PROXY_URL = process.env.BRIGHT_DATA_PROXY_URL + '';
-export const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID + '';
-export const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY + '';
-export const R2_SECRET_KEY = process.env.R2_SECRET_KEY + '';
-export const R2_BUCKET = process.env.R2_BUCKET + '';
-export const ELEVEN_LABS_KEY = process.env.ELEVEN_LABS_KEY + '';
+export const PORT = `${process.env.PORT}`;
+export const JWT_SECRET = `${process.env.JWT_SECRET}`;
+export const SITE_SECRET = `${process.env.SITE_SECRET}`;
+export const CLIENT_HOST = `${process.env.CLIENT_HOST}`;
+export const GOOGLE_CLIENT_ID = `${process.env.GOOGLE_CLIENT_ID}`;
+export const GOOGLE_CLIENT_SECRET = `${process.env.GOOGLE_CLIENT_SECRET}`;
+export const BRIGHT_DATA_PROXY_URL = `${process.env.BRIGHT_DATA_PROXY_URL}`;
+export const R2_ACCOUNT_ID = `${process.env.R2_ACCOUNT_ID}`;
+export const R2_ACCESS_KEY = `${process.env.R2_ACCESS_KEY}`;
+export const R2_SECRET_KEY = `${process.env.R2_SECRET_KEY}`;
+export const R2_BUCKET = `${process.env.R2_BUCKET}`;
+export const ELEVEN_LABS_KEY = `${process.env.ELEVEN_LABS_KEY}`;
 
 export function init() {
 	if (PORT.length === 0) throw new Error('PORT is not set');

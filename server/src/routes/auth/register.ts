@@ -1,14 +1,14 @@
+import bcrypt from 'bcryptjs';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
-import bcrypt from 'bcryptjs';
-import { z } from 'zod';
 import { generateToken } from '@/utils/token';
 
 const schema = z.object({
 	email: z.string().email(),
 	name: z.string().min(2),
-	password: z.string().min(8)
+	password: z.string().min(8),
 });
 
 export const POST = [
@@ -20,9 +20,9 @@ export const POST = [
 			where: {
 				email: {
 					equals: body.email,
-					mode: 'insensitive'
-				}
-			}
+					mode: 'insensitive',
+				},
+			},
 		});
 		if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
@@ -31,12 +31,12 @@ export const POST = [
 			data: {
 				email: body.email,
 				password: hashedPassword,
-				name: body.name
-			}
+				name: body.name,
+			},
 		});
 
 		const { token } = generateToken(createdUser.id);
 
 		return res.json({ token });
-	}
+	},
 ];

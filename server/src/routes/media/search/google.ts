@@ -1,17 +1,17 @@
+import axios from 'axios';
+import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { BRIGHT_DATA_PROXY_URL } from '@/utils/env';
-import type { Request, Response } from 'express';
-import axios from 'axios';
 
 export const GET = [
 	authenticateRequest(),
 	async (req: Request, res: Response) => {
-		const query = req.query.q + '';
+		const query = `${req.query.q}`;
 
 		const results = await searchImages(query);
 
 		return res.json({ results });
-	}
+	},
 ];
 
 interface BrightDataImage {
@@ -35,8 +35,8 @@ function parseProxyUrl(proxyUrl: string) {
 		port: parseInt(url.port, 10),
 		auth: {
 			username: decodeURIComponent(url.username),
-			password: decodeURIComponent(url.password)
-		}
+			password: decodeURIComponent(url.password),
+		},
 	};
 }
 
@@ -50,9 +50,9 @@ async function searchImages(query: string) {
 		const response = await axios.get<BrightDataResponse>(searchUrl, {
 			proxy,
 			timeout: 30000,
-			httpsAgent: new (require('https').Agent)({
-				rejectUnauthorized: false
-			})
+			httpsAgent: new (require('node:https').Agent)({
+				rejectUnauthorized: false,
+			}),
 		});
 
 		const data = response.data;
@@ -62,7 +62,7 @@ async function searchImages(query: string) {
 		const results = data.images.map((image) => ({
 			alt: image.title || image.image_alt || '',
 			image_url: image.original_image,
-			thumbnail_url: image.original_image
+			thumbnail_url: image.original_image,
 		}));
 
 		return results;

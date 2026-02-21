@@ -1,16 +1,16 @@
-import { z } from 'zod';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
+import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 import slugify from '@/utils/slugify';
-import { invalidateCache } from '@/resources/cache';
-import { TileData, DEFAULT_TILE } from '@/utils/tile-types';
+import { DEFAULT_TILE, type TileData } from '@/utils/tile-types';
 import { updateProjectLastEditedAt } from '@/utils/update-project-last-edited';
 
 const schema = z.object({
 	name: z.string().min(1).max(50),
-	projectId: z.string()
+	projectId: z.string(),
 });
 
 export const POST = [
@@ -23,28 +23,24 @@ export const POST = [
 		const project = await prisma.project.findUnique({
 			where: {
 				id: body.projectId,
-				userId: req.userId
+				userId: req.userId,
 			},
 			include: {
 				connectedPages: {
 					include: {
-						tilePage: true
-					}
-				}
-			}
+						tilePage: true,
+					},
+				},
+			},
 		});
 
 		// Check if the project exists
 		if (!project) return res.json({ error: 'The project you are trying to edit does not exist.' });
 
 		// Check if the page already exists
-		if (
-			project.connectedPages
-				.map(({ tilePage }) => slugify(tilePage.name))
-				.includes(slugify(body.name))
-		)
+		if (project.connectedPages.map(({ tilePage }) => slugify(tilePage.name)).includes(slugify(body.name)))
 			return res.json({
-				error: 'A page with that name already exists in the project.'
+				error: 'A page with that name already exists in the project.',
 			});
 
 		// Create initial tile at position (0, 0)
@@ -61,16 +57,16 @@ export const POST = [
 				name: body.name,
 				user: {
 					connect: {
-						id: req.userId
-					}
+						id: req.userId,
+					},
 				},
 				connectedProjects: {
 					create: {
-						projectId: project.id
-					}
+						projectId: project.id,
+					},
 				},
-				tiles: [initialTile]
-			}
+				tiles: [initialTile],
+			},
 		});
 
 		// Update project lastEditedAt
@@ -79,5 +75,5 @@ export const POST = [
 		invalidateCache(`project:${body.projectId}:${req.userId}`);
 
 		return res.json({ page });
-	}
+	},
 ];

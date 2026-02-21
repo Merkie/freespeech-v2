@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
-import { OBFPage } from '@/utils/open-board-format-types';
 import { authenticateRequest } from '@/middleware/authenticate-request';
-import prisma from '@/resources/prisma';
 import { invalidateCache } from '@/resources/cache';
-import { TileData, DEFAULT_TILE } from '@/utils/tile-types';
+import prisma from '@/resources/prisma';
+import type { OBFPage } from '@/utils/open-board-format-types';
+import { DEFAULT_TILE, type TileData } from '@/utils/tile-types';
 
 export const POST = [
 	authenticateRequest(),
@@ -28,8 +28,8 @@ export const POST = [
 				isPublic: false,
 				columns: rootFile.data.grid.columns,
 				rows: rootFile.data.grid.rows,
-				userId: req.userId!
-			}
+				userId: req.userId!,
+			},
 		});
 
 		if (!createdProject) return res.status(500).json({ error: 'Failed to create project' });
@@ -43,16 +43,16 @@ export const POST = [
 				data: {
 					name: file.fileName === manifest.root ? 'Home' : file.data.name,
 					userId: req.userId!,
-					tiles: [] // Empty initially, will populate after ID mapping is complete
-				}
+					tiles: [], // Empty initially, will populate after ID mapping is complete
+				},
 			});
 			if (!createdTilePage) throw new Error('Failed to create tile page');
 
 			await prisma.tilePageInProject.create({
 				data: {
 					projectId: createdProject.id,
-					tilePageId: createdTilePage.id
-				}
+					tilePageId: createdTilePage.id,
+				},
 			});
 
 			obzIDToPrismaID.set(file.data.id, createdTilePage.id);
@@ -88,9 +88,7 @@ export const POST = [
 						const image = file.data.images.find((image) => image.id === obfButton.image_id)?.url || '';
 
 						// Resolve navigation using the ID mapping
-						const navigation = obfButton.load_board
-							? obzIDToPrismaID.get(obfButton.load_board.id) || ''
-							: '';
+						const navigation = obfButton.load_board ? obzIDToPrismaID.get(obfButton.load_board.id) || '' : '';
 
 						return {
 							x: itemIndex,
@@ -101,7 +99,7 @@ export const POST = [
 							backgroundColor: obfButton.background_color || DEFAULT_TILE.backgroundColor,
 							borderColor: obfButton.border_color || DEFAULT_TILE.borderColor,
 							image,
-							navigation
+							navigation,
 						} as TileData;
 					});
 				})
@@ -110,7 +108,7 @@ export const POST = [
 			// Update page with JSON tiles
 			await prisma.tilePage.update({
 				where: { id: pageId },
-				data: { tiles: tilesData }
+				data: { tiles: tilesData },
 			});
 		});
 
@@ -124,12 +122,12 @@ export const POST = [
 		if (homePageId) {
 			await prisma.project.update({
 				where: { id: createdProject.id },
-				data: { homePageId }
+				data: { homePageId },
 			});
 		}
 
 		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({ success: true, projectId: createdProject.id });
-	}
+	},
 ];

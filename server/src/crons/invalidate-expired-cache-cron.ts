@@ -1,8 +1,8 @@
-import { invalidateCacheAllExpired } from '@/resources/cache';
 import cron from 'node-cron';
+import { invalidateCacheAllExpired } from '@/resources/cache';
 
 const ExampleCron = {
-	start: startExampleCron
+	start: startExampleCron,
 };
 
 export default ExampleCron;

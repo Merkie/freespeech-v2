@@ -10,5 +10,5 @@ export const POST = [
 			error: 'This endpoint is deprecated. Use POST /page/:pageId/tile/update instead.',
 			migration: 'Tiles are now identified by position (x, y, page) instead of ID.',
 		});
-	}
+	},
 ];

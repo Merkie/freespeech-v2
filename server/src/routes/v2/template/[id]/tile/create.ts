@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
-import { TileData, TilePositionSchema, DEFAULT_TILE, isTilePositionOccupied } from '@/utils/tile-types';
+import { DEFAULT_TILE, isTilePositionOccupied, type TileData, TilePositionSchema } from '@/utils/tile-types';
 import { updateProjectLastEditedAt } from '@/utils/update-project-last-edited';
 
 const schema = TilePositionSchema.extend({

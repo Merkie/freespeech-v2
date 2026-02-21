@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import { z } from 'zod';
 
 const schema = z.object({
-	url: z.string().url()
+	url: z.string().url(),
 });
 
 export const POST = [
@@ -22,18 +22,13 @@ export const POST = [
 		const arrayBuffer = await response.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
 
-		res.setHeader(
-			'Content-Type',
-			response.headers.get('content-type') || 'application/octet-stream'
-		);
+		res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
 		res.setHeader('Content-Length', buffer.length.toString());
 		res.setHeader(
 			'Content-Disposition',
-			`attachment; filename="image.${
-				response.headers.get('content-type')?.split('/').pop() || 'jpg'
-			}"`
+			`attachment; filename="image.${response.headers.get('content-type')?.split('/').pop() || 'jpg'}"`,
 		);
 
 		res.end(buffer);
-	}
+	},
 ];

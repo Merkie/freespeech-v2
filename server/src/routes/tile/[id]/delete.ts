@@ -10,5 +10,5 @@ export const DELETE = [
 			error: 'This endpoint is deprecated. Use POST /page/:pageId/tile/delete instead.',
 			migration: 'Tiles are now identified by position (x, y, page) instead of ID.',
 		});
-	}
+	},
 ];

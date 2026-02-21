@@ -65,7 +65,7 @@ export const GET = [
 				? {
 						...templatePage,
 						project: templatePage.connectedProjects[0]?.project || null,
-				  }
+					}
 				: null,
 			templateTiles: optimizedTemplateTiles,
 		});

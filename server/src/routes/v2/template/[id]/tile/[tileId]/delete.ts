@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import prisma from '@/resources/prisma';
-import { TileData, findTileIndexByPosition } from '@/utils/tile-types';
+import { findTileIndexByPosition, type TileData } from '@/utils/tile-types';
 import { updateProjectLastEditedAt } from '@/utils/update-project-last-edited';
 
 // Note: Route param is [tileId] for backwards compatibility, but we now use position
@@ -21,7 +21,7 @@ export const DELETE = [
 			page: parseInt(positionParts[2], 10),
 		};
 
-		if (isNaN(position.x) || isNaN(position.y) || isNaN(position.page)) {
+		if (Number.isNaN(position.x) || Number.isNaN(position.y) || Number.isNaN(position.page)) {
 			return res.status(400).json({ error: 'Invalid tile position values.' });
 		}
 

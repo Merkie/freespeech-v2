@@ -1,15 +1,15 @@
-import { authenticateRequest } from '@/middleware/authenticate-request';
-import { validateSchema } from '@/middleware/validate-schema';
-import prisma from '@/resources/prisma';
-import { invalidateCache } from '@/resources/cache';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { TileData, DEFAULT_TILE } from '@/utils/tile-types';
+import { authenticateRequest } from '@/middleware/authenticate-request';
+import { validateSchema } from '@/middleware/validate-schema';
+import { invalidateCache } from '@/resources/cache';
+import prisma from '@/resources/prisma';
+import { DEFAULT_TILE, type TileData } from '@/utils/tile-types';
 
 const schema = z.object({
 	name: z.string(),
 	columns: z.number(),
-	rows: z.number()
+	rows: z.number(),
 });
 
 export const POST = [
@@ -26,8 +26,8 @@ export const POST = [
 				isPublic: false,
 				columns: body.columns,
 				rows: body.rows,
-				userId: req.userId!
-			}
+				userId: req.userId!,
+			},
 		});
 
 		// Create initial tile at position (0, 0)
@@ -45,21 +45,21 @@ export const POST = [
 				userId: req.userId!,
 				connectedProjects: {
 					create: {
-						projectId: createdProject.id
-					}
+						projectId: createdProject.id,
+					},
 				},
-				tiles: [initialTile]
-			}
+				tiles: [initialTile],
+			},
 		});
 
 		// Set the homePageId on the project
 		await prisma.project.update({
 			where: { id: createdProject.id },
-			data: { homePageId: createdHomePage.id }
+			data: { homePageId: createdHomePage.id },
 		});
 
 		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({ success: true, projectId: createdProject.id });
-	}
+	},
 ];

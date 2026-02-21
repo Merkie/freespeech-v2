@@ -1,18 +1,14 @@
-import { NextFunction, type Request, type Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { verifyToken } from '@/utils/token';
 
 export const authenticateRequest =
 	(
-		{
-			noRedirect
-		}: {
-			noRedirect?: boolean;
-		} = {
-			noRedirect: false
-		}
+		{ noRedirect }: { noRedirect?: boolean } = {
+			noRedirect: false,
+		},
 	) =>
 	async (req: Request, res: Response, next: NextFunction) => {
-		const authHeader = req.headers.authorization + '';
+		const authHeader = `${req.headers.authorization}`;
 
 		const token = authHeader.split(' ').at(-1);
 

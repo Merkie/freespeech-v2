@@ -1,5 +1,5 @@
 import { useNavigate } from '@solidjs/router';
-import { onMount, type Component } from 'solid-js';
+import { type Component, onMount } from 'solid-js';
 import { localSettings } from '@/lib/state';
 
 /**
@@ -12,22 +12,22 @@ import { localSettings } from '@/lib/state';
  * Auth is handled by the parent Layout, so we don't check it here.
  */
 const AppEntryPage: Component = () => {
-  const navigate = useNavigate();
+	const navigate = useNavigate();
 
-  onMount(() => {
-    const lastProjectId = localSettings().lastVisitedProjectId;
+	onMount(() => {
+		const lastProjectId = localSettings().lastVisitedProjectId;
 
-    if (lastProjectId) {
-      // Redirect to last visited project
-      navigate(`/app/project/${lastProjectId}`, { replace: true });
-    } else {
-      // Default: go to projects dashboard
-      navigate('/app/dashboard/projects', { replace: true });
-    }
-  });
+		if (lastProjectId) {
+			// Redirect to last visited project
+			navigate(`/app/project/${lastProjectId}`, { replace: true });
+		} else {
+			// Default: go to projects dashboard
+			navigate('/app/dashboard/projects', { replace: true });
+		}
+	});
 
-  // Return empty div while redirect happens
-  return <div />;
+	// Return empty div while redirect happens
+	return <div />;
 };
 
 export default AppEntryPage;

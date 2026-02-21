@@ -1,13 +1,13 @@
 import type { Request, Response } from 'express';
-import prisma from '@/resources/prisma';
-import { generateToken } from '@/utils/token';
-import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from '@/utils/env';
 import { z } from 'zod';
 import { validateSchema } from '@/middleware/validate-schema';
+import prisma from '@/resources/prisma';
+import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } from '@/utils/env';
+import { generateToken } from '@/utils/token';
 
 const schema = z.object({
 	origin: z.string(),
-	code: z.string()
+	code: z.string(),
 });
 
 export const POST = [
@@ -32,8 +32,8 @@ export const POST = [
 				data: {
 					email: profile.email,
 					name: profile.name,
-					profileImgUrl: profile.picture
-				}
+					profileImgUrl: profile.picture,
+				},
 			});
 
 			tokenUserId = createdUser.id;
@@ -42,7 +42,7 @@ export const POST = [
 		const { token } = generateToken(tokenUserId);
 
 		return res.json({ token });
-	}
+	},
 ];
 
 async function getAccessToken(origin: string, code: string) {
@@ -55,7 +55,7 @@ async function getAccessToken(origin: string, code: string) {
 	url.searchParams.append('redirect_uri', `${origin}/oauth/google`);
 
 	const response = await fetch(url, {
-		method: 'POST'
+		method: 'POST',
 	});
 
 	return response.json() as Promise<{

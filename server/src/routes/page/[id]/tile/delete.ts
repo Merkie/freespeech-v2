@@ -1,10 +1,10 @@
-import { z } from 'zod';
 import type { Request, Response } from 'express';
-import { validateSchema } from '@/middleware/validate-schema';
+import type { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
-import prisma from '@/resources/prisma';
+import { validateSchema } from '@/middleware/validate-schema';
 import { invalidateCache } from '@/resources/cache';
-import { TilePositionSchema, TileData, findTileIndexByPosition } from '@/utils/tile-types';
+import prisma from '@/resources/prisma';
+import { findTileIndexByPosition, type TileData, TilePositionSchema } from '@/utils/tile-types';
 import { updateProjectLastEditedAt } from '@/utils/update-project-last-edited';
 
 const schema = TilePositionSchema;

@@ -1,14 +1,14 @@
-import { ELEVEN_LABS_KEY } from '@/utils/env';
-import { z } from 'zod';
 import type { Request, Response } from 'express';
-import { validateSchema } from '@/middleware/validate-schema';
+import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
+import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
 import { DecryptElevenLabsKey } from '@/utils/decrypt-key';
+import { ELEVEN_LABS_KEY } from '@/utils/env';
 
 const schema = z.object({
 	voiceId: z.string().min(1),
-	text: z.string().min(1).max(1500)
+	text: z.string().min(1).max(1500),
 });
 
 export const POST = [
@@ -19,21 +19,19 @@ export const POST = [
 
 		const user = await prisma.user.findUnique({
 			where: {
-				id: req.userId
-			}
+				id: req.userId,
+			},
 		});
 		if (!user) return res.json({ error: 'User not found' });
 
-		const userKey = user.usePersonalElevenLabsKey
-			? DecryptElevenLabsKey(user.elevenLabsApiKey)
-			: '';
+		const userKey = user.usePersonalElevenLabsKey ? DecryptElevenLabsKey(user.elevenLabsApiKey) : '';
 
 		if (user.usePersonalElevenLabsKey && !userKey)
 			return res.json({
-				error: 'User has enabled personal Eleven Labs API key but it is not set'
+				error: 'User has enabled personal Eleven Labs API key but it is not set',
 			});
 
-		const startTime = Date.now();
+		const _startTime = Date.now();
 
 		const response = await fetch(
 			`https://api.elevenlabs.io/v1/text-to-speech/${body.voiceId}?optimize_streaming_latency=1`,
@@ -42,12 +40,12 @@ export const POST = [
 				headers: {
 					Accept: 'audio/mpeg',
 					'Content-Type': 'application/json',
-					'xi-api-key': userKey || ELEVEN_LABS_KEY
+					'xi-api-key': userKey || ELEVEN_LABS_KEY,
 				},
 				body: JSON.stringify({
-					text: body.text
-				})
-			}
+					text: body.text,
+				}),
+			},
 		);
 
 		const audio = await response.arrayBuffer();
@@ -56,5 +54,5 @@ export const POST = [
 
 		res.set('Content-Type', 'audio/mpeg');
 		res.send(Buffer.from(audio));
-	}
+	},
 ];

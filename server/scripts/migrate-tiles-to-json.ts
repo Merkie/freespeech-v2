@@ -67,7 +67,7 @@ async function migrateTilesToJson() {
 			);
 		`;
 		tileTableExists = result[0]?.exists ?? false;
-	} catch (error) {
+	} catch (_error) {
 		console.log('Could not check if Tile table exists, assuming it does not');
 		tileTableExists = false;
 	}
@@ -177,10 +177,7 @@ async function verifyMigration() {
 		// Validate tile structure
 		const validTiles = tiles.every(
 			(t) =>
-				typeof t.x === 'number' &&
-				typeof t.y === 'number' &&
-				typeof t.page === 'number' &&
-				typeof t.text === 'string'
+				typeof t.x === 'number' && typeof t.y === 'number' && typeof t.page === 'number' && typeof t.text === 'string',
 		);
 
 		if (validTiles) {

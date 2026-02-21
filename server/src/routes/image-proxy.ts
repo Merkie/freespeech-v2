@@ -8,7 +8,7 @@ export const GET = [
 			if (!imageUrl) {
 				return res.status(400).json({
 					success: false,
-					error: "Missing 'url' query parameter"
+					error: "Missing 'url' query parameter",
 				});
 			}
 
@@ -19,7 +19,7 @@ export const GET = [
 			} catch {
 				return res.status(400).json({
 					success: false,
-					error: 'Invalid URL'
+					error: 'Invalid URL',
 				});
 			}
 
@@ -27,22 +27,22 @@ export const GET = [
 			if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
 				return res.status(400).json({
 					success: false,
-					error: 'Only HTTP and HTTPS URLs are allowed'
+					error: 'Only HTTP and HTTPS URLs are allowed',
 				});
 			}
 
 			// Fetch the image
 			const response = await fetch(imageUrl, {
 				headers: {
-					'User-Agent': 'FreeSpeech-ImageProxy/1.0'
+					'User-Agent': 'FreeSpeech-ImageProxy/1.0',
 				},
-				signal: AbortSignal.timeout(10000) // 10 second timeout
+				signal: AbortSignal.timeout(10000), // 10 second timeout
 			});
 
 			if (!response.ok) {
 				return res.status(response.status).json({
 					success: false,
-					error: `Failed to fetch image: ${response.statusText}`
+					error: `Failed to fetch image: ${response.statusText}`,
 				});
 			}
 
@@ -52,7 +52,7 @@ export const GET = [
 			if (!contentType?.startsWith('image/')) {
 				return res.status(400).json({
 					success: false,
-					error: 'URL does not point to an image'
+					error: 'URL does not point to an image',
 				});
 			}
 
@@ -70,8 +70,8 @@ export const GET = [
 			console.error('Error proxying image:', error);
 			return res.status(500).json({
 				success: false,
-				error: error instanceof Error ? error.message : 'An unknown error occurred'
+				error: error instanceof Error ? error.message : 'An unknown error occurred',
 			});
 		}
-	}
+	},
 ];

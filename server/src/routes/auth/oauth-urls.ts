@@ -1,10 +1,10 @@
-import { validateSchema } from '@/middleware/validate-schema';
-import { GOOGLE_CLIENT_ID } from '@/utils/env';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { validateSchema } from '@/middleware/validate-schema';
+import { GOOGLE_CLIENT_ID } from '@/utils/env';
 
 const schema = z.object({
-	origin: z.string()
+	origin: z.string(),
 });
 
 export const POST = [
@@ -15,7 +15,7 @@ export const POST = [
 		const googleUrl = getGoogleOauthUrl(body.origin);
 
 		return res.json({ google: googleUrl });
-	}
+	},
 ];
 
 function getGoogleOauthUrl(origin: string) {
@@ -28,10 +28,7 @@ function getGoogleOauthUrl(origin: string) {
 	url.searchParams.append('prompt', 'consent');
 	url.searchParams.append(
 		'scope',
-		[
-			'https://www.googleapis.com/auth/userinfo.email',
-			'https://www.googleapis.com/auth/userinfo.profile'
-		].join(' ')
+		['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile'].join(' '),
 	);
 
 	return url;

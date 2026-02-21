@@ -1,13 +1,13 @@
+import bcrypt from 'bcryptjs';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
-import bcrypt from 'bcryptjs';
-import { z } from 'zod';
 import { generateToken } from '@/utils/token';
 
 const schema = z.object({
 	email: z.string().email(),
-	password: z.string()
+	password: z.string(),
 });
 
 export const POST = [
@@ -19,9 +19,9 @@ export const POST = [
 			where: {
 				email: {
 					equals: body.email,
-					mode: 'insensitive'
-				}
-			}
+					mode: 'insensitive',
+				},
+			},
 		});
 		if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 		if (!user.password) return res.status(401).json({ error: 'Invalid email or password' });
@@ -32,5 +32,5 @@ export const POST = [
 		const { token } = generateToken(user.id);
 
 		return res.json({ token });
-	}
+	},
 ];

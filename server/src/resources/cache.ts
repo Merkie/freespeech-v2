@@ -26,7 +26,7 @@ class Cache {
 	public set<T>(key: string, value: T, ttl: number): void {
 		this.store.set(key, {
 			value,
-			expires: Date.now() + ttl
+			expires: Date.now() + ttl,
 		});
 	}
 
@@ -62,7 +62,7 @@ function parseTTL(ttl: string | number): number {
 		s: 1000,
 		m: 60 * 1000,
 		h: 60 * 60 * 1000,
-		d: 24 * 60 * 60 * 1000
+		d: 24 * 60 * 60 * 1000,
 	};
 
 	const match = ttl.match(/^(\d+)([smhd])$/);
@@ -71,28 +71,21 @@ function parseTTL(ttl: string | number): number {
 	}
 
 	const [, value, unit] = match;
-	return parseInt(value) * units[unit];
+	return parseInt(value, 10) * units[unit];
 }
 
 async function cache<T>(promise: Promise<T>, options: CacheOptions): Promise<T> {
 	const cacheInstance = Cache.getInstance();
-
-	try {
-		const cachedValue = cacheInstance.get<T>(options.key);
-		if (cachedValue !== null) {
-			return cachedValue;
-		}
-
-		const result = await promise;
-		const ttlMs = parseTTL(options.ttl);
-		cacheInstance.set(options.key, result, ttlMs);
-
-		return result;
-	} catch (error) {
-		// Re-throw any errors that occur during promise execution
-		// or cache operations to be handled by the caller
-		throw error;
+	const cachedValue = cacheInstance.get<T>(options.key);
+	if (cachedValue !== null) {
+		return cachedValue;
 	}
+
+	const result = await promise;
+	const ttlMs = parseTTL(options.ttl);
+	cacheInstance.set(options.key, result, ttlMs);
+
+	return result;
 }
 
 function invalidateCache(key: string): boolean {
@@ -105,4 +98,4 @@ function invalidateCacheAllExpired(): void {
 	cacheInstance.invalidateAllExpired();
 }
 
-export { cache, CacheOptions, invalidateCache, invalidateCacheAllExpired };
+export { cache, type CacheOptions, invalidateCache, invalidateCacheAllExpired };

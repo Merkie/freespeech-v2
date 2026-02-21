@@ -1,16 +1,16 @@
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { fal } from '@fal-ai/client';
+import { createId } from '@paralleldrive/cuid2';
 import type { Request, Response } from 'express';
+import sharp from 'sharp';
+import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import { z } from 'zod';
-import { fal } from '@fal-ai/client';
-import sharp from 'sharp';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { createId } from '@paralleldrive/cuid2';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
 
 const schema = z.object({
-	image_url: z.string().url()
+	image_url: z.string().url(),
 });
 
 export const POST = [
@@ -24,8 +24,8 @@ export const POST = [
 			input: {
 				image_url: body.image_url,
 				model: 'General Use (Dynamic)' as any, // This isn't typed in the Fal SDK, but it works
-				output_format: 'png'
-			}
+				output_format: 'png',
+			},
 		});
 
 		const data = result.data as {
@@ -52,12 +52,12 @@ export const POST = [
 				Bucket: R2_BUCKET,
 				Key: key,
 				Body: trimmedImage,
-				ContentType: 'image/png'
-			})
+				ContentType: 'image/png',
+			}),
 		);
 
 		res.json({
-			image_url: `https://media.freespeechaac.com/${key}`
+			image_url: `https://media.freespeechaac.com/${key}`,
 		});
-	}
+	},
 ];

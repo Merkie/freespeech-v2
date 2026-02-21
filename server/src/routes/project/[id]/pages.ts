@@ -1,7 +1,7 @@
+import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { cache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
-import type { Request, Response } from 'express';
 
 export const GET = [
 	authenticateRequest(),
@@ -13,22 +13,22 @@ export const GET = [
 				where: {
 					project: {
 						id: req.params.id,
-						userId: req.userId
-					}
+						userId: req.userId,
+					},
 				},
 				include: {
-					tilePage: true
+					tilePage: true,
 				},
 				orderBy: {
 					tilePage: {
-						updatedAt: 'desc'
-					}
-				}
+						updatedAt: 'desc',
+					},
+				},
 			}),
 			{
 				key: `project-pages:${req.params.id}:${req.userId}`,
-				ttl: '5m'
-			}
+				ttl: '5m',
+			},
 		);
 
 		const duration = Date.now() - startTime;
@@ -39,5 +39,5 @@ export const GET = [
 		}
 
 		return res.json({ pages: pages.map((p) => p.tilePage) });
-	}
+	},
 ];

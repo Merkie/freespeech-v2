@@ -38,7 +38,7 @@ async function migrate() {
 	if (projCols.length === 0) {
 		console.log('Adding lastEditedAt column to Project...');
 		await prisma.$executeRawUnsafe(
-			`ALTER TABLE "Project" ADD COLUMN "lastEditedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`
+			`ALTER TABLE "Project" ADD COLUMN "lastEditedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP`,
 		);
 		console.log('Done.');
 	} else {
@@ -100,7 +100,7 @@ async function migrate() {
 			) sub
 			WHERE tp."id" = sub."tilePageId"
 			`,
-			ids
+			ids,
 		);
 
 		processed += batch.length;

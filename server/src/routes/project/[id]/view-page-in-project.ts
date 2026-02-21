@@ -1,12 +1,12 @@
+import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
 import { cache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
-import type { Request, Response } from 'express';
-import { z } from 'zod';
 
 const schema = z.object({
-	pageId: z.string()
+	pageId: z.string(),
 });
 
 export const POST = [
@@ -21,20 +21,20 @@ export const POST = [
 				where: {
 					project: {
 						userId: req.userId,
-						id: req.params.id
+						id: req.params.id,
 					},
-					tilePageId: body.pageId
+					tilePageId: body.pageId,
 				},
 				include: {
 					// Tiles are now embedded as JSON in tilePage.tiles column
 					tilePage: true,
-					project: true
-				}
+					project: true,
+				},
 			}),
 			{
 				key: `page:${body.pageId}:${req.userId}`,
-				ttl: '60s'
-			}
+				ttl: '60s',
+			},
 		);
 		const duration = Date.now() - startTime;
 		console.log(`[view-page-in-project] Page fetched in ${duration}ms (pageId: ${body.pageId})`);
@@ -42,5 +42,5 @@ export const POST = [
 		if (!page) return res.status(404).json({ error: 'Page not found' });
 
 		return res.json({ page, isHomePage: page.tilePageId === page.project.homePageId });
-	}
+	},
 ];

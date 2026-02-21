@@ -1,47 +1,47 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export async function fetchFromAPI({
-  path,
-  method,
-  body,
-  token,
-  options,
+	path,
+	method,
+	body,
+	token,
+	options,
 }: {
-  path: string;
-  method: 'GET' | 'POST' | 'DELETE';
-  body?: any;
-  token?: string;
-  options?: {
-    parseResponseJson?: boolean;
-  };
+	path: string;
+	method: 'GET' | 'POST' | 'DELETE';
+	body?: any;
+	token?: string;
+	options?: {
+		parseResponseJson?: boolean;
+	};
 }) {
-  let headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
+	let headers: HeadersInit = {
+		'Content-Type': 'application/json',
+	};
 
-  try {
-    const authToken = (token ? token : localStorage.getItem('token')) + '';
+	try {
+		const authToken = `${token ? token : localStorage.getItem('token')}`;
 
-    if (authToken) {
-      headers = {
-        ...headers,
-        Authorization: `Bearer ${authToken}`,
-      };
-    }
-  } catch {
-    // do nothing
-  }
+		if (authToken) {
+			headers = {
+				...headers,
+				Authorization: `Bearer ${authToken}`,
+			};
+		}
+	} catch {
+		// do nothing
+	}
 
-  const response = await fetch(import.meta.env.VITE_API_URL + path, {
-    method,
-    headers,
-    body: JSON.stringify(body),
-  });
+	const response = await fetch(import.meta.env.VITE_API_URL + path, {
+		method,
+		headers,
+		body: JSON.stringify(body),
+	});
 
-  if (options?.parseResponseJson === false) {
-    return response;
-  }
+	if (options?.parseResponseJson === false) {
+		return response;
+	}
 
-  const data = await response.json();
-  return data;
+	const data = await response.json();
+	return data;
 }

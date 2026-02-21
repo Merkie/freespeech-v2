@@ -2,8 +2,8 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import prisma from '@/resources/prisma';
 import { invalidateCache } from '@/resources/cache';
+import prisma from '@/resources/prisma';
 
 const schema = z.object({
 	templatePageId: z.string(),

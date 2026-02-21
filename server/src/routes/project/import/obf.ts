@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
-import { OBFPage } from '@/utils/open-board-format-types';
 import { authenticateRequest } from '@/middleware/authenticate-request';
-import prisma from '@/resources/prisma';
 import { invalidateCache } from '@/resources/cache';
-import { TileData, DEFAULT_TILE } from '@/utils/tile-types';
+import prisma from '@/resources/prisma';
+import type { OBFPage } from '@/utils/open-board-format-types';
+import { DEFAULT_TILE, type TileData } from '@/utils/tile-types';
 
 export const POST = [
 	authenticateRequest(),
@@ -23,8 +23,8 @@ export const POST = [
 				isPublic: false,
 				columns,
 				rows,
-				userId: req.userId!
-			}
+				userId: req.userId!,
+			},
 		});
 		if (!createdProject) return res.status(500).json({ error: 'Failed to create project' });
 
@@ -48,7 +48,7 @@ export const POST = [
 						backgroundColor: obfButton.background_color || DEFAULT_TILE.backgroundColor,
 						borderColor: obfButton.border_color || DEFAULT_TILE.borderColor,
 						image,
-						navigation: ''
+						navigation: '',
 					} as TileData;
 				});
 			})
@@ -59,26 +59,26 @@ export const POST = [
 			data: {
 				name: 'Home',
 				userId: req.userId!,
-				tiles: tilesData
-			}
+				tiles: tilesData,
+			},
 		});
 		if (!createdHomepage) return res.status(500).json({ error: 'Failed to create tile page' });
 
 		await prisma.tilePageInProject.create({
 			data: {
 				projectId: createdProject.id,
-				tilePageId: createdHomepage.id
-			}
+				tilePageId: createdHomepage.id,
+			},
 		});
 
 		// Set homePageId
 		await prisma.project.update({
 			where: { id: createdProject.id },
-			data: { homePageId: createdHomepage.id }
+			data: { homePageId: createdHomepage.id },
 		});
 
 		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({ success: true, projectId: createdProject.id });
-	}
+	},
 ];

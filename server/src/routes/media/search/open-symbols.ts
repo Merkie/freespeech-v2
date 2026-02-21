@@ -1,24 +1,22 @@
-import { authenticateRequest } from '@/middleware/authenticate-request';
 import type { Request, Response } from 'express';
+import { authenticateRequest } from '@/middleware/authenticate-request';
 
 export const GET = [
 	authenticateRequest(),
 	async (req: Request, res: Response) => {
-		const query = req.query.q + '';
-		const skin = req.query.skin + '';
+		const query = `${req.query.q}`;
+		const skin = `${req.query.skin}`;
 
 		const results = await searchOpenSymbols(query, skin);
 
 		return res.json({ results });
-	}
+	},
 ];
 
 async function searchOpenSymbols(query: string, skin: string) {
 	if (!query || !skin) return [];
 
-	const response = await fetch(
-		'https://www.opensymbols.org/api/v1/symbols/search?q=' + encodeURIComponent(query)
-	);
+	const response = await fetch(`https://www.opensymbols.org/api/v1/symbols/search?q=${encodeURIComponent(query)}`);
 	const data = (await response.json()) as { name: string; image_url: string }[];
 
 	const results = data.map((item) => {
@@ -27,7 +25,7 @@ async function searchOpenSymbols(query: string, skin: string) {
 		return {
 			alt: item.name,
 			image_url: urlWithModifiedSkin,
-			thumbnail_url: urlWithModifiedSkin
+			thumbnail_url: urlWithModifiedSkin,
 		};
 	});
 

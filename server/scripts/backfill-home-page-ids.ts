@@ -8,10 +8,10 @@ async function backfillHomePageIds() {
 		include: {
 			connectedPages: {
 				include: {
-					tilePage: true
-				}
-			}
-		}
+					tilePage: true,
+				},
+			},
+		},
 	});
 
 	console.log(`Found ${projects.length} projects without homePageId`);
@@ -21,9 +21,7 @@ async function backfillHomePageIds() {
 
 	for (const project of projects) {
 		// Find the "Home" page (case-insensitive)
-		const homePage = project.connectedPages.find(
-			(cp) => cp.tilePage.name.toLowerCase().trim() === 'home'
-		);
+		const homePage = project.connectedPages.find((cp) => cp.tilePage.name.toLowerCase().trim() === 'home');
 
 		// Fallback to first page if no "Home" page
 		const homePageId = homePage?.tilePageId || project.connectedPages[0]?.tilePageId;
@@ -31,7 +29,7 @@ async function backfillHomePageIds() {
 		if (homePageId) {
 			await prisma.project.update({
 				where: { id: project.id },
-				data: { homePageId }
+				data: { homePageId },
 			});
 			console.log(`Updated project "${project.name}" (${project.id}) with homePageId: ${homePageId}`);
 			updated++;

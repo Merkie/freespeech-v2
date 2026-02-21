@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
-import prisma from '@/resources/prisma';
 import { invalidateCache } from '@/resources/cache';
+import prisma from '@/resources/prisma';
 
 export const POST = [
 	authenticateRequest(),

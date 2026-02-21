@@ -1,17 +1,17 @@
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import type { Request, Response } from 'express';
+import sharp from 'sharp';
+import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import { z } from 'zod';
-import sharp from 'sharp';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
-import s3 from '@/resources/s3';
 import prisma from '@/resources/prisma';
+import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
-import { TileData } from '@/utils/tile-types';
+import type { TileData } from '@/utils/tile-types';
 import { updateProjectLastEditedAt } from '@/utils/update-project-last-edited';
 
 const schema = z.object({
-	dryRun: z.boolean()
+	dryRun: z.boolean(),
 });
 
 const MEDIA_HOST = 'media.freespeechaac.com';
@@ -39,15 +39,15 @@ export const POST = [
 		const project = await prisma.project.findFirst({
 			where: {
 				id: projectId,
-				userId: req.userId
+				userId: req.userId,
 			},
 			include: {
 				connectedPages: {
 					include: {
-						tilePage: true
-					}
-				}
-			}
+						tilePage: true,
+					},
+				},
+			},
 		});
 
 		if (!project) {
@@ -65,7 +65,7 @@ export const POST = [
 						x: tile.x,
 						y: tile.y,
 						page: tile.page,
-						image: tile.image
+						image: tile.image,
 					});
 				}
 			}
@@ -82,7 +82,7 @@ export const POST = [
 			return res.json({
 				imageCount: tilesToOptimize.length,
 				totalTilesWithImages: tilesWithImages.length,
-				alreadyOptimized: tilesWithImages.filter((t) => t.image.endsWith(OPTIMIZED_SUFFIX)).length
+				alreadyOptimized: tilesWithImages.filter((t) => t.image.endsWith(OPTIMIZED_SUFFIX)).length,
 			});
 		}
 
@@ -100,7 +100,9 @@ export const POST = [
 				// Fetch the original image
 				const imageResponse = await fetch(tile.image);
 				if (!imageResponse.ok) {
-					console.error(`Failed to fetch image for tile at (${tile.x},${tile.y}) on page ${tile.pageId}: ${imageResponse.status}`);
+					console.error(
+						`Failed to fetch image for tile at (${tile.x},${tile.y}) on page ${tile.pageId}: ${imageResponse.status}`,
+					);
 					failed++;
 					continue;
 				}
@@ -112,7 +114,7 @@ export const POST = [
 				const optimizedBuffer = await sharp(originalBuffer)
 					.resize(TARGET_SIZE, TARGET_SIZE, {
 						fit: 'inside',
-						withoutEnlargement: true
+						withoutEnlargement: true,
 					})
 					.webp({ quality: WEBP_QUALITY })
 					.toBuffer();
@@ -130,19 +132,19 @@ export const POST = [
 						Bucket: R2_BUCKET,
 						Key: newKey,
 						Body: optimizedBuffer,
-						ContentType: 'image/webp'
-					})
+						ContentType: 'image/webp',
+					}),
 				);
 
 				// Track update for this page
 				if (!updatesByPage.has(tile.pageId)) {
 					updatesByPage.set(tile.pageId, []);
 				}
-				updatesByPage.get(tile.pageId)!.push({
+				updatesByPage.get(tile.pageId)?.push({
 					x: tile.x,
 					y: tile.y,
 					page: tile.page,
-					newUrl: `https://${MEDIA_HOST}/${newKey}`
+					newUrl: `https://${MEDIA_HOST}/${newKey}`,
 				});
 				optimized++;
 			} catch (error) {
@@ -154,7 +156,7 @@ export const POST = [
 		// Apply updates to each page's JSON tiles
 		for (const [pageId, updates] of updatesByPage) {
 			const tilePage = await prisma.tilePage.findUnique({
-				where: { id: pageId }
+				where: { id: pageId },
 			});
 
 			if (!tilePage) continue;
@@ -163,9 +165,7 @@ export const POST = [
 
 			// Apply updates
 			for (const update of updates) {
-				const tileIndex = tiles.findIndex(
-					(t) => t.x === update.x && t.y === update.y && t.page === update.page
-				);
+				const tileIndex = tiles.findIndex((t) => t.x === update.x && t.y === update.y && t.page === update.page);
 				if (tileIndex !== -1) {
 					tiles[tileIndex].image = update.newUrl;
 				}
@@ -174,7 +174,7 @@ export const POST = [
 			// Save updated tiles
 			await prisma.tilePage.update({
 				where: { id: pageId },
-				data: { tiles }
+				data: { tiles },
 			});
 
 			// Update project lastEditedAt
@@ -186,7 +186,7 @@ export const POST = [
 			failed,
 			oldTotalSize,
 			newTotalSize,
-			savedBytes: oldTotalSize - newTotalSize
+			savedBytes: oldTotalSize - newTotalSize,
 		});
-	}
+	},
 ];
