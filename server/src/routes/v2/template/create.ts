@@ -46,19 +46,17 @@ export const POST = [
 				userId: req.userId,
 				name: body.name,
 				isTemplate: true,
-				tiles: {
-					create: body.tiles.map((tile) => ({
-						x: tile.x,
-						y: tile.y,
-						page: tile.page,
-						text: tile.text,
-						backgroundColor: tile.backgroundColor,
-						borderColor: tile.borderColor,
-						image: tile.image,
-						navigation: tile.navigation,
-						displayText: tile.displayText,
-					})),
-				},
+				tiles: body.tiles.map((tile) => ({
+					x: tile.x,
+					y: tile.y,
+					page: tile.page,
+					text: tile.text,
+					backgroundColor: tile.backgroundColor,
+					borderColor: tile.borderColor,
+					image: tile.image,
+					navigation: tile.navigation,
+					displayText: tile.displayText,
+				})),
 				connectedProjects: {
 					create: {
 						projectId: body.projectId,
@@ -66,7 +64,6 @@ export const POST = [
 				},
 			},
 			include: {
-				tiles: true,
 				connectedProjects: {
 					include: {
 						project: {

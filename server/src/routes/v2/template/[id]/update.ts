@@ -32,7 +32,6 @@ export const POST = [
 				name: body.name,
 			},
 			include: {
-				tiles: true,
 				connectedProjects: {
 					include: {
 						project: {

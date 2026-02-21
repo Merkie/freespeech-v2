@@ -13,12 +13,10 @@ export const GET = [
 				userId: req.userId,
 			},
 			include: {
-				tiles: true,
 				templateLink: {
 					include: {
 						templatePage: {
 							include: {
-								tiles: true,
 								connectedProjects: {
 									include: {
 										project: {

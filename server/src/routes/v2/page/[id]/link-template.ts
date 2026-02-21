@@ -36,7 +36,6 @@ export const POST = [
 				isTemplate: true,
 			},
 			include: {
-				tiles: true,
 				connectedProjects: {
 					include: {
 						project: {
@@ -69,7 +68,6 @@ export const POST = [
 			include: {
 				templatePage: {
 					include: {
-						tiles: true,
 						connectedProjects: {
 							include: {
 								project: {
