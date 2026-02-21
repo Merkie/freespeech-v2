@@ -2,13 +2,22 @@
 	"name": "freespeech-v2",
 	"version": "1.0.0",
 	"private": true,
-	"workspaces": ["server", "client"],
+	"workspaces": [
+		"server",
+		"client"
+	],
 	"scripts": {
 		"dev": "cd server && bun --watch src/index.ts & cd client && bun run dev",
 		"start": "cd client && bun run build && cd ../server && NODE_ENV=production bun src/index.ts",
 		"build:client": "cd client && bun run build",
 		"db:generate": "cd server && bunx prisma generate",
 		"db:push": "cd server && bunx prisma db push",
-		"db:studio": "cd server && bunx prisma studio"
+		"db:studio": "cd server && bunx prisma studio",
+		"format": "bunx biome format --write .",
+		"lint": "bunx biome lint .",
+		"check": "bunx biome check --write ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.4"
 	}
 }
