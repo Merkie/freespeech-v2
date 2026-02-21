@@ -1,0 +1,80 @@
+import './index.css';
+
+import { render } from 'solid-js/web';
+import { Route, Router } from '@solidjs/router';
+import { TooltipProvider } from '@/hooks/useTooltip';
+
+// --- Direct Component Imports ---
+
+// Root Layouts
+import Layout from './routes/layout.tsx';
+import HomePage from './routes/page.tsx';
+
+// Auth Routes
+import LoginPage from './routes/(auth)/login/page.tsx';
+import LoginEmailPage from './routes/(auth)/login/email/page.tsx';
+import RegisterPage from './routes/(auth)/register/page.tsx';
+import RegisterEmailPage from './routes/(auth)/register/email/page.tsx';
+import GoogleOauthPage from './routes/(auth)/oauth/google/page.tsx';
+
+// Application Layouts and Pages
+import AppLayout from './routes/app/layout.tsx';
+import DashboardLayout from './routes/app/dashboard/layout.tsx';
+import ProjectsPage from './routes/app/dashboard/projects/page.tsx';
+import SettingsPage from './routes/app/dashboard/settings/page.tsx';
+import SettingsVoicePage from './routes/app/dashboard/settings/voice/page.tsx';
+import SettingsBehaviorPage from './routes/app/dashboard/settings/behavior/page.tsx';
+import ProfilePage from './routes/app/dashboard/profile/page.tsx';
+import TemplatesPage from './routes/app/dashboard/templates/page.tsx';
+import AppProjectPage from './routes/app/project/[project_id]/page.tsx';
+import LegacyPageRedirect from './routes/app/project/[project_id]/[page_id].tsx';
+import AppEntryPage from './routes/app/page.tsx';
+import NotFound from './routes/NotFound.tsx';
+
+// --- Application Entry Point ---
+
+const wrapper = document.getElementById('root');
+
+if (!wrapper) {
+  // eslint-disable-next-line no-console
+  console.error('Wrapper div not found');
+  throw new Error('Wrapper div not found');
+}
+
+render(
+  () => (
+    <>
+      <TooltipProvider />
+      <Router>
+        <Route path="/" component={Layout}>
+        <Route path="/" component={HomePage} />
+        <Route path="/login" component={LoginPage} />
+        <Route path="/login/email" component={LoginEmailPage} />
+        <Route path="/register" component={RegisterPage} />
+        <Route path="/register/email" component={RegisterEmailPage} />
+        <Route path="/oauth/google" component={GoogleOauthPage} />
+        <Route path="/app" component={AppLayout}>
+          {/* Index route - handles /app entry point for PWA */}
+          <Route path="/" component={AppEntryPage} />
+          <Route path="/dashboard" component={DashboardLayout}>
+            <Route path="/projects" component={ProjectsPage} />
+            <Route path="/templates" component={TemplatesPage} />
+            <Route path="/settings" component={SettingsPage} />
+            <Route path="/settings/voice" component={SettingsVoicePage} />
+            <Route path="/settings/behavior" component={SettingsBehaviorPage} />
+            <Route path="/profile" component={ProfilePage} />
+          </Route>
+
+          <Route path="/project/:project_id" component={AppProjectPage} />
+          {/* Legacy route - redirects old URLs with page_id to new format */}
+          <Route path="/project/:project_id/:page_id" component={LegacyPageRedirect} />
+        </Route>
+
+        {/* 404 catch-all - redirect to home or dashboard */}
+        <Route path="*" component={NotFound} />
+      </Route>
+    </Router>
+    </>
+  ),
+  wrapper
+);

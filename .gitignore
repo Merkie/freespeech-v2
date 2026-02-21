@@ -1,0 +1,20 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# OS files
+.DS_Store
+.DS_STORE
+
+# IDE
+.vscode
+
+# Misc
+repo.txt

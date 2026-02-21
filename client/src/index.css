@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Grey palette */
+  --color-grey-900: #1e1e21;
+  --color-grey-800: #2b2c2f;
+  --color-grey-750: #353b40;
+  --color-grey-700: #464c53;
+  --color-grey-600: #68717d;
+  --color-grey-500: #7a8390;
+  --color-grey-400: #9096a2;
+  --color-grey-300: #a0a7b0;
+  --color-grey-200: #c8cbd0;
+  --color-grey-100: #d6d8db;
+  --color-grey-50: #e8e9e9;
+
+  /* Primary (Orange) */
+  --color-primary-600: #D97608;
+  --color-primary-500: #FF890A;
+  --color-primary-400: #F59F67;
+}
+
+.animate-shine {
+  @apply relative overflow-hidden;
+}
+
+/* Animate Shine class */
+.animate-shine:after {
+  content: '';
+  top: 0;
+  transform: translateX(-100%);
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  z-index: 1;
+  animation: slide 1.5s infinite;
+
+  /* Gradient for shine effect */
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Add the missing keyframes */
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}

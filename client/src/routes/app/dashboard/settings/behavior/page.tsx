@@ -1,0 +1,50 @@
+import { A } from '@solidjs/router';
+import type { Component } from 'solid-js';
+import {
+  enableSentenceCopyButton,
+  setEnableSentenceCopyButton,
+} from '@/lib/state';
+
+const BehaviorSettingsPage: Component = () => {
+  return (
+    <div class="flex flex-col gap-12 p-8 pb-[200px]">
+      <div class="flex flex-col gap-8">
+        <A
+          href="/app/dashboard/settings"
+          class="w-fit p-2 pl-0 text-xl text-zinc-600 hover:text-zinc-800"
+        >
+          <i class="bi bi-arrow-left-short"></i>
+          <span>Back</span>
+        </A>
+
+        <p class="border-b border-zinc-300 pb-8 text-4xl text-zinc-600">
+          Behavior Settings
+        </p>
+      </div>
+
+      <div class="flex flex-col">
+        <div class="flex items-center gap-4">
+          <p class="text-3xl text-zinc-800">Display "Copy Sentence" button:</p>
+          <button
+            aria-label="Toggle copy sentence button"
+            onClick={() =>
+              setEnableSentenceCopyButton(!enableSentenceCopyButton())
+            }
+            class={`relative w-[48px] scale-[120%] rounded-full p-1 shadow-sm transition-all ${
+              enableSentenceCopyButton() ? 'bg-green-500' : 'bg-zinc-300'
+            }`}
+          >
+            <div
+              style={{
+                transform: `translateX(${!enableSentenceCopyButton() ? '0' : '100%'})`,
+              }}
+              class="h-[20px] w-[20px] rounded-full bg-white shadow-sm transition-all"
+            ></div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BehaviorSettingsPage;
