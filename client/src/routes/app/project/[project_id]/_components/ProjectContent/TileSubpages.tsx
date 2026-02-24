@@ -11,11 +11,9 @@ import {
 	getPageFromBlob,
 	localSettings,
 	multiSelectMode,
-	pendingTileEdits,
 	project,
 	projectBlob,
 	setEditingTilePositions,
-	setPendingTileEdits,
 	setSentence,
 	speakingTilePosition,
 	tilePositionKey,
@@ -102,29 +100,14 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 				const isAlreadySelected = currentSelection.includes(tileKey);
 
 				if (isAlreadySelected) {
-					// Remove from selection
 					const newSelection = currentSelection.filter((key) => key !== tileKey);
 					setEditingTilePositions(newSelection);
-					// Clear pending edits if no tiles left
-					if (newSelection.length === 0) {
-						setPendingTileEdits({});
-					}
 				} else {
-					// Add to selection - keep pending edits (for bulk color changes)
 					setEditingTilePositions([...currentSelection, tileKey]);
 				}
 			} else {
 				// Regular click: select only this tile
 				setEditingTilePositions([tileKey]);
-				// Initialize pending edits with this tile's current values
-				setPendingTileEdits({
-					text: tile.text,
-					displayText: tile.displayText,
-					image: tile.image,
-					backgroundColor: tile.backgroundColor,
-					borderColor: tile.borderColor,
-					navigation: tile.navigation,
-				});
 			}
 			return;
 		}
@@ -203,39 +186,6 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 		return false;
 	};
 
-	// Get the display version of a tile - apply pending edits for live preview
-	const getDisplayTile = (tile: RenderTile): RenderTile => {
-		// Template tiles don't have pending edits
-		if (tile.isTemplate) return tile;
-
-		const selected = editingTilePositions();
-		const pending = pendingTileEdits();
-		const tileKey = tilePositionKey(tile);
-
-		// Only apply pending edits to selected tiles
-		if (selected.includes(tileKey)) {
-			// For bulk editing (multiple tiles), only apply color changes
-			if (selected.length > 1) {
-				return {
-					...tile,
-					backgroundColor: pending.backgroundColor ?? tile.backgroundColor,
-					borderColor: pending.borderColor ?? tile.borderColor,
-				};
-			}
-			// For single tile editing, apply all pending changes
-			return {
-				...tile,
-				text: pending.text ?? tile.text,
-				displayText: pending.displayText ?? tile.displayText,
-				image: pending.image ?? tile.image,
-				backgroundColor: pending.backgroundColor ?? tile.backgroundColor,
-				borderColor: pending.borderColor ?? tile.borderColor,
-				navigation: pending.navigation ?? tile.navigation,
-			};
-		}
-		return tile;
-	};
-
 	// Calculate unused coordinates for a given subpage
 	const getUnusedCoords = (tiles: TileType[], pageIndex: number) => {
 		const columns = project().columns;
@@ -281,22 +231,17 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 				<TileSubpageContainer containerHeight={containerHeight} pageIndex={pageIndex}>
 					{/* Merged tiles (page tiles + template tiles on page 0) */}
 					<For each={getMergedTilesForSubpage(tiles, pageIndex())}>
-						{(tile) => {
-							// Use a function to get current display state for live updates
-							const displayTile = () => getDisplayTile(tile);
-
-							return (
-								<Tile
-									tile={displayTile()}
-									isTemplate={tile.isTemplate}
-									isSelected={isTileSelected(tile)}
-									isDimmed={isTileDimmed(tile)}
-									isSpeaking={isTileSpeaking(tile)}
-									isEditMode={editingTiles()}
-									onClick={(e) => handleTileClick(tile, e)}
-								/>
-							);
-						}}
+						{(tile) => (
+						<Tile
+							tile={tile}
+							isTemplate={tile.isTemplate}
+							isSelected={isTileSelected(tile)}
+							isDimmed={isTileDimmed(tile)}
+							isSpeaking={isTileSpeaking(tile)}
+							isEditMode={editingTiles()}
+							onClick={(e) => handleTileClick(tile, e)}
+						/>
+					)}
 					</For>
 
 					{/* Empty tile slots - only shown in edit mode */}

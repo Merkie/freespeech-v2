@@ -6,7 +6,6 @@ import {
 	project,
 	projectHomePageId,
 	setEditingTilePositions,
-	setPendingTileEdits,
 	tilePositionKey,
 } from '@/lib/state';
 
@@ -34,27 +33,7 @@ const AddTileButton: Component<AddTileButtonProps> = (props) => {
 			void api.project.updateThumbnail(project()?.id || '');
 		}
 
-		const fullTile = {
-			x: tile.x,
-			y: tile.y,
-			page: tile.page,
-			text: tile.text ?? '',
-			displayText: tile.displayText ?? '',
-			backgroundColor: tile.backgroundColor ?? '#fafafa',
-			borderColor: tile.borderColor ?? '#71717a',
-			image: tile.image ?? '',
-			navigation: tile.navigation ?? '',
-		};
-
-		setEditingTilePositions([tilePositionKey(fullTile)]);
-		setPendingTileEdits({
-			text: fullTile.text,
-			displayText: fullTile.displayText,
-			image: fullTile.image,
-			backgroundColor: fullTile.backgroundColor,
-			borderColor: fullTile.borderColor,
-			navigation: fullTile.navigation,
-		});
+		setEditingTilePositions([tilePositionKey({ x: tile.x, y: tile.y, page: tile.page })]);
 	};
 
 	return (

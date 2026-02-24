@@ -1,17 +1,17 @@
 import { type Component, createEffect, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
+import { blobUpdateTile } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { type SkinTone, SkinTones } from '@/lib/opensymbols';
 import { uploadBlob } from '@/lib/presigned-uploads';
 import {
+	currentPageId,
 	editingTilePositions,
 	findTileByPositionKey,
 	getCurrentPageTiles,
 	localSettings,
-	pendingTileEdits,
 	setLoading,
 	setLocalSettings,
-	setPendingTileEdits,
 	setUsingOnlineSearch,
 } from '@/lib/state';
 
@@ -32,7 +32,7 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 		if (positions.length === 0) return '';
 		const tiles = getCurrentPageTiles();
 		const tile = findTileByPositionKey(tiles, positions[0]);
-		return pendingTileEdits().text ?? tile?.text ?? '';
+		return tile?.text ?? '';
 	};
 
 	const [searchTerm, setSearchTerm] = createSignal(getFirstSelectedTileText());
@@ -75,6 +75,10 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 		const positions = editingTilePositions();
 		if (positions.length === 0) return;
 
+		const tiles = getCurrentPageTiles();
+		const tile = findTileByPositionKey(tiles, positions[0]);
+		if (!tile) return;
+
 		const filename = `${url.split('/').pop()}`;
 
 		const blob = await api.media.fetchFromUrl(url);
@@ -85,10 +89,11 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 
 		if (key) {
 			setUsingOnlineSearch(false);
-			setPendingTileEdits({
-				...pendingTileEdits(),
-				image: `https://media.freespeechaac.com/${key}`,
-			});
+			blobUpdateTile(
+				currentPageId(),
+				{ x: tile.x, y: tile.y, page: tile.page },
+				{ image: `https://media.freespeechaac.com/${key}` },
+			);
 		}
 	};
 

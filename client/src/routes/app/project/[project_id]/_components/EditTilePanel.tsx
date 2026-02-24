@@ -1,4 +1,4 @@
-import { type Component, createEffect, createSignal, For, Show } from 'solid-js';
+import { type Component, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
 import { blobDeleteTiles, blobUpdateTile, blobUpdateTilesBatch } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
@@ -10,13 +10,10 @@ import {
 	getCurrentPageTiles,
 	getProjectPagesFromBlob,
 	isBulkEditing,
-	pendingTileEdits,
 	project,
 	projectHomePageId,
 	setEditingTilePositions,
 	setLoading,
-	setPendingTileEdits,
-	setUnsavedChanges,
 	setUsingOnlineSearch,
 	tilePositionKey,
 } from '@/lib/state';
@@ -63,7 +60,6 @@ interface EditTilePanelProps {
 const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 	const [showingDisplayTextOption, setShowingDisplayTextOption] = createSignal(false);
 	const [removingBackground, setRemovingBackground] = createSignal(false);
-	const [hasUnsavedChanges, setHasUnsavedChanges] = createSignal(false);
 	let fileinput: HTMLInputElement | undefined;
 
 	const tiles = () => getCurrentPageTiles();
@@ -84,54 +80,16 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		return tiles().filter((t) => positions.includes(tilePositionKey(t)));
 	};
 
-	// Track unsaved changes
-	createEffect(() => {
-		const positions = editingTilePositions();
-		const pending = pendingTileEdits();
-
-		if (positions.length === 0) {
-			setHasUnsavedChanges(false);
-			setUnsavedChanges(false);
-			return;
-		}
-
-		// For bulk mode, check if colors have been changed
-		if (isBulkEditing()) {
-			const hasChanges = pending.backgroundColor !== undefined || pending.borderColor !== undefined;
-			setHasUnsavedChanges(hasChanges);
-			setUnsavedChanges(hasChanges);
-			return;
-		}
-
-		// For single tile, compare pending changes to original
-		const originalTile = firstSelectedTile();
-		if (!originalTile) {
-			setHasUnsavedChanges(false);
-			setUnsavedChanges(false);
-			return;
-		}
-
-		const hasChanges =
-			(pending.text !== undefined && pending.text !== originalTile.text) ||
-			(pending.displayText !== undefined && pending.displayText !== originalTile.displayText) ||
-			(pending.image !== undefined && pending.image !== originalTile.image) ||
-			(pending.backgroundColor !== undefined && pending.backgroundColor !== originalTile.backgroundColor) ||
-			(pending.borderColor !== undefined && pending.borderColor !== originalTile.borderColor) ||
-			(pending.navigation !== undefined && pending.navigation !== originalTile.navigation);
-
-		setHasUnsavedChanges(hasChanges);
-		setUnsavedChanges(hasChanges);
-	});
-
 	const handleRemoveBackground = async () => {
-		const pending = pendingTileEdits();
-		const image = pending.image ?? firstSelectedTile()?.image;
+		const tile = firstSelectedTile();
+		const image = tile?.image;
 		if (!image) return;
 
 		setRemovingBackground(true);
 		try {
 			const { image_url } = await api.media.removeBackground(image);
-			setPendingTileEdits({ ...pending, image: image_url });
+			const pos = tile;
+			blobUpdateTile(pageId(), { x: pos.x, y: pos.y, page: pos.page }, { image: image_url });
 		} catch (error) {
 			console.error('Failed to remove background:', error);
 		} finally {
@@ -148,71 +106,13 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		setLoading(false);
 
 		if (key) {
-			setPendingTileEdits({
-				...pendingTileEdits(),
-				image: `https://media.freespeechaac.com/${key}`,
-			});
+			const tile = firstSelectedTile();
+			if (tile) {
+				blobUpdateTile(pageId(), { x: tile.x, y: tile.y, page: tile.page }, {
+					image: `https://media.freespeechaac.com/${key}`,
+				});
+			}
 		}
-	};
-
-	const handleSaveChanges = () => {
-		const pending = pendingTileEdits();
-		const tilesToUpdate = selectedTiles();
-		const currentPid = pageId();
-
-		if (tilesToUpdate.length === 0 || !currentPid) return;
-
-		if (isBulkEditing()) {
-			// Bulk color update via blob
-			blobUpdateTilesBatch(
-				currentPid,
-				tilesToUpdate.map((t) => ({ x: t.x, y: t.y, page: t.page })),
-				{
-					backgroundColor: pending.backgroundColor ?? tilesToUpdate[0].backgroundColor,
-					borderColor: pending.borderColor ?? tilesToUpdate[0].borderColor,
-				},
-			);
-		} else {
-			// Single tile update via blob
-			const tile = tilesToUpdate[0];
-			blobUpdateTile(currentPid, { x: tile.x, y: tile.y, page: tile.page }, {
-				text: pending.text ?? tile.text,
-				displayText: pending.displayText ?? tile.displayText,
-				image: pending.image ?? tile.image,
-				backgroundColor: pending.backgroundColor ?? tile.backgroundColor,
-				borderColor: pending.borderColor ?? tile.borderColor,
-				navigation: pending.navigation ?? tile.navigation,
-			});
-		}
-
-		// Update thumbnail if this is the home page
-		if (isHomePage()) {
-			void api.project.updateThumbnail(project()?.id || '');
-		}
-
-		// Clear editing state
-		setEditingTilePositions([]);
-		setPendingTileEdits({});
-	};
-
-	const handleCancelChanges = () => {
-		// In bulk mode, just clear the pending color changes
-		if (isBulkEditing()) {
-			setPendingTileEdits({});
-			return;
-		}
-
-		const tile = firstSelectedTile();
-		if (!tile) return;
-		// Reset pending edits to original tile values
-		setPendingTileEdits({
-			text: tile.text,
-			displayText: tile.displayText,
-			image: tile.image,
-			backgroundColor: tile.backgroundColor,
-			borderColor: tile.borderColor,
-			navigation: tile.navigation,
-		});
 	};
 
 	const handleDeleteTiles = () => {
@@ -220,71 +120,77 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		const currentPid = pageId();
 		if (tilesToDelete.length === 0 || !currentPid) return;
 
-		// Delete tiles via blob mutation
 		blobDeleteTiles(
 			currentPid,
 			tilesToDelete.map((t) => ({ x: t.x, y: t.y, page: t.page })),
 		);
 
-		// Update thumbnail if this is the home page
 		if (isHomePage()) {
 			void api.project.updateThumbnail(project()?.id || '');
 		}
 
-		// Clear editing state
 		setEditingTilePositions([]);
-		setPendingTileEdits({});
 	};
 
 	const setTileColor = (colorKey: string) => {
 		const colorValues = tileColors[colorKey as keyof typeof tileColors];
-		setPendingTileEdits({
-			...pendingTileEdits(),
-			backgroundColor: colorValues.background_color,
-			borderColor: colorValues.border_color,
-		});
+		const currentPid = pageId();
+		if (!currentPid) return;
+
+		if (isBulkEditing()) {
+			blobUpdateTilesBatch(
+				currentPid,
+				selectedTiles().map((t) => ({ x: t.x, y: t.y, page: t.page })),
+				{ backgroundColor: colorValues.background_color, borderColor: colorValues.border_color },
+			);
+		} else {
+			const tile = firstSelectedTile();
+			if (tile) {
+				blobUpdateTile(currentPid, { x: tile.x, y: tile.y, page: tile.page }, {
+					backgroundColor: colorValues.background_color,
+					borderColor: colorValues.border_color,
+				});
+			}
+		}
 	};
 
 	const updateTileText = (text: string) => {
-		setPendingTileEdits({ ...pendingTileEdits(), text });
+		const tile = firstSelectedTile();
+		if (!tile) return;
+		blobUpdateTile(pageId(), { x: tile.x, y: tile.y, page: tile.page }, { text });
 	};
 
 	const updateTileDisplayText = (displayText: string) => {
-		setPendingTileEdits({ ...pendingTileEdits(), displayText });
+		const tile = firstSelectedTile();
+		if (!tile) return;
+		blobUpdateTile(pageId(), { x: tile.x, y: tile.y, page: tile.page }, { displayText });
 	};
 
 	const updateTileNavigation = (navigation: string) => {
-		setPendingTileEdits({ ...pendingTileEdits(), navigation });
+		const tile = firstSelectedTile();
+		if (!tile) return;
+		blobUpdateTile(pageId(), { x: tile.x, y: tile.y, page: tile.page }, { navigation });
 	};
 
 	const removeImage = () => {
-		setPendingTileEdits({ ...pendingTileEdits(), image: '' });
-	};
-
-	// Get the current display value for a field (pending or original)
-	const getDisplayValue = (field: keyof ReturnType<typeof pendingTileEdits>): string => {
-		const pending = pendingTileEdits();
 		const tile = firstSelectedTile();
-		if (pending[field] !== undefined) {
-			return (pending[field] as string) || '';
-		}
-		if (tile) {
-			return (tile[field as keyof typeof tile] as string) || '';
-		}
-		return '';
+		if (!tile) return;
+		blobUpdateTile(pageId(), { x: tile.x, y: tile.y, page: tile.page }, { image: '' });
 	};
 
 	// Check if current color matches a preset
 	const isColorSelected = (colorKey: string) => {
 		const colorValues = tileColors[colorKey as keyof typeof tileColors];
-		const bgColor = getDisplayValue('backgroundColor');
-		const borderColor = getDisplayValue('borderColor');
-		return bgColor === colorValues.background_color && borderColor === colorValues.border_color;
+		const tile = firstSelectedTile();
+		if (!tile) return false;
+		return tile.backgroundColor === colorValues.background_color && tile.borderColor === colorValues.border_color;
 	};
 
 	// Check if a page color matches the current selection
 	const isPageColorSelected = (bgColor: string, borderColor: string) => {
-		return getDisplayValue('backgroundColor') === bgColor && getDisplayValue('borderColor') === borderColor;
+		const tile = firstSelectedTile();
+		if (!tile) return false;
+		return tile.backgroundColor === bgColor && tile.borderColor === borderColor;
 	};
 
 	// Get unique colors from tiles on the current page that aren't in default palette, sorted by frequency
@@ -297,11 +203,9 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 			const border = tile.borderColor;
 			if (!bg || !border) continue;
 
-			// Skip if it matches any default color
 			const isDefault = defaultColors.some((c) => c.background_color === bg && c.border_color === border);
 			if (isDefault) continue;
 
-			// Use combined key to deduplicate and count frequency
 			const key = `${bg}|${border}`;
 			const existing = colorMap.get(key);
 			if (existing) {
@@ -311,16 +215,28 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 			}
 		}
 
-		// Sort by frequency (most used first)
 		return Array.from(colorMap.values()).sort((a, b) => b.count - a.count);
 	};
 
 	const setPageColor = (bgColor: string, borderColor: string) => {
-		setPendingTileEdits({
-			...pendingTileEdits(),
-			backgroundColor: bgColor,
-			borderColor: borderColor,
-		});
+		const currentPid = pageId();
+		if (!currentPid) return;
+
+		if (isBulkEditing()) {
+			blobUpdateTilesBatch(
+				currentPid,
+				selectedTiles().map((t) => ({ x: t.x, y: t.y, page: t.page })),
+				{ backgroundColor: bgColor, borderColor },
+			);
+		} else {
+			const tile = firstSelectedTile();
+			if (tile) {
+				blobUpdateTile(currentPid, { x: tile.x, y: tile.y, page: tile.page }, {
+					backgroundColor: bgColor,
+					borderColor,
+				});
+			}
+		}
 	};
 
 	// Classes to disable sections in bulk mode
@@ -337,21 +253,21 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 					<p class="mb-2">Tile Text:</p>
 					<input
 						type="text"
-						value={getDisplayValue('text')}
+						value={firstSelectedTile()?.text ?? ''}
 						onInput={(e) => updateTileText(e.currentTarget.value)}
 						class="w-full rounded-md border border-zinc-300 bg-white p-1 px-2 text-zinc-800"
 					/>
 
-					<Show when={showingDisplayTextOption() || getDisplayValue('displayText')}>
+					<Show when={showingDisplayTextOption() || (firstSelectedTile()?.displayText ?? '')}>
 						<p class="my-2">Tile Display Text:</p>
 						<input
 							type="text"
-							value={getDisplayValue('displayText')}
+							value={firstSelectedTile()?.displayText ?? ''}
 							onInput={(e) => updateTileDisplayText(e.currentTarget.value)}
 							class="w-full rounded-md border border-zinc-300 bg-white p-1 px-2 text-zinc-800"
 						/>
 					</Show>
-					<Show when={!showingDisplayTextOption() && !getDisplayValue('displayText')}>
+					<Show when={!showingDisplayTextOption() && !(firstSelectedTile()?.displayText ?? '')}>
 						<button
 							onClick={() => setShowingDisplayTextOption(true)}
 							class="mt-2 text-left text-sm text-zinc-300 hover:underline"
@@ -366,7 +282,7 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 					<p class="my-2">Image:</p>
 					<div class="flex flex-col gap-2">
 						<Show
-							when={getDisplayValue('image')}
+							when={firstSelectedTile()?.image}
 							fallback={
 								<div class="flex flex-wrap gap-2">
 									<button
@@ -391,7 +307,7 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 								}}
 							>
 								<img
-									src={getDisplayValue('image')}
+									src={firstSelectedTile()?.image}
 									width={150}
 									class="mx-auto rounded-md"
 									alt="Uploaded media preview"
@@ -477,7 +393,7 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 					<div>
 						<select
 							class="rounded-md border border-zinc-300 bg-white p-1 px-2 text-zinc-800"
-							value={getDisplayValue('navigation')}
+							value={firstSelectedTile()?.navigation ?? ''}
 							onChange={(e) => updateTileNavigation(e.currentTarget.value)}
 						>
 							<option value="">No Navigation</option>
@@ -485,25 +401,6 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 						</select>
 					</div>
 				</div>
-
-				{/* Save/Cancel buttons */}
-				<button
-					disabled={!hasUnsavedChanges()}
-					class="mt-6 flex items-center justify-center gap-2 rounded-md border border-blue-500 bg-blue-600 p-1 disabled:opacity-50"
-					onClick={handleSaveChanges}
-				>
-					<i class="bi bi-check-lg" />
-					<span>Save Changes</span>
-				</button>
-
-				<button
-					onClick={handleCancelChanges}
-					class="mt-4 flex items-center justify-center gap-2 rounded-md border border-zinc-500 bg-zinc-600 p-1 disabled:opacity-50"
-					disabled={!hasUnsavedChanges()}
-				>
-					<i class="bi bi-x-lg" />
-					<span>Cancel Changes</span>
-				</button>
 
 				<div class="flex-1" />
 
