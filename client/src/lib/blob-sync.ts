@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js';
 import api from './api';
 import { cacheBlob, getCachedBlob, getDirtyBlobIds, markBlobClean } from './cache/blob-cache';
 import { projectBlob, setProjectBlob, setSyncStatus } from './state';
@@ -6,6 +7,43 @@ import type { ProjectBlob } from './types';
 // --- Debounce timer ---
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 const SYNC_DEBOUNCE_MS = 2000;
+
+// --- Edit mode state ---
+let editModeActive = false;
+let editModeSnapshot: ProjectBlob | null = null;
+export const [editModeHasChanges, setEditModeHasChanges] = createSignal(false);
+
+export function enterEditMode(): void {
+	const current = projectBlob();
+	if (!current) return;
+	editModeSnapshot = structuredClone(current);
+	editModeActive = true;
+	setEditModeHasChanges(false);
+}
+
+export function saveEditMode(): void {
+	editModeActive = false;
+	editModeSnapshot = null;
+	setEditModeHasChanges(false);
+
+	const blob = projectBlob();
+	if (!blob) return;
+
+	// Persist to IndexedDB and sync to server
+	cacheBlob(blob, true).catch((err) => console.error('Failed to cache blob:', err));
+	setSyncStatus('dirty');
+	forceSyncNow().catch((err) => console.error('Sync failed:', err));
+}
+
+export function discardEditMode(): void {
+	editModeActive = false;
+	setEditModeHasChanges(false);
+
+	if (editModeSnapshot) {
+		setProjectBlob(editModeSnapshot);
+	}
+	editModeSnapshot = null;
+}
 
 // --- Load project blob ---
 // Returns true if loaded successfully (from cache or server)
@@ -46,8 +84,14 @@ export function mutateBlob(mutator: (blob: ProjectBlob) => void): void {
 	const clone = structuredClone(current);
 	mutator(clone);
 
-	// Update in-memory signal
+	// Update in-memory signal (instant UI update)
 	setProjectBlob(clone);
+
+	// In edit mode: skip cache and server sync — changes are held in memory only
+	if (editModeActive) {
+		setEditModeHasChanges(true);
+		return;
+	}
 
 	// Persist to IndexedDB (dirty)
 	cacheBlob(clone, true).catch((err) => console.error('Failed to cache blob:', err));

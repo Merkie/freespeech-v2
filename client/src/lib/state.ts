@@ -59,20 +59,12 @@ export const [isSynthesizingSpeech, setIsSynthesizingSpeech] = createSignal(fals
 export const [sentence, setSentence] = createSignal<Tile[]>([]);
 export const [loading, setLoading] = createSignal(false);
 
-// Modals & Panels
-export const [unsavedChanges, setUnsavedChanges] = createSignal(false);
-export const [discardUnsavedChangesHandler, setDiscardUnsavedChangesHandler] = createSignal<() => void>(() => {});
-export const [unsavedChangesModalOpen, setUnsavedChangesModalOpen] = createSignal(false);
-
 export const [editingTiles, setEditingTiles] = createSignal(false);
 export const [usingOnlineSearch, setUsingOnlineSearch] = createSignal(false);
 
 // Tile editing - array of tile position keys being edited (supports single and multi-select)
 // Position keys are in format "x-y-page" (e.g., "0-1-0")
 export const [editingTilePositions, setEditingTilePositions] = createSignal<TilePositionKey[]>([]);
-
-// Pending edits to apply to tiles (for live preview and saving)
-export const [pendingTileEdits, setPendingTileEdits] = createSignal<Partial<Tile>>({});
 
 // Helper to check if we're editing multiple tiles
 export const isBulkEditing = () => editingTilePositions().length > 1;
@@ -159,7 +151,6 @@ export function resetProjectState() {
 	setSentence([]);
 	setEditingTiles(false);
 	setEditingTilePositions([]);
-	setPendingTileEdits({});
 	setMultiSelectMode(false);
 	setUsingOnlineSearch(false);
 	setEditingPages(false);
