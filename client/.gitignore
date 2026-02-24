@@ -1,5 +1,0 @@
-.env
-.DS_STORE
-.vscode
-dist
-node_modules
