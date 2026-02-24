@@ -1,1 +1,1 @@
-export { clearCache, evictLRUIfNeeded, getDB } from './db';
+export { clearCache, evictLRUIfNeeded, getCacheStats, getDB } from './db';

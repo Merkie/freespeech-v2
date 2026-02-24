@@ -41,6 +41,12 @@ export async function getDirtyBlobIds(): Promise<string[]> {
 	return all.filter((e) => e.dirty).map((e) => e.id);
 }
 
+export async function isBlobCached(projectId: string): Promise<boolean> {
+	const db = await getDB();
+	const key = await db.getKey('projectBlobs', projectId);
+	return key !== undefined;
+}
+
 export async function deleteCachedBlob(projectId: string): Promise<void> {
 	const db = await getDB();
 	await db.delete('projectBlobs', projectId);

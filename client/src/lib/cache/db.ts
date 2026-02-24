@@ -55,6 +55,17 @@ function estimateSize(obj: unknown): number {
 	return new Blob([JSON.stringify(obj)]).size;
 }
 
+// Get cache usage stats
+export async function getCacheStats(): Promise<{ usedBytes: number; maxBytes: number; entryCount: number }> {
+	const db = await getDB();
+	const allBlobs = await db.getAll('projectBlobs');
+	let usedBytes = 0;
+	for (const entry of allBlobs) {
+		usedBytes += estimateSize(entry);
+	}
+	return { usedBytes, maxBytes: MAX_CACHE_SIZE_BYTES, entryCount: allBlobs.length };
+}
+
 // Evict least recently used entries if cache exceeds max size
 export async function evictLRUIfNeeded(): Promise<{ evictedBlobs: number }> {
 	const db = await getDB();
