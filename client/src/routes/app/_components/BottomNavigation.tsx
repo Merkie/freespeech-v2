@@ -1,54 +1,93 @@
 import { A, useLocation } from '@solidjs/router';
 import type { Component } from 'solid-js';
+import { setPendingEditModeAction } from '@/components/Modal/_modal_inners/SaveEditMode';
+import { discardEditMode, editModeHasChanges, enterEditMode } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
+import { MODAL_ID } from '@/lib/constants';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import {
-	currentPageId,
 	editingTiles,
 	pageIdBeforeTemplateEdit,
 	project,
-	projectBlob,
 	projectHomePageId,
-	setDiscardUnsavedChangesHandler,
-	setEditingTileIds,
+	setActiveModalId,
+	setEditingTilePositions,
 	setEditingTiles,
+	setMultiSelectMode,
 	setPageIdBeforeTemplateEdit,
-	setPendingTileEdits,
-	setUnsavedChanges,
-	setUnsavedChangesModalOpen,
 	setUsingOnlineSearch,
-	unsavedChanges,
 } from '@/lib/state';
+
+function exitEditModeClean() {
+	setEditingTiles(false);
+	setEditingTilePositions([]);
+	setMultiSelectMode(false);
+	setUsingOnlineSearch(false);
+}
 
 const BottomNavigation: Component = () => {
 	const location = useLocation();
 
 	const handleHomeClick = (e: MouseEvent) => {
-		if (!unsavedChanges()) {
-			setEditingTiles(false);
-			setUsingOnlineSearch(false);
-			setEditingTileIds([]);
-			setPendingTileEdits({});
-			setUnsavedChanges(false);
-			// Reset to home page when clicking home button
+		if (!editingTiles()) {
+			// Not in edit mode — just navigate home
 			const homeId = projectHomePageId();
 			if (homeId) {
 				navigateToPageInProject(homeId);
 			}
+			return;
+		}
+
+		// In edit mode — check for unsaved changes
+		e.preventDefault();
+
+		const navigateHome = () => {
+			const homeId = projectHomePageId();
+			if (homeId) {
+				navigateToPageInProject(homeId);
+			}
+		};
+
+		if (editModeHasChanges()) {
+			setPendingEditModeAction(navigateHome);
+			setActiveModalId(MODAL_ID.SAVE_EDIT_MODE);
 		} else {
-			e.preventDefault();
-			setDiscardUnsavedChangesHandler(() => () => {
-				setEditingTiles(false);
-				setUsingOnlineSearch(false);
-				setEditingTileIds([]);
-				setPendingTileEdits({});
-				setUnsavedChanges(false);
-				const homeId = projectHomePageId();
-				if (homeId) {
-					navigateToPageInProject(homeId);
+			discardEditMode();
+			exitEditModeClean();
+			navigateHome();
+		}
+	};
+
+	const handleEditClick = () => {
+		if (editingTiles()) {
+			// Exiting edit mode
+			if (editModeHasChanges()) {
+				// Has changes — show save/discard modal
+				const previousPageId = pageIdBeforeTemplateEdit();
+				if (previousPageId) {
+					setPendingEditModeAction(() => {
+						navigateToPageInProject(previousPageId);
+						setPageIdBeforeTemplateEdit(null);
+					});
+				} else {
+					setPendingEditModeAction(null);
 				}
-			});
-			setUnsavedChangesModalOpen(true);
+				setActiveModalId(MODAL_ID.SAVE_EDIT_MODE);
+			} else {
+				// No changes — exit immediately
+				discardEditMode();
+				exitEditModeClean();
+
+				const previousPageId = pageIdBeforeTemplateEdit();
+				if (previousPageId) {
+					navigateToPageInProject(previousPageId);
+					setPageIdBeforeTemplateEdit(null);
+				}
+			}
+		} else {
+			// Entering edit mode
+			enterEditMode();
+			setEditingTiles(true);
 		}
 	};
 
@@ -75,28 +114,7 @@ const BottomNavigation: Component = () => {
 			{/* Edit Button */}
 			<button
 				aria-label="Edit tiles"
-				onClick={() => {
-					if (editingTiles()) {
-						// Exiting edit mode - clear editing state
-						setEditingTiles(false);
-						setEditingTileIds([]);
-						setPendingTileEdits({});
-						setUnsavedChanges(false);
-
-						// If we were editing a template, navigate back to the previous page
-						const pageId = currentPageId();
-					const blob = projectBlob();
-					const isOnTemplatePage = !!(blob && pageId && blob.pages.some((p) => p.templatePageId === pageId));
-						const previousPageId = pageIdBeforeTemplateEdit();
-						if (isOnTemplatePage && previousPageId) {
-							navigateToPageInProject(previousPageId);
-							setPageIdBeforeTemplateEdit(null);
-						}
-					} else {
-						// Entering edit mode
-						setEditingTiles(true);
-					}
-				}}
+				onClick={handleEditClick}
 				class={cn('flex-1 rounded-md p-1 text-center transition-colors', {
 					'bg-blue-500': !location.pathname.startsWith('/app/dashboard') && editingTiles(),
 				})}

@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js';
 import useOutsideClick from '@/hooks/useOutsideClick';
 import api from '@/lib/api';
+import { editModeHasChanges } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import { navigateToPageInProject } from '@/lib/page-actions';
@@ -12,6 +13,7 @@ import {
 	getCurrentPageTiles,
 	getPageFromBlob,
 	multiSelectMode,
+	pageIdBeforeTemplateEdit,
 	projectBlob,
 	setActiveModalId,
 	setCurrentPageTemplate,
@@ -43,8 +45,11 @@ export default function ProjectHeader() {
 	};
 	const hasTemplate = () => currentPageTemplate() !== null;
 
-	// Check if current page is a template (editing the template source directly)
-	const isCurrentPageATemplate = () => {
+	// Check if current page is a template being edited.
+	// Combines two checks: (1) a page references this as its templatePageId, or
+	// (2) we navigated here via "Edit Template" / "View/Edit" from ManageTemplates
+	const isEditingTemplate = () => {
+		if (pageIdBeforeTemplateEdit() !== null) return true;
 		const blob = projectBlob();
 		const pid = currentPageId();
 		if (!blob || !pid) return false;
@@ -184,95 +189,105 @@ export default function ProjectHeader() {
 						</div>
 					</div>
 
-					{/* Template Actions dropdown - hide when editing a template directly */}
-					<Show when={!isCurrentPageATemplate()}>
-						<div class="relative" ref={setTemplateDropdownRef}>
-							<button
-								onClick={() => {
-									setIsTemplateDropdownOpen(!isTemplateDropdownOpen());
-									setIsPageDropdownOpen(false);
-								}}
-								class="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-700"
-							>
-								<i class="bi bi-grid-3x3" />
-								<span>Template Actions</span>
-							</button>
+					{/* Template Actions dropdown */}
+					<div class="relative" ref={setTemplateDropdownRef}>
+						<button
+							onClick={() => {
+								setIsTemplateDropdownOpen(!isTemplateDropdownOpen());
+								setIsPageDropdownOpen(false);
+							}}
+							class="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-700"
+						>
+							<i class="bi bi-grid-3x3" />
+							<span>Template Actions</span>
+						</button>
 
-							<div
-								class={cn(
-									'absolute left-0 top-full z-20 mt-1 flex w-fit flex-col rounded-md border border-zinc-700 bg-zinc-800 py-1 shadow-lg transition-all',
-									{
-										'pointer-events-auto translate-y-0 opacity-100': isTemplateDropdownOpen(),
-										'pointer-events-none -translate-y-1 select-none opacity-0': !isTemplateDropdownOpen(),
-									},
-								)}
+						<div
+							class={cn(
+								'absolute left-0 top-full z-20 mt-1 flex w-fit flex-col rounded-md border border-zinc-700 bg-zinc-800 py-1 shadow-lg transition-all',
+								{
+									'pointer-events-auto translate-y-0 opacity-100': isTemplateDropdownOpen(),
+									'pointer-events-none -translate-y-1 select-none opacity-0': !isTemplateDropdownOpen(),
+								},
+							)}
+						>
+							<Show
+								when={!isEditingTemplate() && hasTemplate()}
+								fallback={
+									<button
+										onClick={handleApplyTemplate}
+										disabled={isEditingTemplate()}
+										class={cn(
+											'flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors',
+											isEditingTemplate()
+												? 'cursor-not-allowed text-zinc-600'
+												: 'hover:bg-zinc-700',
+										)}
+									>
+										<i class="bi bi-grid-3x3" />
+										<span>Apply Template</span>
+									</button>
+								}
 							>
-								<Show
-									when={hasTemplate()}
-									fallback={
-										<button
-											onClick={handleApplyTemplate}
-											class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
-										>
-											<i class="bi bi-grid-3x3" />
-											<span>Apply Template</span>
-										</button>
-									}
-								>
-									<button
-										onClick={handleEditTemplate}
-										class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
-									>
-										<i class="bi bi-pencil" />
-										<span>Edit Template "{currentPageTemplate()?.name}"</span>
-									</button>
-									<button
-										onClick={handleUnlinkTemplate}
-										disabled={isUnlinking()}
-										class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm text-red-400 transition-colors hover:bg-zinc-700 disabled:opacity-50"
-									>
-										<i class="bi bi-x-lg" />
-										<span>{isUnlinking() ? 'Unlinking...' : `Unlink Template "${currentPageTemplate()?.name}"`}</span>
-									</button>
-								</Show>
-								<div class="mx-2 h-px bg-zinc-700" />
 								<button
-									onClick={handleManageTemplates}
+									onClick={handleEditTemplate}
 									class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
 								>
-									<i class="bi bi-collection" />
-									<span>Manage Templates</span>
+									<i class="bi bi-pencil" />
+									<span>Edit Template "{currentPageTemplate()?.name}"</span>
 								</button>
-								<Show when={hasSelectedTilesOnPage0()}>
-									<div class="mx-2 h-px bg-zinc-700" />
-									<button
-										onClick={handleCreateTemplate}
-										class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
-									>
-										<i class="bi bi-plus-lg" />
-										<span>Create Template</span>
-									</button>
-								</Show>
-							</div>
+								<button
+									onClick={handleUnlinkTemplate}
+									disabled={isUnlinking()}
+									class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm text-red-400 transition-colors hover:bg-zinc-700 disabled:opacity-50"
+								>
+									<i class="bi bi-x-lg" />
+									<span>{isUnlinking() ? 'Unlinking...' : `Unlink Template "${currentPageTemplate()?.name}"`}</span>
+								</button>
+							</Show>
+							<div class="mx-2 h-px bg-zinc-700" />
+							<button
+								onClick={handleManageTemplates}
+								class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
+							>
+								<i class="bi bi-collection" />
+								<span>Manage Templates</span>
+							</button>
+							<Show when={hasSelectedTilesOnPage0()}>
+								<div class="mx-2 h-px bg-zinc-700" />
+								<button
+									onClick={handleCreateTemplate}
+									class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
+								>
+									<i class="bi bi-plus-lg" />
+									<span>Create Template</span>
+								</button>
+							</Show>
 						</div>
-					</Show>
+					</div>
 				</Show>
 			</div>
 
-			{/* Center - Page name (with template indicator when editing a template) */}
+			{/* Center - Page name (with Template badge when editing a template) */}
 			<Show
-				when={isCurrentPageATemplate()}
+				when={isEditingTemplate()}
 				fallback={<p class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-light">{pageName()}</p>}
 			>
 				<div class="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
-					<span class="rounded bg-purple-600 px-2 py-0.5 text-xs font-medium">Editing Template</span>
+					<span class="rounded bg-purple-600 px-2 py-0.5 text-xs font-medium">Template</span>
 					<span class="font-light">{pageName()}</span>
 				</div>
 			</Show>
 
-			{/* Right side - Sync status + Multi-select toggle */}
+			{/* Right side - Sync status + Unsaved badge + Multi-select toggle */}
 			<div class="flex flex-1 items-center justify-end gap-2">
 				<SyncStatusIndicator />
+				<Show when={editingTiles() && editModeHasChanges()}>
+					<div class="flex items-center gap-1.5 rounded-md bg-yellow-500/10 px-2 py-1 text-xs text-yellow-400">
+						<i class="bi bi-circle-fill text-[6px]" />
+						<span>Unsaved changes</span>
+					</div>
+				</Show>
 				<Show when={editingTiles()}>
 					<button
 						onClick={() => setMultiSelectMode(!multiSelectMode())}

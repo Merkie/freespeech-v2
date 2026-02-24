@@ -8,6 +8,7 @@ import EditTemplateDetails from './_modal_inners/EditTemplateDetails';
 import ManagePages from './_modal_inners/ManagePages';
 import ManageTemplates from './_modal_inners/ManageTemplates';
 import OptimizeImages from './_modal_inners/OptimizeImages';
+import SaveEditMode from './_modal_inners/SaveEditMode';
 
 type ModalConfig = {
 	title: string | (() => string);
@@ -50,5 +51,9 @@ export const MODAL_REGISTRY: Record<ModalIdType, ModalConfig> = {
 	[MODAL_ID.OPTIMIZE_IMAGES]: {
 		title: 'Optimize Images',
 		innerElement: OptimizeImages,
+	},
+	[MODAL_ID.SAVE_EDIT_MODE]: {
+		title: 'Unsaved Changes',
+		innerElement: SaveEditMode,
 	},
 };
