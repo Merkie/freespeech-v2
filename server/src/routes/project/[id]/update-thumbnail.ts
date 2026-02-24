@@ -60,7 +60,9 @@ export const POST = [
 		await page.close();
 
 		const fileName = `${Date.now()}-thumbnail.png`;
-		const file = new File([screenshotBuffer], fileName, { type: 'image/png' });
+		const file = new File([Buffer.from(screenshotBuffer)], fileName, {
+			type: 'image/png',
+		});
 
 		if (project.imageUrl) {
 			const deleteCommand = new DeleteObjectCommand({
