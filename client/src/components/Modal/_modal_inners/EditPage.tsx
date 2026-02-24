@@ -1,45 +1,30 @@
 import { createSignal, Show } from 'solid-js';
-import api from '@/lib/api';
+import { blobRenamePage } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
-import { pageBeingEdited, project, setActiveModalId, setPageBeingEdited, setProjectPages } from '@/lib/state';
+import { pageBeingEdited, setActiveModalId, setPageBeingEdited } from '@/lib/state';
 
 export default function EditPage() {
 	const page = pageBeingEdited();
 	const [name, setName] = createSignal(page?.name || '');
-	const [isLoading, setIsLoading] = createSignal(false);
 	const [error, setError] = createSignal('');
 
-	const handleSubmit = async (e: Event) => {
+	const handleSubmit = (e: Event) => {
 		e.preventDefault();
 		const pageId = page?.id;
-		const projectId = project()?.id;
-		if (isLoading() || !name().trim() || !pageId || !projectId) return;
+		if (!name().trim() || !pageId) return;
 
-		setIsLoading(true);
 		setError('');
 
 		try {
-			const response = await api.page.edit(pageId, {
-				name: name().trim(),
-			});
-
-			if (response.error) {
-				setError(response.error);
-				setIsLoading(false);
-				return;
-			}
-
-			// Refresh the pages list
-			const { pages } = await api.project.listPages(projectId);
-			setProjectPages(pages);
+			// Instant rename via blob mutation
+			blobRenamePage(pageId, name().trim());
 
 			// Clear the page being edited and go back to manage pages
 			setPageBeingEdited(null);
 			setActiveModalId(MODAL_ID.MANAGE_PAGES);
 		} catch (_err) {
 			setError('Failed to update page');
-			setIsLoading(false);
 		}
 	};
 
@@ -76,13 +61,13 @@ export default function EditPage() {
 				</button>
 				<button
 					type="submit"
-					disabled={!isValid() || isLoading()}
+					disabled={!isValid()}
 					class={cn('rounded-lg border px-4 py-2 text-sm font-medium transition-all', {
-						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': isValid() && !isLoading(),
-						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !isValid() || isLoading(),
+						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': isValid(),
+						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !isValid(),
 					})}
 				>
-					{isLoading() ? 'Saving...' : 'Save Changes'}
+					Save Changes
 				</button>
 			</div>
 		</form>

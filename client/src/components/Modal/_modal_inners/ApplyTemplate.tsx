@@ -3,7 +3,7 @@ import TemplatePreview from '@/components/TemplatePreview';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
-	currentPage,
+	currentPageId,
 	project,
 	setActiveModalId,
 	setCurrentPageTemplate,
@@ -17,7 +17,7 @@ export default function ApplyTemplate() {
 	const [error, setError] = createSignal('');
 
 	const currentProject = () => project();
-	const currentPageData = () => currentPage();
+	const currentPageIdValue = () => currentPageId();
 
 	// Fetch templates for the current project
 	const [templates] = createResource(
@@ -42,7 +42,7 @@ export default function ApplyTemplate() {
 
 	const handleApply = async () => {
 		const templateId = selectedTemplateId();
-		const pageId = currentPageData()?.tilePageId;
+		const pageId = currentPageIdValue();
 		if (!templateId || !pageId || isApplying()) return;
 
 		setIsApplying(true);

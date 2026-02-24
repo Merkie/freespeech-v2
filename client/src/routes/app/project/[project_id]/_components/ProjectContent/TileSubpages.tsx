@@ -3,14 +3,17 @@ import { cn } from '@/lib/cn';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import { speakText } from '@/lib/speak';
 import {
-	currentPage,
-	currentPageTemplateTiles,
+	currentPageId,
+	getCurrentPageTemplateTilesFromBlob,
+	getCurrentPageTiles,
 	editingTilePositions,
 	editingTiles,
+	getPageFromBlob,
 	localSettings,
 	multiSelectMode,
 	pendingTileEdits,
 	project,
+	projectBlob,
 	setEditingTilePositions,
 	setPendingTileEdits,
 	setSentence,
@@ -29,9 +32,9 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 	const [reducedTiles, setReducedTiles] = createSignal<TileType[][]>([]);
 	const [nextDbPage, setNextDbPage] = createSignal(0);
 
-	// Use createEffect to react to currentPage changes (not onMount which only runs once)
+	// Use createEffect to react to blob/currentPageId changes
 	createEffect(() => {
-		const tiles = currentPage()?.tilePage?.tiles || [];
+		const tiles = getCurrentPageTiles();
 		setReducedTiles(reduceTileSubpages(tiles));
 		// Calculate the next available DB page number for new subpages
 		const maxPage = tiles.length > 0 ? Math.max(...tiles.map((t) => t.page)) : -1;
@@ -48,7 +51,14 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 	};
 
 	// Check if current page is a template (editing the template source directly)
-	const isCurrentPageATemplate = () => currentPage()?.tilePage?.isTemplate === true;
+	const isCurrentPageATemplate = () => {
+		const page = getPageFromBlob(currentPageId());
+		// A page that IS a template won't be in the blob's pages array normally,
+		// but if it is (e.g., navigated to for editing), check if another page references it as template
+		const blob = projectBlob();
+		if (!blob || !page) return false;
+		return blob.pages.some((p) => p.templatePageId === page.id);
+	};
 
 	// Merge page tiles with template tiles for a given subpage
 	// Template tiles take precedence (overlay on top of page tiles at same position)
@@ -58,7 +68,7 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 			return pageTiles.map((t) => ({ ...t, isTemplate: false }));
 		}
 
-		const templateTiles = currentPageTemplateTiles();
+		const templateTiles = getCurrentPageTemplateTilesFromBlob();
 		const templatePositions = new Set(templateTiles.map((t) => `${t.x},${t.y}`));
 
 		// Filter out page tiles that are covered by template tiles
@@ -235,7 +245,7 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 		// Also exclude template tile positions on first subpage
 		// (but NOT when editing the template itself - we want all positions available)
 		if (pageIndex === 0 && !isCurrentPageATemplate()) {
-			const templateTiles = currentPageTemplateTiles();
+			const templateTiles = getCurrentPageTemplateTilesFromBlob();
 			for (const t of templateTiles) {
 				usedCoords.add(`${t.x},${t.y}`);
 			}

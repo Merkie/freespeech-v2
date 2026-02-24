@@ -2,8 +2,8 @@ import { createMemo, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
-	currentPage,
 	editingTilePositions,
+	getCurrentPageTiles,
 	project,
 	setActiveModalId,
 	setEditingTilePositions,
@@ -18,10 +18,7 @@ export default function CreateTemplate() {
 
 	// Get selected tiles from current page (only page 0 tiles)
 	const selectedTiles = createMemo(() => {
-		const page = currentPage();
-		if (!page?.tilePage?.tiles) return [];
-
-		const tiles = page.tilePage.tiles as Tile[];
+		const tiles = getCurrentPageTiles();
 		const selectedPositions = editingTilePositions();
 		return tiles.filter((tile: Tile) => selectedPositions.includes(tilePositionKey(tile)) && tile.page === 0);
 	});

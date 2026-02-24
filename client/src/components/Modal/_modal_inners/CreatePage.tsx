@@ -1,43 +1,27 @@
 import { createSignal, Show } from 'solid-js';
-import api from '@/lib/api';
+import { blobCreatePage } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
-import { project, setActiveModalId, setProjectPages } from '@/lib/state';
+import { setActiveModalId } from '@/lib/state';
 
 export default function CreatePage() {
 	const [name, setName] = createSignal('');
-	const [isLoading, setIsLoading] = createSignal(false);
 	const [error, setError] = createSignal('');
 
-	const handleSubmit = async (e: Event) => {
+	const handleSubmit = (e: Event) => {
 		e.preventDefault();
-		const projectId = project()?.id;
-		if (isLoading() || !name().trim() || !projectId) return;
+		if (!name().trim()) return;
 
-		setIsLoading(true);
 		setError('');
 
 		try {
-			const response = await api.page.create({
-				projectId,
-				name: name().trim(),
-			});
-
-			if (response.error) {
-				setError(response.error);
-				setIsLoading(false);
-				return;
-			}
-
-			// Refresh the pages list
-			const { pages } = await api.project.listPages(projectId);
-			setProjectPages(pages);
+			// Create page via blob mutation — instant, no network call
+			blobCreatePage(name().trim());
 
 			// Go back to manage pages modal
 			setActiveModalId(MODAL_ID.MANAGE_PAGES);
 		} catch (_err) {
 			setError('Failed to create page');
-			setIsLoading(false);
 		}
 	};
 
@@ -71,13 +55,13 @@ export default function CreatePage() {
 				</button>
 				<button
 					type="submit"
-					disabled={!isValid() || isLoading()}
+					disabled={!isValid()}
 					class={cn('rounded-lg border px-4 py-2 text-sm font-medium transition-all', {
-						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': isValid() && !isLoading(),
-						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !isValid() || isLoading(),
+						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': isValid(),
+						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !isValid(),
 					})}
 				>
-					{isLoading() ? 'Creating...' : 'Create Page'}
+					Create Page
 				</button>
 			</div>
 		</form>

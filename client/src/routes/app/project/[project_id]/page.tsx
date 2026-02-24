@@ -1,16 +1,18 @@
 import { useNavigate, useParams } from '@solidjs/router';
-import { type Component, createEffect, on, Show } from 'solid-js';
+import { type Component, createEffect, on, onCleanup, onMount, Show } from 'solid-js';
+import { flushDirtyBlobs } from '@/lib/blob-sync';
 import { loadProject, navigateToPageInProject } from '@/lib/page-actions';
 import {
-	currentPage,
+	currentPageId,
 	editingTemplate,
 	editingTiles,
 	localSettings,
-	pageLoading,
+	projectBlob,
 	projectLoading,
 	resetProjectState,
 	setEditingTemplate,
 	setEditingTiles,
+	setSyncStatus,
 } from '@/lib/state';
 import type { Project } from '@/lib/types';
 import ProjectContent from './_components/ProjectContent';
@@ -22,13 +24,31 @@ const AppProjectPage: Component = () => {
 	const params = useParams();
 	const navigate = useNavigate();
 
+	// Online/offline listeners for sync
+	const handleOnline = () => {
+		flushDirtyBlobs().catch((err) => console.error('Failed to flush dirty blobs:', err));
+	};
+	const handleOffline = () => {
+		setSyncStatus('offline');
+	};
+
+	onMount(() => {
+		window.addEventListener('online', handleOnline);
+		window.addEventListener('offline', handleOffline);
+	});
+
+	onCleanup(() => {
+		window.removeEventListener('online', handleOnline);
+		window.removeEventListener('offline', handleOffline);
+	});
+
 	// React to route param changes
 	createEffect(
 		on(
 			() => params.project_id,
 			async (projectId, prevProjectId) => {
-				// Skip if same project
-				if (projectId === prevProjectId) return;
+				// Skip if same project or missing
+				if (projectId === prevProjectId || !projectId) return;
 
 				// Reset state when switching from one project to another
 				if (prevProjectId) {
@@ -46,7 +66,7 @@ const AppProjectPage: Component = () => {
 
 				// If editing a template, navigate to it and enter edit mode
 				if (templateToEdit) {
-					await navigateToPageInProject(templateToEdit.id);
+					navigateToPageInProject(templateToEdit.id);
 					setEditingTiles(true);
 					setEditingTemplate(null); // Clear after use
 				}
@@ -55,8 +75,8 @@ const AppProjectPage: Component = () => {
 		),
 	);
 
-	// Show skeleton while loading or when no page is loaded
-	const isLoading = () => projectLoading() || pageLoading() || !currentPage();
+	// Show skeleton while loading or when no blob/page is loaded
+	const isLoading = () => projectLoading() || !projectBlob() || !currentPageId();
 
 	return (
 		<>

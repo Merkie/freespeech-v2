@@ -3,10 +3,11 @@ import type { Component } from 'solid-js';
 import { cn } from '@/lib/cn';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import {
-	currentPage,
+	currentPageId,
 	editingTiles,
 	pageIdBeforeTemplateEdit,
 	project,
+	projectBlob,
 	projectHomePageId,
 	setDiscardUnsavedChangesHandler,
 	setEditingTileIds,
@@ -83,7 +84,9 @@ const BottomNavigation: Component = () => {
 						setUnsavedChanges(false);
 
 						// If we were editing a template, navigate back to the previous page
-						const isOnTemplatePage = currentPage()?.tilePage?.isTemplate === true;
+						const pageId = currentPageId();
+					const blob = projectBlob();
+					const isOnTemplatePage = !!(blob && pageId && blob.pages.some((p) => p.templatePageId === pageId));
 						const previousPageId = pageIdBeforeTemplateEdit();
 						if (isOnTemplatePage && previousPageId) {
 							navigateToPageInProject(previousPageId);

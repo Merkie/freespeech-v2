@@ -4,9 +4,9 @@ import { cn } from '@/lib/cn';
 import { type SkinTone, SkinTones } from '@/lib/opensymbols';
 import { uploadBlob } from '@/lib/presigned-uploads';
 import {
-	currentPage,
 	editingTilePositions,
 	findTileByPositionKey,
+	getCurrentPageTiles,
 	localSettings,
 	pendingTileEdits,
 	setLoading,
@@ -14,7 +14,6 @@ import {
 	setPendingTileEdits,
 	setUsingOnlineSearch,
 } from '@/lib/state';
-import type { Tile } from '@/lib/types';
 
 type SearchResult = {
 	image_url: string;
@@ -31,7 +30,7 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 	const getFirstSelectedTileText = () => {
 		const positions = editingTilePositions();
 		if (positions.length === 0) return '';
-		const tiles = (currentPage()?.tilePage?.tiles || []) as Tile[];
+		const tiles = getCurrentPageTiles();
 		const tile = findTileByPositionKey(tiles, positions[0]);
 		return pendingTileEdits().text ?? tile?.text ?? '';
 	};

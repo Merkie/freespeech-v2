@@ -5,12 +5,14 @@ import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import {
-	currentPage,
 	currentPageId,
 	currentPageTemplate,
 	editingTilePositions,
 	editingTiles,
+	getCurrentPageTiles,
+	getPageFromBlob,
 	multiSelectMode,
+	projectBlob,
 	setActiveModalId,
 	setCurrentPageTemplate,
 	setCurrentPageTemplateTiles,
@@ -18,6 +20,7 @@ import {
 	setMultiSelectMode,
 	setPageBeingEdited,
 	setPageIdBeforeTemplateEdit,
+	syncStatus,
 	tilePositionKey,
 } from '@/lib/state';
 import type { Tile } from '@/lib/types';
@@ -34,15 +37,23 @@ export default function ProjectHeader() {
 
 	useOutsideClick(templateDropdownRef, () => setIsTemplateDropdownOpen(false));
 
-	const pageName = () => currentPage()?.tilePage?.name || 'Loading...';
+	const pageName = () => {
+		const page = getPageFromBlob(currentPageId());
+		return page?.name || 'Loading...';
+	};
 	const hasTemplate = () => currentPageTemplate() !== null;
 
 	// Check if current page is a template (editing the template source directly)
-	const isCurrentPageATemplate = () => currentPage()?.tilePage?.isTemplate === true;
+	const isCurrentPageATemplate = () => {
+		const blob = projectBlob();
+		const pid = currentPageId();
+		if (!blob || !pid) return false;
+		return blob.pages.some((p) => p.templatePageId === pid);
+	};
 
 	// Check if there are selected tiles on page 0 (for creating templates)
 	const hasSelectedTilesOnPage0 = () => {
-		const tiles = (currentPage()?.tilePage?.tiles || []) as Tile[];
+		const tiles = getCurrentPageTiles();
 		const selectedPositions = editingTilePositions();
 		if (selectedPositions.length === 0) return false;
 		return tiles.some((t: Tile) => selectedPositions.includes(tilePositionKey(t)) && t.page === 0);
@@ -53,9 +64,17 @@ export default function ProjectHeader() {
 	};
 
 	const handleEditPage = () => {
-		const page = currentPage()?.tilePage;
+		const page = getPageFromBlob(currentPageId());
 		if (page) {
-			setPageBeingEdited({ ...page });
+			setPageBeingEdited({
+				id: page.id,
+				name: page.name,
+				tiles: [],
+				userId: '',
+				isPublic: false,
+				createdAt: '',
+				updatedAt: '',
+			});
 			setActiveModalId(MODAL_ID.EDIT_PAGE);
 		}
 		setIsPageDropdownOpen(false);
@@ -89,7 +108,7 @@ export default function ProjectHeader() {
 	};
 
 	const handleUnlinkTemplate = async () => {
-		const pageId = currentPage()?.tilePageId;
+		const pageId = currentPageId();
 		if (!pageId || isUnlinking()) return;
 
 		setIsUnlinking(true);
@@ -251,8 +270,9 @@ export default function ProjectHeader() {
 				</div>
 			</Show>
 
-			{/* Right side - Multi-select toggle */}
-			<div class="flex flex-1 justify-end">
+			{/* Right side - Sync status + Multi-select toggle */}
+			<div class="flex flex-1 items-center justify-end gap-2">
+				<SyncStatusIndicator />
 				<Show when={editingTiles()}>
 					<button
 						onClick={() => setMultiSelectMode(!multiSelectMode())}
@@ -269,5 +289,43 @@ export default function ProjectHeader() {
 				</Show>
 			</div>
 		</div>
+	);
+}
+
+function SyncStatusIndicator() {
+	const status = () => syncStatus();
+
+	return (
+		<Show when={status() !== 'synced'}>
+			<div
+				class={cn('flex items-center gap-1.5 rounded-md px-2 py-1 text-xs', {
+					'bg-yellow-500/10 text-yellow-400': status() === 'dirty' || status() === 'syncing',
+					'bg-green-500/10 text-green-400': status() === 'synced',
+					'bg-red-500/10 text-red-400': status() === 'conflict' || status() === 'error',
+					'bg-zinc-500/10 text-zinc-400': status() === 'offline',
+				})}
+			>
+				<Show when={status() === 'syncing'}>
+					<i class="bi bi-arrow-repeat animate-spin" />
+					<span>Saving...</span>
+				</Show>
+				<Show when={status() === 'dirty'}>
+					<i class="bi bi-circle-fill text-[6px]" />
+					<span>Unsaved</span>
+				</Show>
+				<Show when={status() === 'offline'}>
+					<i class="bi bi-wifi-off" />
+					<span>Offline — saved locally</span>
+				</Show>
+				<Show when={status() === 'conflict'}>
+					<i class="bi bi-exclamation-triangle" />
+					<span>Sync conflict</span>
+				</Show>
+				<Show when={status() === 'error'}>
+					<i class="bi bi-exclamation-circle" />
+					<span>Sync error</span>
+				</Show>
+			</div>
+		</Show>
 	);
 }

@@ -1,22 +1,21 @@
-import { type Component, createEffect, createSignal, For, onMount, Show } from 'solid-js';
+import { type Component, createEffect, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
+import { blobDeleteTiles, blobUpdateTile, blobUpdateTilesBatch } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { uploadFile } from '@/lib/presigned-uploads';
 import {
-	currentPage,
 	currentPageId,
 	editingTilePositions,
 	findTileByPositionKey,
+	getCurrentPageTiles,
+	getProjectPagesFromBlob,
 	isBulkEditing,
 	pendingTileEdits,
 	project,
 	projectHomePageId,
-	projectPages,
-	setCurrentPage,
 	setEditingTilePositions,
 	setLoading,
 	setPendingTileEdits,
-	setProjectPages,
 	setUnsavedChanges,
 	setUsingOnlineSearch,
 	tilePositionKey,
@@ -67,10 +66,10 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 	const [hasUnsavedChanges, setHasUnsavedChanges] = createSignal(false);
 	let fileinput: HTMLInputElement | undefined;
 
-	const tiles = () => (currentPage()?.tilePage?.tiles || []) as import('@/lib/types').Tile[];
-	const pages = () => projectPages() || [];
+	const tiles = () => getCurrentPageTiles();
+	const pages = () => getProjectPagesFromBlob();
 	const isHomePage = () => currentPageId() === projectHomePageId();
-	const pageId = () => currentPage()?.tilePage?.id || '';
+	const pageId = () => currentPageId();
 
 	// Get the first selected tile (for single tile editing display)
 	const firstSelectedTile = () => {
@@ -84,19 +83,6 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		const positions = editingTilePositions();
 		return tiles().filter((t) => positions.includes(tilePositionKey(t)));
 	};
-
-	// Load project pages when entering edit mode
-	onMount(async () => {
-		const proj = project();
-		if (proj && projectPages().length === 0) {
-			try {
-				const { pages } = await api.project.listPages(proj.id);
-				setProjectPages(pages);
-			} catch (error) {
-				console.error('Failed to load project pages:', error);
-			}
-		}
-	});
 
 	// Track unsaved changes
 	createEffect(() => {
@@ -169,78 +155,39 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		}
 	};
 
-	const handleSaveChanges = async () => {
-		const positions = editingTilePositions();
+	const handleSaveChanges = () => {
 		const pending = pendingTileEdits();
 		const tilesToUpdate = selectedTiles();
-		const currentPageId = pageId();
+		const currentPid = pageId();
 
-		if (tilesToUpdate.length === 0 || !currentPageId) return;
+		if (tilesToUpdate.length === 0 || !currentPid) return;
 
-		// For bulk mode, use batch operation with only color changes
 		if (isBulkEditing()) {
-			const operations = tilesToUpdate.map((tile) => ({
-				type: 'update' as const,
-				position: { x: tile.x, y: tile.y, page: tile.page },
-				data: {
-					backgroundColor: pending.backgroundColor ?? tile.backgroundColor,
-					borderColor: pending.borderColor ?? tile.borderColor,
-				},
-			}));
-			await api.tile.batch(currentPageId, operations);
-		} else {
-			// For single tile, apply all pending changes
-			const tile = tilesToUpdate[0];
-			await api.tile.update(
-				currentPageId,
-				{ x: tile.x, y: tile.y, page: tile.page },
+			// Bulk color update via blob
+			blobUpdateTilesBatch(
+				currentPid,
+				tilesToUpdate.map((t) => ({ x: t.x, y: t.y, page: t.page })),
 				{
-					text: pending.text ?? tile.text,
-					displayText: pending.displayText ?? tile.displayText,
-					image: pending.image ?? tile.image,
-					backgroundColor: pending.backgroundColor ?? tile.backgroundColor,
-					borderColor: pending.borderColor ?? tile.borderColor,
-					navigation: pending.navigation ?? tile.navigation,
+					backgroundColor: pending.backgroundColor ?? tilesToUpdate[0].backgroundColor,
+					borderColor: pending.borderColor ?? tilesToUpdate[0].borderColor,
 				},
 			);
+		} else {
+			// Single tile update via blob
+			const tile = tilesToUpdate[0];
+			blobUpdateTile(currentPid, { x: tile.x, y: tile.y, page: tile.page }, {
+				text: pending.text ?? tile.text,
+				displayText: pending.displayText ?? tile.displayText,
+				image: pending.image ?? tile.image,
+				backgroundColor: pending.backgroundColor ?? tile.backgroundColor,
+				borderColor: pending.borderColor ?? tile.borderColor,
+				navigation: pending.navigation ?? tile.navigation,
+			});
 		}
 
 		// Update thumbnail if this is the home page
 		if (isHomePage()) {
 			void api.project.updateThumbnail(project()?.id || '');
-		}
-
-		// Update tiles in current page state
-		const page = currentPage();
-		if (page?.tilePage) {
-			const currentTiles = tiles();
-			const updatedTiles = currentTiles.map((t) => {
-				const tileKey = tilePositionKey(t);
-				if (!positions.includes(tileKey)) return t;
-				if (isBulkEditing()) {
-					return {
-						...t,
-						backgroundColor: pending.backgroundColor ?? t.backgroundColor,
-						borderColor: pending.borderColor ?? t.borderColor,
-					};
-				}
-				return {
-					...t,
-					text: pending.text ?? t.text,
-					displayText: pending.displayText ?? t.displayText,
-					image: pending.image ?? t.image,
-					backgroundColor: pending.backgroundColor ?? t.backgroundColor,
-					borderColor: pending.borderColor ?? t.borderColor,
-					navigation: pending.navigation ?? t.navigation,
-				};
-			});
-			setCurrentPage({
-				...page,
-				tilePage: {
-					...page.tilePage,
-					tiles: updatedTiles,
-				},
-			});
 		}
 
 		// Clear editing state
@@ -268,36 +215,20 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		});
 	};
 
-	const handleDeleteTiles = async () => {
+	const handleDeleteTiles = () => {
 		const tilesToDelete = selectedTiles();
-		const currentPageId = pageId();
-		if (tilesToDelete.length === 0 || !currentPageId) return;
+		const currentPid = pageId();
+		if (tilesToDelete.length === 0 || !currentPid) return;
 
-		// Use batch operation for deleting multiple tiles
-		const operations = tilesToDelete.map((tile) => ({
-			type: 'delete' as const,
-			position: { x: tile.x, y: tile.y, page: tile.page },
-		}));
-		await api.tile.batch(currentPageId, operations);
+		// Delete tiles via blob mutation
+		blobDeleteTiles(
+			currentPid,
+			tilesToDelete.map((t) => ({ x: t.x, y: t.y, page: t.page })),
+		);
 
 		// Update thumbnail if this is the home page
 		if (isHomePage()) {
 			void api.project.updateThumbnail(project()?.id || '');
-		}
-
-		// Remove tiles from current page state
-		const page = currentPage();
-		if (page?.tilePage) {
-			const positions = editingTilePositions();
-			const currentTiles = tiles();
-			const updatedTiles = currentTiles.filter((t) => !positions.includes(tilePositionKey(t)));
-			setCurrentPage({
-				...page,
-				tilePage: {
-					...page.tilePage,
-					tiles: updatedTiles,
-				},
-			});
 		}
 
 		// Clear editing state

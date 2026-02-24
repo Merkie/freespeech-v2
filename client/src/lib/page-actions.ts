@@ -1,21 +1,18 @@
 import { batch } from 'solid-js';
-import { getHomePageId } from '@/routes/app/project/[project_id]/page';
-import { fetchPageWithCache, fetchProjectWithCache } from './api/cached-fetch';
+import { loadProjectBlob } from './blob-sync';
 import {
 	localSettings,
-	project,
+	projectBlob,
 	resetProjectState,
-	setCurrentPage,
 	setCurrentPageId,
 	setCurrentPageTemplate,
 	setCurrentPageTemplateTiles,
 	setLocalSettings,
-	setPageLoading,
 	setProject,
 	setProjectHomePageId,
 	setProjectLoading,
 } from './state';
-import type { TilePageInProject } from './types';
+import type { Project } from './types';
 
 // Helper to update last visited project/page in localStorage
 function trackVisit(projectId: string, pageId?: string) {
@@ -31,7 +28,7 @@ let currentlyLoadingProjectId: string | null = null;
 
 export async function loadProject(
 	projectId: string,
-	options?: { setHomePage?: boolean; skipCache?: boolean },
+	options?: { setHomePage?: boolean },
 ): Promise<boolean> {
 	// Guard: prevent duplicate loads for same project
 	if (currentlyLoadingProjectId === projectId) {
@@ -45,42 +42,45 @@ export async function loadProject(
 		// Reset state before loading new project
 		resetProjectState();
 
-		// Use cached fetch with stale-while-revalidate strategy
-		const { project: projectResponse, fromCache } = await fetchProjectWithCache(projectId, {
-			skipCache: options?.skipCache,
-			onRevalidate: (freshProject) => {
-				// Update state with fresh data when revalidation completes
-				const freshHomePageId = getHomePageId(freshProject);
-				batch(() => {
-					setProject(freshProject);
-					setProjectHomePageId(freshHomePageId);
-				});
-			},
-		});
+		// Load the full project blob (IndexedDB first, then server)
+		const success = await loadProjectBlob(projectId);
 
-		if (!projectResponse) {
+		if (!success) {
 			console.warn('Project not found');
 			return false;
 		}
 
-		const homePageId = getHomePageId(projectResponse);
+		const blob = projectBlob();
+		if (!blob) return false;
 
-		// Batch state updates
+		// Build a lightweight Project object for backwards compatibility
+		const projectObj: Project = {
+			id: blob.id,
+			userId: '', // Not needed for display
+			name: blob.name,
+			description: blob.description,
+			imageUrl: blob.imageUrl,
+			columns: blob.columns,
+			rows: blob.rows,
+			isPublic: false,
+			homePageId: blob.homePageId,
+			lastEditedAt: blob.lastEditedAt,
+			createdAt: blob.lastEditedAt,
+			updatedAt: blob.lastEditedAt,
+		};
+
+		const homePageId = getHomePageId(blob);
+
 		batch(() => {
-			setProject(projectResponse);
+			setProject(projectObj);
 			setProjectHomePageId(homePageId);
 		});
 
 		// Track this project visit
 		trackVisit(projectId);
 
-		// Stop showing loading indicator if data came from cache (instant load)
-		if (fromCache) {
-			setProjectLoading(false);
-		}
-
 		if (options?.setHomePage) {
-			await navigateToPageInProject(homePageId, { skipCache: options?.skipCache });
+			navigateToPageInProject(homePageId);
 		}
 
 		return true;
@@ -93,82 +93,71 @@ export async function loadProject(
 	}
 }
 
-export async function navigateToPageInProject(pageId: string, options?: { skipCache?: boolean }): Promise<boolean> {
-	const projectId = project()?.id;
-	if (!projectId) {
-		console.warn('No project loaded');
+// Navigate to a page — now instant (no network call)
+export function navigateToPageInProject(pageId: string): boolean {
+	const blob = projectBlob();
+	if (!blob) {
+		console.warn('No project blob loaded');
 		return false;
 	}
 
-	setPageLoading(true);
+	const page = blob.pages.find((p) => p.id === pageId);
+	if (!page) {
+		console.warn('Page not found in blob:', pageId);
+		return false;
+	}
 
-	try {
-		// Use cached fetch with stale-while-revalidate strategy
-		const { page, template, templateTiles, fromCache } = await fetchPageWithCache(pageId, {
-			skipCache: options?.skipCache,
-			onRevalidate: (freshData) => {
-				// Update state with fresh data when revalidation completes
-				const freshPageData = {
-					tilePageId: freshData.page.id,
-					tilePage: freshData.page,
-					projectId,
-					project: null,
-				} as unknown as TilePageInProject;
+	batch(() => {
+		setCurrentPageId(pageId);
 
-				batch(() => {
-					setCurrentPage(freshPageData);
-					if (freshData.page.isTemplate) {
-						setCurrentPageTemplate(null);
-						setCurrentPageTemplateTiles([]);
-					} else {
-						setCurrentPageTemplate(freshData.template);
-						setCurrentPageTemplateTiles(freshData.templateTiles || []);
-					}
+		// Update template state from blob
+		if (page.templatePageId && page.templateTiles) {
+			// Page has a template — set template overlay data
+			const templatePage = blob.pages.find((p) => p.id === page.templatePageId);
+			if (templatePage) {
+				setCurrentPageTemplate({
+					id: templatePage.id,
+					name: templatePage.name,
+					tiles: [],
+					userId: '',
+					isPublic: false,
+					isTemplate: true,
+					columns: blob.columns,
+					rows: blob.rows,
+					createdAt: '',
+					updatedAt: '',
 				});
-			},
-		});
-
-		if (!page) {
-			console.warn('Page not found');
-			return false;
-		}
-
-		const pageData = {
-			tilePageId: page.id,
-			tilePage: page,
-			projectId,
-			project: null,
-		} as unknown as TilePageInProject;
-
-		// Set current page and template state
-		batch(() => {
-			setCurrentPage(pageData);
-			setCurrentPageId(pageId);
-
-			// If this page IS a template, don't set template overlay data
-			// (we ARE the template source, not a page with a template applied)
-			if (page.isTemplate) {
-				setCurrentPageTemplate(null);
-				setCurrentPageTemplateTiles([]);
 			} else {
-				setCurrentPageTemplate(template);
-				setCurrentPageTemplateTiles(templateTiles || []);
+				setCurrentPageTemplate(null);
 			}
-		});
-
-		// Track this page visit
-		trackVisit(projectId, pageId);
-
-		// Stop showing loading indicator if data came from cache (instant load)
-		if (fromCache) {
-			setPageLoading(false);
+			setCurrentPageTemplateTiles(
+				page.templateTiles.map((t) => ({
+					x: t.x,
+					y: t.y,
+					page: t.page,
+					text: t.text,
+					displayText: t.displayText ?? '',
+					backgroundColor: t.backgroundColor ?? '#fafafa',
+					borderColor: t.borderColor ?? '#71717a',
+					image: t.image ?? '',
+					navigation: t.navigation ?? '',
+				})),
+			);
+		} else {
+			setCurrentPageTemplate(null);
+			setCurrentPageTemplateTiles([]);
 		}
+	});
 
-		return true;
-	} catch (error) {
-		console.error('Failed to navigate to page:', error);
-		return false;
-	} finally {
-		setPageLoading(false);
-	}
+	// Track this page visit
+	trackVisit(blob.id, pageId);
+
+	return true;
+}
+
+// Get home page ID from blob
+function getHomePageId(blob: { homePageId: string | null; pages: { id: string; name: string }[] }): string {
+	if (blob.homePageId) return blob.homePageId;
+	const homePage = blob.pages.find((p) => p.name.toLowerCase().trim() === 'home');
+	return homePage?.id ?? blob.pages[0]?.id ?? '';
 }

@@ -1,16 +1,14 @@
 import type { Component } from 'solid-js';
 import api from '@/lib/api';
+import { blobCreateTile } from '@/lib/blob-actions';
 import {
-	currentPage,
 	currentPageId,
 	project,
 	projectHomePageId,
-	setCurrentPage,
 	setEditingTilePositions,
 	setPendingTileEdits,
 	tilePositionKey,
 } from '@/lib/state';
-import type { Tile } from '@/lib/types';
 
 interface AddTileButtonProps {
 	x: number;
@@ -19,44 +17,43 @@ interface AddTileButtonProps {
 }
 
 const AddTileButton: Component<AddTileButtonProps> = (props) => {
-	const pageId = () => currentPage()?.tilePage?.id || '';
 	const isHomePage = () => currentPageId() === projectHomePageId();
 
-	const handleAddTile = async () => {
-		const { tile } = await api.tile.create(pageId(), {
+	const handleAddTile = () => {
+		const pid = currentPageId();
+		if (!pid) return;
+
+		// Create tile via blob mutation — instant, no network call
+		const tile = blobCreateTile(pid, {
 			x: props.x,
 			y: props.y,
 			page: props.page,
 		});
 
-		// Update thumbnail if this is the home page
 		if (isHomePage()) {
 			void api.project.updateThumbnail(project()?.id || '');
 		}
 
-		// Add the new tile to the current page state
-		const page = currentPage();
-		if (page?.tilePage) {
-			const currentTiles = (page.tilePage.tiles || []) as Tile[];
-			const updatedTiles = [...currentTiles, tile];
-			setCurrentPage({
-				...page,
-				tilePage: {
-					...page.tilePage,
-					tiles: updatedTiles,
-				},
-			});
-		}
+		const fullTile = {
+			x: tile.x,
+			y: tile.y,
+			page: tile.page,
+			text: tile.text ?? '',
+			displayText: tile.displayText ?? '',
+			backgroundColor: tile.backgroundColor ?? '#fafafa',
+			borderColor: tile.borderColor ?? '#71717a',
+			image: tile.image ?? '',
+			navigation: tile.navigation ?? '',
+		};
 
-		// Select the new tile for editing using position key
-		setEditingTilePositions([tilePositionKey(tile)]);
+		setEditingTilePositions([tilePositionKey(fullTile)]);
 		setPendingTileEdits({
-			text: tile.text,
-			displayText: tile.displayText,
-			image: tile.image,
-			backgroundColor: tile.backgroundColor,
-			borderColor: tile.borderColor,
-			navigation: tile.navigation,
+			text: fullTile.text,
+			displayText: fullTile.displayText,
+			image: fullTile.image,
+			backgroundColor: fullTile.backgroundColor,
+			borderColor: fullTile.borderColor,
+			navigation: fullTile.navigation,
 		});
 	};
 
