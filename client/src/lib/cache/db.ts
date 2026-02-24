@@ -1,52 +1,16 @@
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb';
-import type { Project, Template, Tile, TilePage } from '../types';
-
-// Cached page data includes template information
-export interface CachedPage {
-	id: string;
-	page: TilePage;
-	template: Template | null;
-	templateTiles: Tile[];
-	cachedAt: number;
-	lastAccessedAt?: number;
-}
-
-// Cached project data
-export interface CachedProject {
-	id: string;
-	project: Project;
-	cachedAt: number;
-	lastAccessedAt?: number;
-}
-
-// Pending mutation for offline support
-export interface PendingMutation {
-	id: string;
-	type: 'tile_update' | 'tile_create' | 'tile_delete' | 'page_update';
-	payload: unknown;
-	createdAt: number;
-}
+import type { CachedProjectBlob } from '../types';
 
 interface FreeSpeechDB extends DBSchema {
-	projects: {
+	projectBlobs: {
 		key: string;
-		value: CachedProject;
-		indexes: { 'by-cachedAt': number };
-	};
-	pages: {
-		key: string;
-		value: CachedPage;
-		indexes: { 'by-cachedAt': number };
-	};
-	pendingMutations: {
-		key: string;
-		value: PendingMutation;
-		indexes: { 'by-createdAt': number };
+		value: CachedProjectBlob;
+		indexes: { 'by-cachedAt': number; 'by-dirty': number };
 	};
 }
 
 const DB_NAME = 'freespeech-cache';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 // Max cache size in bytes (50MB) - generous for AAC boards
 const MAX_CACHE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -57,22 +21,18 @@ export function getDB(): Promise<IDBPDatabase<FreeSpeechDB>> {
 	if (!dbPromise) {
 		dbPromise = openDB<FreeSpeechDB>(DB_NAME, DB_VERSION, {
 			upgrade(db) {
-				// Projects store
-				if (!db.objectStoreNames.contains('projects')) {
-					const projectStore = db.createObjectStore('projects', { keyPath: 'id' });
-					projectStore.createIndex('by-cachedAt', 'cachedAt');
+				// Clean up old stores from previous versions
+				for (const name of ['projects', 'pages', 'pendingMutations'] as const) {
+					if (db.objectStoreNames.contains(name as never)) {
+						db.deleteObjectStore(name as never);
+					}
 				}
 
-				// Pages store
-				if (!db.objectStoreNames.contains('pages')) {
-					const pageStore = db.createObjectStore('pages', { keyPath: 'id' });
-					pageStore.createIndex('by-cachedAt', 'cachedAt');
-				}
-
-				// Pending mutations store (for offline support)
-				if (!db.objectStoreNames.contains('pendingMutations')) {
-					const mutationStore = db.createObjectStore('pendingMutations', { keyPath: 'id' });
-					mutationStore.createIndex('by-createdAt', 'createdAt');
+				// Project blobs store (for offline-first sync)
+				if (!db.objectStoreNames.contains('projectBlobs')) {
+					const blobStore = db.createObjectStore('projectBlobs', { keyPath: 'id' });
+					blobStore.createIndex('by-cachedAt', 'cachedAt');
+					blobStore.createIndex('by-dirty', 'dirty');
 				}
 			},
 		});
@@ -83,8 +43,11 @@ export function getDB(): Promise<IDBPDatabase<FreeSpeechDB>> {
 // Clear all cached data
 export async function clearCache(): Promise<void> {
 	const db = await getDB();
-	const tx = db.transaction(['projects', 'pages'], 'readwrite');
-	await Promise.all([tx.objectStore('projects').clear(), tx.objectStore('pages').clear(), tx.done]);
+	const tx = db.transaction(['projectBlobs'], 'readwrite');
+	await Promise.all([
+		tx.objectStore('projectBlobs').clear(),
+		tx.done,
+	]);
 }
 
 // Estimate size of a cached entry in bytes
@@ -92,91 +55,48 @@ function estimateSize(obj: unknown): number {
 	return new Blob([JSON.stringify(obj)]).size;
 }
 
-// Get effective last accessed time (falls back to cachedAt for old entries)
-function getLastAccessed(entry: { lastAccessedAt?: number; cachedAt: number }): number {
-	return entry.lastAccessedAt ?? entry.cachedAt ?? 0;
-}
-
-// Get total cache size and entries sorted by lastAccessedAt (oldest first)
-async function getCacheStats(): Promise<{
-	totalSize: number;
-	projects: Array<{ id: string; size: number; lastAccessedAt: number }>;
-	pages: Array<{ id: string; size: number; lastAccessedAt: number }>;
-}> {
-	const db = await getDB();
-
-	const projects: Array<{ id: string; size: number; lastAccessedAt: number }> = [];
-	const pages: Array<{ id: string; size: number; lastAccessedAt: number }> = [];
-	let totalSize = 0;
-
-	// Get all projects
-	const allProjects = await db.getAll('projects');
-	for (const entry of allProjects) {
-		const size = estimateSize(entry);
-		projects.push({
-			id: entry.id,
-			size,
-			lastAccessedAt: getLastAccessed(entry),
-		});
-		totalSize += size;
-	}
-
-	// Get all pages
-	const allPages = await db.getAll('pages');
-	for (const entry of allPages) {
-		const size = estimateSize(entry);
-		pages.push({
-			id: entry.id,
-			size,
-			lastAccessedAt: getLastAccessed(entry),
-		});
-		totalSize += size;
-	}
-
-	// Sort by lastAccessedAt (oldest first)
-	projects.sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
-	pages.sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
-
-	return { totalSize, projects, pages };
-}
-
 // Evict least recently used entries if cache exceeds max size
-export async function evictLRUIfNeeded(): Promise<{ evictedProjects: number; evictedPages: number }> {
-	const stats = await getCacheStats();
+export async function evictLRUIfNeeded(): Promise<{ evictedBlobs: number }> {
+	const db = await getDB();
 
-	if (stats.totalSize <= MAX_CACHE_SIZE_BYTES) {
-		return { evictedProjects: 0, evictedPages: 0 };
+	const allBlobs = await db.getAll('projectBlobs');
+	let totalSize = 0;
+	const blobEntries: Array<{ id: string; size: number; cachedAt: number; dirty: boolean }> = [];
+
+	for (const entry of allBlobs) {
+		const size = estimateSize(entry);
+		blobEntries.push({
+			id: entry.id,
+			size,
+			cachedAt: entry.cachedAt,
+			dirty: entry.dirty,
+		});
+		totalSize += size;
 	}
 
-	const db = await getDB();
-	let bytesToFree = stats.totalSize - MAX_CACHE_SIZE_BYTES;
-	let evictedProjects = 0;
-	let evictedPages = 0;
+	if (totalSize <= MAX_CACHE_SIZE_BYTES) {
+		return { evictedBlobs: 0 };
+	}
 
-	// Combine and sort all entries by lastAccessedAt (oldest first)
-	const allEntries = [
-		...stats.projects.map((p) => ({ ...p, type: 'project' as const })),
-		...stats.pages.map((p) => ({ ...p, type: 'page' as const })),
-	].sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
+	// Sort by cachedAt (oldest first), never evict dirty blobs
+	const evictable = blobEntries
+		.filter((b) => !b.dirty)
+		.sort((a, b) => a.cachedAt - b.cachedAt);
 
-	// Evict oldest entries until we're under the limit
-	for (const entry of allEntries) {
+	let bytesToFree = totalSize - MAX_CACHE_SIZE_BYTES;
+	let evictedBlobs = 0;
+
+	for (const entry of evictable) {
 		if (bytesToFree <= 0) break;
 
-		if (entry.type === 'project') {
-			await db.delete('projects', entry.id);
-			evictedProjects++;
-		} else {
-			await db.delete('pages', entry.id);
-			evictedPages++;
-		}
-
+		await db.delete('projectBlobs', entry.id);
+		evictedBlobs++;
 		bytesToFree -= entry.size;
 	}
 
-	if (evictedProjects > 0 || evictedPages > 0) {
-		console.log(`Cache eviction: removed ${evictedProjects} projects and ${evictedPages} pages to free space`);
+	if (evictedBlobs > 0) {
+		console.log(`Cache eviction: removed ${evictedBlobs} blobs to free space`);
 	}
 
-	return { evictedProjects, evictedPages };
+	return { evictedBlobs };
 }

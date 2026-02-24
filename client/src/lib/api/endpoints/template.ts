@@ -4,7 +4,6 @@ import { fetchFromAPI } from '../util';
 const template = {
 	list: listTemplates,
 	create: createTemplate,
-	view: viewTemplate,
 	update: updateTemplate,
 	delete: deleteTemplate,
 };
@@ -17,7 +16,7 @@ async function listTemplates(filters?: { projectId?: string }) {
 		params.set('projectId', filters.projectId);
 	}
 	const queryString = params.toString();
-	const path = `/v2/template/list${queryString ? `?${queryString}` : ''}`;
+	const path = `/template/list${queryString ? `?${queryString}` : ''}`;
 
 	const response = (await fetchFromAPI({
 		path,
@@ -45,7 +44,7 @@ async function createTemplate(body: {
 	}[];
 }) {
 	const response = (await fetchFromAPI({
-		path: '/v2/template/create',
+		path: '/template/create',
 		method: 'POST',
 		body,
 	})) as {
@@ -55,20 +54,9 @@ async function createTemplate(body: {
 	return response;
 }
 
-async function viewTemplate(templateId: string) {
-	const response = (await fetchFromAPI({
-		path: `/v2/template/${templateId}/view`,
-		method: 'GET',
-	})) as {
-		template: Template;
-	};
-
-	return response;
-}
-
 async function updateTemplate(templateId: string, body: { name?: string }) {
 	const response = (await fetchFromAPI({
-		path: `/v2/template/${templateId}/update`,
+		path: `/template/${templateId}/update`,
 		method: 'POST',
 		body,
 	})) as {
@@ -80,7 +68,7 @@ async function updateTemplate(templateId: string, body: { name?: string }) {
 
 async function deleteTemplate(templateId: string) {
 	const response = (await fetchFromAPI({
-		path: `/v2/template/${templateId}/delete`,
+		path: `/template/${templateId}/delete`,
 		method: 'DELETE',
 	})) as {
 		success: boolean;
