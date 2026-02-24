@@ -1,10 +1,10 @@
+import crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
 import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
-import { DEFAULT_TILE, type TileData } from '@/utils/tile-types';
 
 const schema = z.object({
 	name: z.string(),
@@ -18,7 +18,31 @@ export const POST = [
 	async (req: Request, res: Response) => {
 		const body = req.body as z.infer<typeof schema>;
 
-		// Create the project first
+		const homePageId = crypto.randomUUID();
+
+		const initialTile = {
+			x: 0,
+			y: 0,
+			page: 0,
+			text: 'New tile',
+		};
+
+		const blob = {
+			name: body.name,
+			description: '',
+			imageUrl: null,
+			columns: body.columns,
+			rows: body.rows,
+			homePageId,
+			pages: [
+				{
+					id: homePageId,
+					name: 'Home',
+					tiles: [initialTile],
+				},
+			],
+		};
+
 		const createdProject = await prisma.project.create({
 			data: {
 				name: body.name,
@@ -27,35 +51,9 @@ export const POST = [
 				columns: body.columns,
 				rows: body.rows,
 				userId: req.userId!,
+				homePageId,
+				blob,
 			},
-		});
-
-		// Create initial tile at position (0, 0)
-		const initialTile: TileData = {
-			x: 0,
-			y: 0,
-			page: 0,
-			...DEFAULT_TILE,
-		};
-
-		// Create the home page with JSON tiles
-		const createdHomePage = await prisma.tilePage.create({
-			data: {
-				name: 'Home',
-				userId: req.userId!,
-				connectedProjects: {
-					create: {
-						projectId: createdProject.id,
-					},
-				},
-				tiles: [initialTile],
-			},
-		});
-
-		// Set the homePageId on the project
-		await prisma.project.update({
-			where: { id: createdProject.id },
-			data: { homePageId: createdHomePage.id },
 		});
 
 		invalidateCache(`projects:${req.userId}`);

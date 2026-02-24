@@ -7,8 +7,7 @@ import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
-import type { TileData } from '@/utils/tile-types';
-import { updateProjectLastEditedAt } from '@/utils/update-project-last-edited';
+import type { PageBlob, TileBlob } from '@/utils/project-blob';
 
 const schema = z.object({
 	dryRun: z.boolean(),
@@ -19,12 +18,9 @@ const OPTIMIZED_SUFFIX = '-optimized.webp';
 const TARGET_SIZE = 250;
 const WEBP_QUALITY = 80;
 
-// Type for tracking tile positions in pages
 interface TileWithContext {
 	pageId: string;
-	x: number;
-	y: number;
-	page: number;
+	tileIndex: number;
 	image: string;
 }
 
@@ -35,43 +31,33 @@ export const POST = [
 		const { dryRun } = req.body as z.infer<typeof schema>;
 		const projectId = req.params.id;
 
-		// Verify project ownership
 		const project = await prisma.project.findFirst({
-			where: {
-				id: projectId,
-				userId: req.userId,
-			},
-			include: {
-				connectedPages: {
-					include: {
-						tilePage: true,
-					},
-				},
-			},
+			where: { id: projectId, userId: req.userId },
 		});
 
 		if (!project) {
 			return res.status(404).json({ error: 'Project not found' });
 		}
 
-		// Collect all tiles with images from all pages in the project
+		const blob = project.blob as unknown as Record<string, unknown>;
+		const pages = ((blob?.pages as PageBlob[]) ?? []) as PageBlob[];
+
+		// Collect all tiles with images
 		const tilesWithImages: TileWithContext[] = [];
-		for (const conn of project.connectedPages) {
-			const tiles = (conn.tilePage.tiles as TileData[]) || [];
-			for (const tile of tiles) {
+		for (const page of pages) {
+			for (let i = 0; i < page.tiles.length; i++) {
+				const tile = page.tiles[i];
 				if (tile.image) {
 					tilesWithImages.push({
-						pageId: conn.tilePageId,
-						x: tile.x,
-						y: tile.y,
-						page: tile.page,
+						pageId: page.id,
+						tileIndex: i,
 						image: tile.image,
 					});
 				}
 			}
 		}
 
-		// Filter to only media.freespeechaac.com URLs and skip already-optimized images
+		// Filter to media host URLs and skip already-optimized
 		const tilesToOptimize = tilesWithImages.filter((tile) => {
 			if (!tile.image.includes(MEDIA_HOST)) return false;
 			if (tile.image.endsWith(OPTIMIZED_SUFFIX)) return false;
@@ -92,17 +78,13 @@ export const POST = [
 		let oldTotalSize = 0;
 		let newTotalSize = 0;
 
-		// Group updates by page for efficient batch updates
-		const updatesByPage = new Map<string, { x: number; y: number; page: number; newUrl: string }[]>();
+		// Track updates by pageId → tileIndex → newUrl
+		const updatesByPage = new Map<string, Map<number, string>>();
 
 		for (const tile of tilesToOptimize) {
 			try {
-				// Fetch the original image
 				const imageResponse = await fetch(tile.image);
 				if (!imageResponse.ok) {
-					console.error(
-						`Failed to fetch image for tile at (${tile.x},${tile.y}) on page ${tile.pageId}: ${imageResponse.status}`,
-					);
 					failed++;
 					continue;
 				}
@@ -110,7 +92,6 @@ export const POST = [
 				const originalBuffer = Buffer.from(await imageResponse.arrayBuffer());
 				oldTotalSize += originalBuffer.length;
 
-				// Convert with Sharp: resize to fit within TARGET_SIZE, WebP quality
 				const optimizedBuffer = await sharp(originalBuffer)
 					.resize(TARGET_SIZE, TARGET_SIZE, {
 						fit: 'inside',
@@ -121,12 +102,10 @@ export const POST = [
 
 				newTotalSize += optimizedBuffer.length;
 
-				// Generate new key with -optimized.webp suffix
 				const originalKey = new URL(tile.image).pathname.slice(1);
 				const baseName = originalKey.replace(/\.[^.]+$/, '');
 				const newKey = `${baseName}${OPTIMIZED_SUFFIX}`;
 
-				// Upload to R2
 				await s3.send(
 					new PutObjectCommand({
 						Bucket: R2_BUCKET,
@@ -136,49 +115,34 @@ export const POST = [
 					}),
 				);
 
-				// Track update for this page
 				if (!updatesByPage.has(tile.pageId)) {
-					updatesByPage.set(tile.pageId, []);
+					updatesByPage.set(tile.pageId, new Map());
 				}
-				updatesByPage.get(tile.pageId)?.push({
-					x: tile.x,
-					y: tile.y,
-					page: tile.page,
-					newUrl: `https://${MEDIA_HOST}/${newKey}`,
-				});
+				updatesByPage.get(tile.pageId)!.set(tile.tileIndex, `https://${MEDIA_HOST}/${newKey}`);
 				optimized++;
 			} catch (error) {
-				console.error(`Failed to optimize image for tile at (${tile.x},${tile.y}) on page ${tile.pageId}:`, error);
+				console.error(`Failed to optimize image:`, error);
 				failed++;
 			}
 		}
 
-		// Apply updates to each page's JSON tiles
-		for (const [pageId, updates] of updatesByPage) {
-			const tilePage = await prisma.tilePage.findUnique({
-				where: { id: pageId },
-			});
-
-			if (!tilePage) continue;
-
-			const tiles = (tilePage.tiles as TileData[]) || [];
-
-			// Apply updates
-			for (const update of updates) {
-				const tileIndex = tiles.findIndex((t) => t.x === update.x && t.y === update.y && t.page === update.page);
-				if (tileIndex !== -1) {
-					tiles[tileIndex].image = update.newUrl;
+		// Apply updates to the blob
+		if (updatesByPage.size > 0) {
+			for (const page of pages) {
+				const pageUpdates = updatesByPage.get(page.id);
+				if (!pageUpdates) continue;
+				for (const [tileIndex, newUrl] of pageUpdates) {
+					page.tiles[tileIndex].image = newUrl;
 				}
 			}
 
-			// Save updated tiles
-			await prisma.tilePage.update({
-				where: { id: pageId },
-				data: { tiles },
+			await prisma.project.update({
+				where: { id: projectId },
+				data: {
+					blob: { ...blob, pages },
+					lastEditedAt: new Date(),
+				},
 			});
-
-			// Update project lastEditedAt
-			await updateProjectLastEditedAt(pageId);
 		}
 
 		return res.json({

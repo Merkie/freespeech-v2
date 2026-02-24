@@ -5,7 +5,6 @@ import { authenticateRequest } from '@/middleware/authenticate-request';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { CLIENT_HOST, R2_BUCKET } from '@/utils/env';
-import { GetProjectHomePageID } from '@/utils/get-project-home-page-id';
 import slugify from '@/utils/slugify';
 import { generateToken } from '@/utils/token';
 
@@ -35,16 +34,11 @@ export const POST = [
 			},
 			include: {
 				user: true,
-				connectedPages: {
-					include: {
-						tilePage: true,
-					},
-				},
 			},
 		});
 		if (!project) return;
 
-		const homePageId = await GetProjectHomePageID(project);
+		const homePageId = project.homePageId;
 		if (!homePageId) return res.status(404).json({ error: 'Home page not found' });
 
 		const browser = await getBrowserInstance();
@@ -89,12 +83,16 @@ export const POST = [
 		});
 		await s3.send(uploadCommand);
 
+		const newImageUrl = `/${newThumbnailKey}`;
+		const currentBlob = project.blob as unknown as Record<string, unknown>;
+
 		await prisma.project.update({
 			where: {
 				id: project.id,
 			},
 			data: {
-				imageUrl: `/${newThumbnailKey}`,
+				imageUrl: newImageUrl,
+				blob: { ...currentBlob, imageUrl: newImageUrl },
 			},
 		});
 
