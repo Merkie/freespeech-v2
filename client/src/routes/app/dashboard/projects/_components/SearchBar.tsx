@@ -2,37 +2,38 @@ import type { Accessor, Component, JSX, Setter } from 'solid-js';
 import { createSignal, Show } from 'solid-js';
 import useOutsideClick from '@/hooks/useOutsideClick';
 
+export type SortOption = 'updated' | 'created' | 'name';
+export type SortDirection = 'asc' | 'desc';
+
 interface SearchBarProps {
 	query: Accessor<string>;
 	setQuery: Setter<string>;
+	sortBy: Accessor<SortOption>;
+	setSortBy: Setter<SortOption>;
+	sortDirection: Accessor<SortDirection>;
+	setSortDirection: Setter<SortDirection>;
 	children?: JSX.Element;
 }
-
-type SortOption = 'updated' | 'created' | 'name';
-type SortDirection = 'asc' | 'desc';
 
 const SearchBar: Component<SearchBarProps> = (props) => {
 	const [sortMenuOpen, setSortMenuOpen] = createSignal(false);
 	const [sortMenuRef, setSortMenuRef] = createSignal<HTMLDivElement | undefined>(undefined);
 
-	// Sort state (not implemented yet, just UI)
-	const [sortBy, setSortBy] = createSignal<SortOption>('updated');
-	const [sortDirection, setSortDirection] = createSignal<SortDirection>('desc');
+	const sortBy = () => props.sortBy();
+	const sortDirection = () => props.sortDirection();
 
 	useOutsideClick(sortMenuRef, () => {
 		if (sortMenuOpen()) setSortMenuOpen(false);
 	});
 
 	const handleSortChange = (newSortBy: SortOption) => {
-		setSortBy(newSortBy);
+		props.setSortBy(newSortBy);
 		setSortMenuOpen(false);
-		// TODO: Implement actual sorting
 	};
 
 	const handleSortDirectionChange = (direction: SortDirection) => {
-		setSortDirection(direction);
+		props.setSortDirection(direction);
 		setSortMenuOpen(false);
-		// TODO: Implement actual sorting
 	};
 
 	const getSortLabel = () => {

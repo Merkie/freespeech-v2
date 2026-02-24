@@ -7,9 +7,12 @@ import { localSettings, setActiveModalId } from '@/lib/state';
 import type { Project } from '@/lib/types';
 import ProjectCard from '@/routes/app/dashboard/projects/_components/ProjectCard';
 import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
+import type { SortDirection, SortOption } from '@/routes/app/dashboard/projects/_components/SearchBar';
 
 const ProjectsPage: Component = () => {
 	const [searchQuery, setSearchQuery] = createSignal('');
+	const [sortBy, setSortBy] = createSignal<SortOption>('updated');
+	const [sortDirection, setSortDirection] = createSignal<SortDirection>('desc');
 
 	const [projects] = createResource<Project[]>(async () => {
 		const response = await api.project.list();
@@ -33,10 +36,22 @@ const ProjectsPage: Component = () => {
 		const projectList = searchedProjects();
 		if (!projectList) return [];
 
+		const sort = sortBy();
+		const direction = sortDirection();
+		const multiplier = direction === 'asc' ? 1 : -1;
+
 		return [...projectList].sort((a, b) => {
+			// Last visited project always first
 			if (a.id === localSettings().lastVisitedProjectId) return -1;
 			if (b.id === localSettings().lastVisitedProjectId) return 1;
-			return 0;
+
+			if (sort === 'name') {
+				return multiplier * a.name.localeCompare(b.name);
+			}
+
+			const dateA = new Date(sort === 'created' ? a.createdAt : a.updatedAt).getTime();
+			const dateB = new Date(sort === 'created' ? b.createdAt : b.updatedAt).getTime();
+			return multiplier * (dateA - dateB);
 		});
 	});
 
@@ -51,7 +66,7 @@ const ProjectsPage: Component = () => {
 		<div class="min-h-screen bg-zinc-100">
 			<div class="mx-auto max-w-[1500px] px-6 py-8 md:px-12 lg:px-[100px]">
 				{/* Search and Sort */}
-				<SearchBar query={searchQuery} setQuery={setSearchQuery}>
+				<SearchBar query={searchQuery} setQuery={setSearchQuery} sortBy={sortBy} setSortBy={setSortBy} sortDirection={sortDirection} setSortDirection={setSortDirection}>
 					<button
 						onClick={() => setActiveModalId(MODAL_ID.CREATE_PROJECT)}
 						class="flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-white transition-all hover:brightness-110 active:brightness-90"
