@@ -16,21 +16,21 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 		if (user()) setShow(true);
 	});
 
-	// Redirect to last visited project when user is authenticated and on dashboard
+	// Redirect to last visited project only on initial app load (not in-app navigation)
+	const initialPathname = location.pathname;
 	createEffect(() => {
 		const currentUser = user();
 		const lastProjectId = localSettings().lastVisitedProjectId;
 
 		// Only redirect once, when user is authenticated
 		if (!currentUser || hasRedirected()) return;
+		setHasRedirected(true);
 
-		// Only redirect if we're at /app/dashboard/projects
-		// Note: /app is now handled by AppEntryPage
-		const isDashboardProjects =
-			location.pathname === '/app/dashboard/projects' || location.pathname === '/app/dashboard/projects/';
+		// Only redirect if the app initially loaded on /app/dashboard/projects
+		const loadedOnDashboard =
+			initialPathname === '/app/dashboard/projects' || initialPathname === '/app/dashboard/projects/';
 
-		if (isDashboardProjects && lastProjectId) {
-			setHasRedirected(true);
+		if (loadedOnDashboard && lastProjectId) {
 			navigate(`/app/project/${lastProjectId}`, { replace: true });
 		}
 	});

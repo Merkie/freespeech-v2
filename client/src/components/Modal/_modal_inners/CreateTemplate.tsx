@@ -1,5 +1,6 @@
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
+import { loadProjectBlob } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import {
 	editingTilePositions,
@@ -61,6 +62,9 @@ export default function CreateTemplate() {
 				setIsLoading(false);
 				return;
 			}
+
+			// Reload the project blob so the new template page is available for navigation
+			await loadProjectBlob(proj.id);
 
 			// Clear selection and close modal
 			setEditingTilePositions([]);
