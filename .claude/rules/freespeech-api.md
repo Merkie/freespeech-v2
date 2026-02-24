@@ -21,9 +21,7 @@ This is the production backend. Test changes thoroughly.
 
 ```
 /auth/*           - Login, register, OAuth
-/project/*        - CRUD, import OBF/OBZ
-/page/*           - TilePage CRUD
-/tile/*           - Tile CRUD
+/project/*        - Project CRUD, blob sync, image optimization
 /media/*          - Image search, upload, fetch
 /text-to-speech/* - ElevenLabs TTS
 ```
@@ -31,27 +29,21 @@ This is the production backend. Test changes thoroughly.
 ## Data Model
 
 - **User** - Auth, optional ElevenLabs API key
-- **Project** - Board project with grid settings (rows/columns), `homePageId`
-- **TilePage** - A page of tiles
-- **TilePageInProject** - Join table (pages can be shared across projects)
-- **Tile** - Position (x, y, page), text, colors, image URL, navigation link
+- **Project** - Board project with grid settings, `blob` JSON column (full source of truth for all pages/tiles)
+
+All pages and tiles are stored as JSON in `Project.blob`. No separate tile/page tables.
 
 ## Structure
 
 ```
-freespeech-api/src/
+server/src/
 ├── routes/           # File-based routing
-├── prisma/           # Schema and migrations
-└── lib/              # Utilities
+├── prisma/           # Schema
+├── utils/            # project-blob.ts, env, token, etc.
+├── scripts/          # One-time migration scripts
+└── middleware/        # Auth, validation, error handling
 ```
 
 ## Path Alias
 
 `@/*` → `src/*`
-
-## Database Indexes
-
-Performance-critical indexes on:
-- `Tile.tilePageId`
-- `TilePageInProject.tilePageId`
-- `TilePageInProject.projectId`
