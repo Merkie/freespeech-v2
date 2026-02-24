@@ -30,7 +30,6 @@ export type Project = {
 	id: string;
 	user?: User;
 	userId: string;
-	connectedPages?: TilePageInProject[];
 	name: string;
 	description: string | null;
 	imageUrl: string | null;
@@ -38,37 +37,13 @@ export type Project = {
 	rows: number;
 	isPublic: boolean;
 	homePageId: string | null;
-	// For cache invalidation - updated when any tile/page changes
 	lastEditedAt: string | Date;
 	createdAt: string | Date;
 	updatedAt: string | Date;
 };
 
-export type TilePage = {
-	id: string;
-	tiles: Tile[];
-	connectedProjects?: TilePageInProject[];
-	user?: User;
-	userId: string;
-	name: string;
-	isPublic: boolean;
-	isTemplate?: boolean;
-	createdAt: string | Date;
-	updatedAt: string | Date;
-};
-
-export type TilePageInProject = {
-	id: string;
-	tilePage?: TilePage;
-	tilePageId: string;
-	project?: Project;
-	projectId: string;
-	createdAt: string | Date;
-	updatedAt: string | Date;
-};
-
 // Tile is now identified by position (x, y, page) instead of ID
-// Tiles are stored as JSON in TilePage.tiles
+// Tiles are stored as JSON in the blob
 export type Tile = {
 	x: number;
 	y: number;
@@ -91,30 +66,6 @@ export type TilePosition = {
 // String key for position-based identification: "x-y-page"
 export type TilePositionKey = string;
 
-// Template is a TilePage with isTemplate=true
-export type Template = TilePage & {
-	isTemplate: true;
-	columns: number;
-	rows: number;
-	project?: {
-		id: string;
-		name: string;
-		columns: number;
-		rows: number;
-	} | null;
-	_count?: { linkedPages: number };
-};
-
-export type PageTemplateLink = {
-	id: string;
-	tilePageId: string;
-	templatePageId: string;
-	templatePage?: TilePage;
-	tilePage?: TilePage;
-	createdAt: string | Date;
-	updatedAt: string | Date;
-};
-
 // --- Blob types (for offline-first sync) ---
 
 export type TileBlob = {
@@ -133,8 +84,8 @@ export type PageBlob = {
 	id: string;
 	name: string;
 	tiles: TileBlob[];
+	isTemplate?: boolean;
 	templatePageId?: string;
-	templateTiles?: TileBlob[];
 };
 
 export type ProjectBlob = {

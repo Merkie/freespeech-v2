@@ -5,11 +5,8 @@ import type {
 	PageBlob,
 	Project,
 	ProjectBlob,
-	Template,
 	Tile,
 	TileBlob,
-	TilePage,
-	TilePageInProject,
 	TilePosition,
 	TilePositionKey,
 	User,
@@ -36,15 +33,7 @@ export function findTileByPositionKey(tiles: Tile[], key: TilePositionKey): Tile
 
 export const [project, setProject] = createSignal<Project>(null as unknown as Project);
 export const [projectHomePageId, setProjectHomePageId] = createSignal('');
-export const [currentPage, setCurrentPage] = createSignal<TilePageInProject>(null as unknown as TilePageInProject);
 export const [currentPageId, setCurrentPageId] = createSignal('');
-
-// Template state - current page's linked template
-export const [currentPageTemplate, setCurrentPageTemplate] = createSignal<Template | null>(null);
-export const [currentPageTemplateTiles, setCurrentPageTemplateTiles] = createSignal<Tile[]>([]);
-
-// Template editing mode
-export const [editingTemplate, setEditingTemplate] = createSignal<Template | null>(null);
 
 // Track page ID before entering template edit mode (to return to after exiting)
 export const [pageIdBeforeTemplateEdit, setPageIdBeforeTemplateEdit] = createSignal<string | null>(null);
@@ -78,7 +67,6 @@ export const [multiSelectMode, setMultiSelectMode] = createSignal(false);
 
 export const [editingPages, setEditingPages] = createSignal(false);
 export const [addingPage, setAddingPage] = createSignal(false);
-export const [pageBeingEdited, setPageBeingEdited] = createSignal<TilePage | null>(null);
 
 export const [editingProjects, setEditingProjects] = createSignal(false);
 export const [addingProject, setAddingProject] = createSignal(false);
@@ -92,10 +80,6 @@ export const [projectToOptimize, setProjectToOptimize] = createSignal<{
 	id: string;
 	name: string;
 } | null>(null);
-
-// Project pages (for page management)
-export const [projectPages, setProjectPages] = createSignal<TilePage[]>([]);
-export const [projectPagesLoading, setProjectPagesLoading] = createSignal(false);
 
 // Loading states for project/page transitions
 export const [projectLoading, setProjectLoading] = createSignal(false);
@@ -134,16 +118,35 @@ export function getCurrentPageTiles(): Tile[] {
 	return page.tiles.map(expandTileBlob);
 }
 
+// Resolve template tiles from the blob's own pages array
 export function getCurrentPageTemplateTilesFromBlob(): Tile[] {
 	const page = getPageFromBlob(currentPageId());
-	if (!page?.templateTiles) return [];
-	return page.templateTiles.map(expandTileBlob);
+	if (!page?.templatePageId) return [];
+	const templatePage = projectBlob()?.pages.find((p) => p.id === page.templatePageId);
+	if (!templatePage) return [];
+	return templatePage.tiles.map(expandTileBlob);
 }
 
 export function getProjectPagesFromBlob(): { id: string; name: string }[] {
 	const blob = projectBlob();
 	if (!blob) return [];
-	return blob.pages.map((p) => ({ id: p.id, name: p.name }));
+	return blob.pages.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name }));
+}
+
+// Get template pages from blob
+export function getTemplatePagesFromBlob(): PageBlob[] {
+	const blob = projectBlob();
+	if (!blob) return [];
+	return blob.pages.filter((p) => p.isTemplate === true);
+}
+
+// Get the template linked to a specific page
+export function getTemplateForPage(pageId: string): PageBlob | null {
+	const page = getPageFromBlob(pageId);
+	if (!page?.templatePageId) return null;
+	const blob = projectBlob();
+	if (!blob) return null;
+	return blob.pages.find((p) => p.id === page.templatePageId) ?? null;
 }
 
 // Reset all project-related state when switching projects
@@ -155,13 +158,6 @@ export function resetProjectState() {
 	setUsingOnlineSearch(false);
 	setEditingPages(false);
 	setAddingPage(false);
-	setPageBeingEdited(null);
-	setProjectPages([]);
-	setCurrentPage(null as unknown as TilePageInProject);
-	setCurrentPageId('');
-	setCurrentPageTemplate(null);
-	setCurrentPageTemplateTiles([]);
-	setEditingTemplate(null);
 	setPageIdBeforeTemplateEdit(null);
 	setProjectBlob(null);
 	setSyncStatus('synced');

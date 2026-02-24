@@ -5,8 +5,6 @@ import {
 	projectBlob,
 	resetProjectState,
 	setCurrentPageId,
-	setCurrentPageTemplate,
-	setCurrentPageTemplateTiles,
 	setLocalSettings,
 	setProject,
 	setProjectHomePageId,
@@ -93,7 +91,8 @@ export async function loadProject(
 	}
 }
 
-// Navigate to a page — now instant (no network call)
+// Navigate to a page — instant (no network call)
+// Template tiles are resolved from the blob's own pages array
 export function navigateToPageInProject(pageId: string): boolean {
 	const blob = projectBlob();
 	if (!blob) {
@@ -107,47 +106,7 @@ export function navigateToPageInProject(pageId: string): boolean {
 		return false;
 	}
 
-	batch(() => {
-		setCurrentPageId(pageId);
-
-		// Update template state from blob
-		if (page.templatePageId && page.templateTiles) {
-			// Page has a template — set template overlay data
-			const templatePage = blob.pages.find((p) => p.id === page.templatePageId);
-			if (templatePage) {
-				setCurrentPageTemplate({
-					id: templatePage.id,
-					name: templatePage.name,
-					tiles: [],
-					userId: '',
-					isPublic: false,
-					isTemplate: true,
-					columns: blob.columns,
-					rows: blob.rows,
-					createdAt: '',
-					updatedAt: '',
-				});
-			} else {
-				setCurrentPageTemplate(null);
-			}
-			setCurrentPageTemplateTiles(
-				page.templateTiles.map((t) => ({
-					x: t.x,
-					y: t.y,
-					page: t.page,
-					text: t.text,
-					displayText: t.displayText ?? '',
-					backgroundColor: t.backgroundColor ?? '#fafafa',
-					borderColor: t.borderColor ?? '#71717a',
-					image: t.image ?? '',
-					navigation: t.navigation ?? '',
-				})),
-			);
-		} else {
-			setCurrentPageTemplate(null);
-			setCurrentPageTemplateTiles([]);
-		}
-	});
+	setCurrentPageId(pageId);
 
 	// Track this page visit
 	trackVisit(blob.id, pageId);
@@ -156,8 +115,10 @@ export function navigateToPageInProject(pageId: string): boolean {
 }
 
 // Get home page ID from blob
-function getHomePageId(blob: { homePageId: string | null; pages: { id: string; name: string }[] }): string {
+function getHomePageId(blob: { homePageId: string | null; pages: { id: string; name: string; isTemplate?: boolean }[] }): string {
 	if (blob.homePageId) return blob.homePageId;
-	const homePage = blob.pages.find((p) => p.name.toLowerCase().trim() === 'home');
-	return homePage?.id ?? blob.pages[0]?.id ?? '';
+	// Only consider non-template pages
+	const nonTemplatePages = blob.pages.filter((p) => !p.isTemplate);
+	const homePage = nonTemplatePages.find((p) => p.name.toLowerCase().trim() === 'home');
+	return homePage?.id ?? nonTemplatePages[0]?.id ?? '';
 }
