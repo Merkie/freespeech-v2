@@ -51,10 +51,11 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 	// Check if current page is a template (editing the template source directly)
 	const isCurrentPageATemplate = () => {
 		const page = getPageFromBlob(currentPageId());
-		// A page that IS a template won't be in the blob's pages array normally,
-		// but if it is (e.g., navigated to for editing), check if another page references it as template
+		if (!page) return false;
+		// Check both: page has isTemplate flag, or another page references it as template
+		if (page.isTemplate) return true;
 		const blob = projectBlob();
-		if (!blob || !page) return false;
+		if (!blob) return false;
 		return blob.pages.some((p) => p.templatePageId === page.id);
 	};
 

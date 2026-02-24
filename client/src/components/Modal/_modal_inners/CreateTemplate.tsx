@@ -1,6 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js';
-import api from '@/lib/api';
-import { loadProjectBlob } from '@/lib/blob-sync';
+import { blobCreateTemplate } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import {
 	editingTilePositions,
@@ -14,7 +13,6 @@ import type { Tile } from '@/lib/types';
 
 export default function CreateTemplate() {
 	const [name, setName] = createSignal('');
-	const [isLoading, setIsLoading] = createSignal(false);
 	const [error, setError] = createSignal('');
 
 	// Get selected tiles from current page (only page 0 tiles)
@@ -30,48 +28,35 @@ export default function CreateTemplate() {
 	const previewCellSize = 12;
 	const previewGap = 1;
 
-	const handleSubmit = async (e: Event) => {
+	const handleSubmit = (e: Event) => {
 		e.preventDefault();
-		const proj = currentProject();
-		if (isLoading() || !name().trim() || !proj) return;
+		if (!name().trim()) return;
 
 		const tiles = selectedTiles();
 
-		setIsLoading(true);
 		setError('');
 
 		try {
-			const response = await api.template.create({
-				name: name().trim(),
-				projectId: proj.id,
-				tiles: tiles.map((tile) => ({
+			blobCreateTemplate(
+				name().trim(),
+				tiles.map((tile) => ({
 					x: tile.x,
 					y: tile.y,
 					page: tile.page,
 					text: tile.text,
-					backgroundColor: tile.backgroundColor,
-					borderColor: tile.borderColor,
-					image: tile.image,
-					navigation: tile.navigation,
-					displayText: tile.displayText,
+					...(tile.backgroundColor !== '#fafafa' && { backgroundColor: tile.backgroundColor }),
+					...(tile.borderColor !== '#71717a' && { borderColor: tile.borderColor }),
+					...(tile.image && { image: tile.image }),
+					...(tile.navigation && { navigation: tile.navigation }),
+					...(tile.displayText && { displayText: tile.displayText }),
 				})),
-			});
-
-			if ('error' in response) {
-				setError(response.error as string);
-				setIsLoading(false);
-				return;
-			}
-
-			// Reload the project blob so the new template page is available for navigation
-			await loadProjectBlob(proj.id);
+			);
 
 			// Clear selection and close modal
 			setEditingTilePositions([]);
 			setActiveModalId('');
 		} catch (_err) {
 			setError('Failed to create template');
-			setIsLoading(false);
 		}
 	};
 
@@ -145,13 +130,13 @@ export default function CreateTemplate() {
 				</button>
 				<button
 					type="submit"
-					disabled={!isValid() || isLoading()}
+					disabled={!isValid()}
 					class={cn('rounded-lg border px-4 py-2 text-sm font-medium transition-all', {
-						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': isValid() && !isLoading(),
-						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !isValid() || isLoading(),
+						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': isValid(),
+						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !isValid(),
 					})}
 				>
-					{isLoading() ? 'Creating...' : 'Create Template'}
+					Create Template
 				</button>
 			</div>
 		</form>

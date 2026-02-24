@@ -1,26 +1,23 @@
 import { createSignal, Show } from 'solid-js';
 import useOutsideClick from '@/hooks/useOutsideClick';
-import api from '@/lib/api';
+import { blobUnlinkTemplate } from '@/lib/blob-actions';
 import { editModeHasChanges } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import {
 	currentPageId,
-	currentPageTemplate,
 	editingTilePositions,
 	editingTiles,
 	getCurrentPageTiles,
 	getPageFromBlob,
+	getTemplateForPage,
 	multiSelectMode,
 	pageIdBeforeTemplateEdit,
 	projectBlob,
 	setActiveModalId,
-	setCurrentPageTemplate,
-	setCurrentPageTemplateTiles,
 	setEditingTiles,
 	setMultiSelectMode,
-	setPageBeingEdited,
 	setPageIdBeforeTemplateEdit,
 	syncStatus,
 	tilePositionKey,
@@ -30,7 +27,6 @@ import type { Tile } from '@/lib/types';
 export default function ProjectHeader() {
 	const [isPageDropdownOpen, setIsPageDropdownOpen] = createSignal(false);
 	const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = createSignal(false);
-	const [isUnlinking, setIsUnlinking] = createSignal(false);
 
 	const [pageDropdownRef, setPageDropdownRef] = createSignal<HTMLDivElement | undefined>(undefined);
 	const [templateDropdownRef, setTemplateDropdownRef] = createSignal<HTMLDivElement | undefined>(undefined);
@@ -43,7 +39,9 @@ export default function ProjectHeader() {
 		const page = getPageFromBlob(currentPageId());
 		return page?.name || 'Loading...';
 	};
-	const hasTemplate = () => currentPageTemplate() !== null;
+
+	const currentTemplate = () => getTemplateForPage(currentPageId());
+	const hasTemplate = () => currentTemplate() !== null;
 
 	// Check if current page is a template being edited.
 	// Combines two checks: (1) a page references this as its templatePageId, or
@@ -71,15 +69,6 @@ export default function ProjectHeader() {
 	const handleEditPage = () => {
 		const page = getPageFromBlob(currentPageId());
 		if (page) {
-			setPageBeingEdited({
-				id: page.id,
-				name: page.name,
-				tiles: [],
-				userId: '',
-				isPublic: false,
-				createdAt: '',
-				updatedAt: '',
-			});
 			setActiveModalId(MODAL_ID.EDIT_PAGE);
 		}
 		setIsPageDropdownOpen(false);
@@ -100,33 +89,24 @@ export default function ProjectHeader() {
 		setIsTemplateDropdownOpen(false);
 	};
 
-	const handleEditTemplate = async () => {
-		const template = currentPageTemplate();
+	const handleEditTemplate = () => {
+		const template = currentTemplate();
 		if (template) {
 			// Store current page ID to return to after exiting template edit
 			setPageIdBeforeTemplateEdit(currentPageId());
 			// Navigate to the template page within the same project editor
-			await navigateToPageInProject(template.id);
+			navigateToPageInProject(template.id);
 			setEditingTiles(true);
 		}
 		setIsTemplateDropdownOpen(false);
 	};
 
-	const handleUnlinkTemplate = async () => {
+	const handleUnlinkTemplate = () => {
 		const pageId = currentPageId();
-		if (!pageId || isUnlinking()) return;
+		if (!pageId) return;
 
-		setIsUnlinking(true);
-		try {
-			await api.page.unlinkTemplate(pageId);
-			setCurrentPageTemplate(null);
-			setCurrentPageTemplateTiles([]);
-		} catch (err) {
-			console.error('Failed to unlink template:', err);
-		} finally {
-			setIsUnlinking(false);
-			setIsTemplateDropdownOpen(false);
-		}
+		blobUnlinkTemplate(pageId);
+		setIsTemplateDropdownOpen(false);
 	};
 
 	const handleManageTemplates = () => {
@@ -234,15 +214,14 @@ export default function ProjectHeader() {
 									class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
 								>
 									<i class="bi bi-pencil" />
-									<span>Edit Template "{currentPageTemplate()?.name}"</span>
+									<span>Edit Template "{currentTemplate()?.name}"</span>
 								</button>
 								<button
 									onClick={handleUnlinkTemplate}
-									disabled={isUnlinking()}
-									class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm text-red-400 transition-colors hover:bg-zinc-700 disabled:opacity-50"
+									class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm text-red-400 transition-colors hover:bg-zinc-700"
 								>
 									<i class="bi bi-x-lg" />
-									<span>{isUnlinking() ? 'Unlinking...' : `Unlink Template "${currentPageTemplate()?.name}"`}</span>
+									<span>Unlink Template "{currentTemplate()?.name}"</span>
 								</button>
 							</Show>
 							<div class="mx-2 h-px bg-zinc-700" />

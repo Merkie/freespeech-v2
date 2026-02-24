@@ -1,37 +1,69 @@
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js';
-import TemplatePreview from '@/components/TemplatePreview';
-import api from '@/lib/api';
+import { createMemo, createSignal, For, Show } from 'solid-js';
+import { blobLinkTemplate } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import {
 	currentPageId,
+	getTemplatePagesFromBlob,
 	project,
 	setActiveModalId,
-	setCurrentPageTemplate,
-	setCurrentPageTemplateTiles,
 } from '@/lib/state';
+import type { PageBlob, Tile } from '@/lib/types';
+
+// Mini preview for template in list
+function TemplateMiniPreview(props: { template: PageBlob }) {
+	const currentProject = () => project();
+	const columns = () => currentProject()?.columns ?? 4;
+	const rows = () => currentProject()?.rows ?? 4;
+	const cellSize = 10;
+	const gap = 1;
+
+	const getTileAt = (x: number, y: number) => {
+		return props.template.tiles.find((t) => t.x === x && t.y === y);
+	};
+
+	return (
+		<div
+			class="inline-grid shrink-0 rounded border border-zinc-600 bg-zinc-900 p-1"
+			style={{
+				'grid-template-columns': `repeat(${columns()}, ${cellSize}px)`,
+				'grid-template-rows': `repeat(${rows()}, ${cellSize}px)`,
+				gap: `${gap}px`,
+			}}
+		>
+			<For each={Array.from({ length: rows() })}>
+				{(_, y) => (
+					<For each={Array.from({ length: columns() })}>
+						{(_, x) => {
+							const tile = getTileAt(x(), y());
+							return (
+								<div
+									class="rounded-sm"
+									style={{
+										'background-color': tile ? (tile.backgroundColor ?? '#fafafa') : 'transparent',
+										border: tile ? `1px solid ${tile.borderColor ?? '#71717a'}` : 'none',
+									}}
+								/>
+							);
+						}}
+					</For>
+				)}
+			</For>
+		</div>
+	);
+}
 
 export default function ApplyTemplate() {
 	const [searchQuery, setSearchQuery] = createSignal('');
 	const [selectedTemplateId, setSelectedTemplateId] = createSignal<string | null>(null);
-	const [isApplying, setIsApplying] = createSignal(false);
-	const [error, setError] = createSignal('');
 
-	const currentProject = () => project();
 	const currentPageIdValue = () => currentPageId();
 
-	// Fetch templates for the current project
-	const [templates] = createResource(
-		() => currentProject()?.id,
-		async (projectId) => {
-			if (!projectId) return [];
-			const response = await api.template.list({ projectId });
-			return response.templates || [];
-		},
-	);
+	// Get templates from blob
+	const templates = () => getTemplatePagesFromBlob();
 
 	// Filter templates by search
 	const filteredTemplates = createMemo(() => {
-		const allTemplates = templates() || [];
+		const allTemplates = templates();
 		const query = searchQuery().toLowerCase();
 
 		return allTemplates.filter((template) => {
@@ -40,34 +72,13 @@ export default function ApplyTemplate() {
 		});
 	});
 
-	const handleApply = async () => {
+	const handleApply = () => {
 		const templateId = selectedTemplateId();
 		const pageId = currentPageIdValue();
-		if (!templateId || !pageId || isApplying()) return;
+		if (!templateId || !pageId) return;
 
-		setIsApplying(true);
-		setError('');
-
-		try {
-			const response = await api.page.linkTemplate(pageId, templateId);
-
-			if ('error' in response) {
-				setError(response.error as string);
-				setIsApplying(false);
-				return;
-			}
-
-			// Update current page template state
-			if (response.template) {
-				setCurrentPageTemplate(response.template);
-				setCurrentPageTemplateTiles(response.template.tiles || []);
-			}
-
-			setActiveModalId('');
-		} catch (_err) {
-			setError('Failed to apply template');
-			setIsApplying(false);
-		}
+		blobLinkTemplate(pageId, templateId);
+		setActiveModalId('');
 	};
 
 	return (
@@ -87,47 +98,33 @@ export default function ApplyTemplate() {
 			{/* Templates list */}
 			<div class="max-h-64 overflow-y-auto">
 				<Show
-					when={!templates.loading}
-					fallback={<div class="py-4 text-center text-sm text-zinc-400">Loading templates...</div>}
+					when={filteredTemplates().length > 0}
+					fallback={<div class="py-4 text-center text-sm text-zinc-400">No templates found for this project</div>}
 				>
-					<Show
-						when={filteredTemplates().length > 0}
-						fallback={<div class="py-4 text-center text-sm text-zinc-400">No templates found for this project</div>}
-					>
-						<div class="flex flex-col gap-2">
-							<For each={filteredTemplates()}>
-								{(template) => (
-									<button
-										type="button"
-										onClick={() => setSelectedTemplateId(template.id)}
-										class={cn('flex items-center gap-3 rounded-lg border p-3 text-left transition-all', {
-											'border-blue-500 bg-blue-500/10': selectedTemplateId() === template.id,
-											'border-zinc-700 bg-zinc-800 hover:border-zinc-600': selectedTemplateId() !== template.id,
-										})}
-									>
-										<TemplatePreview template={template} size="small" />
-										<div class="flex-1">
-											<div class="text-sm font-medium text-white">{template.name}</div>
-											<div class="text-xs text-zinc-400">
-												{template._count && (
-													<span>
-														{template._count.linkedPages} page
-														{template._count.linkedPages !== 1 ? 's' : ''} linked
-													</span>
-												)}
-											</div>
+					<div class="flex flex-col gap-2">
+						<For each={filteredTemplates()}>
+							{(template) => (
+								<button
+									type="button"
+									onClick={() => setSelectedTemplateId(template.id)}
+									class={cn('flex items-center gap-3 rounded-lg border p-3 text-left transition-all', {
+										'border-blue-500 bg-blue-500/10': selectedTemplateId() === template.id,
+										'border-zinc-700 bg-zinc-800 hover:border-zinc-600': selectedTemplateId() !== template.id,
+									})}
+								>
+									<TemplateMiniPreview template={template} />
+									<div class="flex-1">
+										<div class="text-sm font-medium text-white">{template.name}</div>
+										<div class="text-xs text-zinc-400">
+											{template.tiles.length} tile{template.tiles.length !== 1 ? 's' : ''}
 										</div>
-									</button>
-								)}
-							</For>
-						</div>
-					</Show>
+									</div>
+								</button>
+							)}
+						</For>
+					</div>
 				</Show>
 			</div>
-
-			<Show when={error()}>
-				<p class="text-sm text-red-400">{error()}</p>
-			</Show>
 
 			<div class="flex justify-end gap-2 pt-2">
 				<button
@@ -140,13 +137,13 @@ export default function ApplyTemplate() {
 				<button
 					type="button"
 					onClick={handleApply}
-					disabled={!selectedTemplateId() || isApplying()}
+					disabled={!selectedTemplateId()}
 					class={cn('rounded-lg border px-4 py-2 text-sm font-medium transition-all', {
-						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': selectedTemplateId() && !isApplying(),
-						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !selectedTemplateId() || isApplying(),
+						'border-blue-500 bg-blue-600 text-white hover:bg-blue-500': selectedTemplateId(),
+						'cursor-not-allowed border-zinc-700 bg-zinc-800 text-zinc-500': !selectedTemplateId(),
 					})}
 				>
-					{isApplying() ? 'Applying...' : 'Apply Template'}
+					Apply Template
 				</button>
 			</div>
 		</div>

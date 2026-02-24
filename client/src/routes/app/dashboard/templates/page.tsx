@@ -1,77 +1,24 @@
 import { useNavigate } from '@solidjs/router';
-import Fuse from 'fuse.js';
 import type { Component } from 'solid-js';
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js';
-import api from '@/lib/api';
-import { setEditingTemplate } from '@/lib/state';
-import type { Template } from '@/lib/types';
-import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
-import TemplateCard from './_components/TemplateCard';
+import { onMount } from 'solid-js';
 
 const TemplatesPage: Component = () => {
 	const navigate = useNavigate();
-	const [searchQuery, setSearchQuery] = createSignal('');
 
-	const [templates, { refetch }] = createResource<Template[]>(async () => {
-		const response = await api.template.list();
-		return response.templates;
+	onMount(() => {
+		// Templates are now managed per-project via blob.
+		// Redirect to projects page.
+		navigate('/app/dashboard/projects', { replace: true });
 	});
-
-	const searchedTemplates = createMemo(() => {
-		const query = searchQuery();
-		const templateList = templates();
-
-		if (!query || !templateList) return templateList || [];
-
-		const fuse = new Fuse(templateList, {
-			keys: ['name'],
-		});
-
-		return fuse.search(query).map((result) => result.item);
-	});
-
-	const handleEdit = (template: Template) => {
-		if (!template.project?.id) {
-			console.error('Template has no connected project');
-			return;
-		}
-		// Store template to load after project navigation
-		setEditingTemplate(template);
-		navigate(`/app/project/${template.project.id}`);
-	};
 
 	return (
-		<>
-			<SearchBar query={searchQuery} setQuery={setSearchQuery} />
-
-			<Show when={!templates.loading} fallback={<div class="p-8">Loading templates...</div>}>
-				<Show
-					when={searchedTemplates().length > 0}
-					fallback={
-						<div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-							<i class="bi bi-grid-3x3 text-4xl text-zinc-400" />
-							<div class="text-zinc-500">
-								<p class="mb-1 font-medium">No templates yet</p>
-								<p class="text-sm">Create templates from tile selections in a project</p>
-							</div>
-						</div>
-					}
-				>
-					<div class="m-8 grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3">
-						<For each={searchedTemplates()}>
-							{(template) => (
-								<TemplateCard
-									template={template}
-									onDelete={() => refetch()}
-									onEdit={() => handleEdit(template)}
-									onRename={() => refetch()}
-								/>
-							)}
-						</For>
-					</div>
-				</Show>
-			</Show>
-		</>
+		<div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+			<i class="bi bi-grid-3x3 text-4xl text-zinc-400" />
+			<div class="text-zinc-500">
+				<p class="mb-1 font-medium">Templates are now per-project</p>
+				<p class="text-sm">Manage templates from within each project's edit mode</p>
+			</div>
+		</div>
 	);
 };
 

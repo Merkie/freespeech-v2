@@ -4,17 +4,13 @@ import { flushDirtyBlobs } from '@/lib/blob-sync';
 import { loadProject, navigateToPageInProject } from '@/lib/page-actions';
 import {
 	currentPageId,
-	editingTemplate,
 	editingTiles,
 	localSettings,
 	projectBlob,
 	projectLoading,
 	resetProjectState,
-	setEditingTemplate,
-	setEditingTiles,
 	setSyncStatus,
 } from '@/lib/state';
-import type { Project } from '@/lib/types';
 import ProjectContent from './_components/ProjectContent';
 import ProjectContentSkeleton from './_components/ProjectContentSkeleton';
 import ProjectHeader from './_components/ProjectHeader';
@@ -55,20 +51,10 @@ const AppProjectPage: Component = () => {
 					resetProjectState();
 				}
 
-				// Check if we're navigating to edit a specific template
-				const templateToEdit = editingTemplate();
-
-				const success = await loadProject(projectId, { setHomePage: !templateToEdit });
+				const success = await loadProject(projectId, { setHomePage: true });
 				if (!success) {
 					navigate('/app/dashboard/projects');
 					return;
-				}
-
-				// If editing a template, navigate to it and enter edit mode
-				if (templateToEdit) {
-					navigateToPageInProject(templateToEdit.id);
-					setEditingTiles(true);
-					setEditingTemplate(null); // Clear after use
 				}
 			},
 			{ defer: false },
@@ -91,17 +77,5 @@ const AppProjectPage: Component = () => {
 		</>
 	);
 };
-
-// This finds the page named "home" or the first page if "home" doesn't exist
-export function getHomePageId(project: Project): string {
-	return (
-		project.homePageId ||
-		((
-			project.connectedPages?.find(({ tilePage }) => tilePage?.name.toLowerCase().trim() === 'home') ??
-			project.connectedPages?.[0]
-		)?.tilePageId ??
-			'')
-	);
-}
 
 export default AppProjectPage;

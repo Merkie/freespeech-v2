@@ -1,35 +1,30 @@
-import { createResource, createSignal, For, Show } from 'solid-js';
-import TemplatePreview from '@/components/TemplatePreview';
-import { tooltip } from '@/hooks/useTooltip';
-import api from '@/lib/api';
+import { createSignal, For, Show } from 'solid-js';
+import { blobDeleteTemplate, blobRenameTemplate } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import {
 	currentPageId,
-	currentPageTemplate,
+	getTemplatePagesFromBlob,
 	project,
+	projectBlob,
 	setActiveModalId,
-	setCurrentPageTemplate,
 	setEditingTiles,
 	setPageIdBeforeTemplateEdit,
 } from '@/lib/state';
-import type { Template } from '@/lib/types';
+import type { PageBlob } from '@/lib/types';
 
 export default function ManageTemplates() {
 	const [renamingId, setRenamingId] = createSignal<string | null>(null);
 	const [editName, setEditName] = createSignal('');
-	const [isSaving, setIsSaving] = createSignal(false);
 	const [deletingId, setDeletingId] = createSignal<string | null>(null);
-	const [isDeleting, setIsDeleting] = createSignal(false);
 
-	const [templates, { refetch }] = createResource<Template[]>(async () => {
-		const projectId = project()?.id;
-		if (!projectId) return [];
-		const response = await api.template.list({ projectId });
-		return response.templates || [];
-	});
+	const templates = () => getTemplatePagesFromBlob();
 
-	const handleView = (template: Template) => {
+	const currentProject = () => project();
+	const columns = () => currentProject()?.columns ?? 4;
+	const rows = () => currentProject()?.rows ?? 4;
+
+	const handleView = (template: PageBlob) => {
 		// Store current page ID to return to after exiting template edit
 		setPageIdBeforeTemplateEdit(currentPageId());
 		setActiveModalId('');
@@ -37,7 +32,7 @@ export default function ManageTemplates() {
 		setEditingTiles(true);
 	};
 
-	const startRenaming = (template: Template) => {
+	const startRenaming = (template: PageBlob) => {
 		setRenamingId(template.id);
 		setEditName(template.name);
 	};
@@ -47,27 +42,15 @@ export default function ManageTemplates() {
 		setEditName('');
 	};
 
-	const handleRename = async (template: Template) => {
+	const handleRename = (template: PageBlob) => {
 		const newName = editName().trim();
-		if (!newName || newName === template.name || isSaving()) return;
+		if (!newName || newName === template.name) return;
 
-		setIsSaving(true);
-		try {
-			await api.template.update(template.id, { name: newName });
-			// Update currentPageTemplate if it's the one being renamed
-			if (currentPageTemplate()?.id === template.id) {
-				setCurrentPageTemplate({ ...currentPageTemplate()!, name: newName });
-			}
-			refetch();
-			setRenamingId(null);
-		} catch (err) {
-			console.error('Failed to rename template:', err);
-		} finally {
-			setIsSaving(false);
-		}
+		blobRenameTemplate(template.id, newName);
+		setRenamingId(null);
 	};
 
-	const handleKeyDown = (e: KeyboardEvent, template: Template) => {
+	const handleKeyDown = (e: KeyboardEvent, template: PageBlob) => {
 		if (e.key === 'Enter') {
 			handleRename(template);
 		} else if (e.key === 'Escape') {
@@ -75,34 +58,61 @@ export default function ManageTemplates() {
 		}
 	};
 
-	const confirmDelete = async (template: Template) => {
-		if (isDeleting()) return;
-
-		setIsDeleting(true);
-		try {
-			await api.template.delete(template.id);
-			// Clear currentPageTemplate if it's the one being deleted
-			if (currentPageTemplate()?.id === template.id) {
-				setCurrentPageTemplate(null);
-			}
-			refetch();
-			setDeletingId(null);
-		} catch (err) {
-			console.error('Failed to delete template:', err);
-		} finally {
-			setIsDeleting(false);
-		}
+	const confirmDelete = (template: PageBlob) => {
+		blobDeleteTemplate(template.id);
+		setDeletingId(null);
 	};
 
-	const linkedPagesCount = (template: Template) => template._count?.linkedPages || 0;
+	// Count pages linked to this template
+	const linkedPagesCount = (template: PageBlob) => {
+		const blob = projectBlob();
+		if (!blob) return 0;
+		return blob.pages.filter((p) => p.templatePageId === template.id).length;
+	};
+
+	// Mini preview
+	const TemplateMiniPreview = (props: { template: PageBlob }) => {
+		const cellSize = 10;
+		const gap = 1;
+
+		const getTileAt = (x: number, y: number) => {
+			return props.template.tiles.find((t) => t.x === x && t.y === y);
+		};
+
+		return (
+			<div
+				class="inline-grid shrink-0 rounded border border-zinc-600 bg-zinc-900 p-1"
+				style={{
+					'grid-template-columns': `repeat(${columns()}, ${cellSize}px)`,
+					'grid-template-rows': `repeat(${rows()}, ${cellSize}px)`,
+					gap: `${gap}px`,
+				}}
+			>
+				<For each={Array.from({ length: rows() })}>
+					{(_, y) => (
+						<For each={Array.from({ length: columns() })}>
+							{(_, x) => {
+								const tile = getTileAt(x(), y());
+								return (
+									<div
+										class="rounded-sm"
+										style={{
+											'background-color': tile ? (tile.backgroundColor ?? '#fafafa') : 'transparent',
+											border: tile ? `1px solid ${tile.borderColor ?? '#71717a'}` : 'none',
+										}}
+									/>
+								);
+							}}
+						</For>
+					)}
+				</For>
+			</div>
+		);
+	};
 
 	return (
 		<div class="flex flex-col gap-4">
-			<Show when={templates.loading}>
-				<p class="text-zinc-400">Loading templates...</p>
-			</Show>
-
-			<Show when={!templates.loading}>
+			<Show when={templates().length > 0}>
 				<div class="max-h-[400px] overflow-y-auto">
 					<For each={templates()}>
 						{(template, index) => (
@@ -111,7 +121,7 @@ export default function ManageTemplates() {
 									'border-t border-zinc-700': index() !== 0,
 								})}
 							>
-								<TemplatePreview template={template} size="small" />
+								<TemplateMiniPreview template={template} />
 								<div class="flex-1 min-w-0">
 									<Show
 										when={renamingId() !== template.id}
@@ -127,7 +137,7 @@ export default function ManageTemplates() {
 												/>
 												<button
 													onClick={() => handleRename(template)}
-													disabled={isSaving() || !editName().trim() || editName().trim() === template.name}
+													disabled={!editName().trim() || editName().trim() === template.name}
 													class="cursor-pointer rounded p-1 text-green-400 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
 												>
 													<i class="bi bi-check-lg" />
@@ -143,8 +153,7 @@ export default function ManageTemplates() {
 									>
 										<p class="truncate text-zinc-200">{template.name}</p>
 										<p class="text-xs text-zinc-500">
-											{template.columns} x {template.rows} &middot; {linkedPagesCount(template)} page
-											{linkedPagesCount(template) !== 1 ? 's' : ''} linked
+											{columns()} x {rows()} &middot; {template.tiles.length} tile{template.tiles.length !== 1 ? 's' : ''}
 										</p>
 									</Show>
 								</div>
@@ -154,21 +163,21 @@ export default function ManageTemplates() {
 										fallback={
 											<div class="flex items-center gap-1">
 												<button
-													ref={tooltip('View/Edit')}
+													title="View/Edit"
 													onClick={() => handleView(template)}
 													class="grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-blue-500/10 hover:text-blue-400"
 												>
 													<i class="bi bi-eye" />
 												</button>
 												<button
-													ref={tooltip('Rename')}
+													title="Rename"
 													onClick={() => startRenaming(template)}
 													class="grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-yellow-500/10 hover:text-yellow-400"
 												>
 													<i class="bi bi-input-cursor-text" />
 												</button>
 												<button
-													ref={tooltip('Delete')}
+													title="Delete"
 													onClick={() => setDeletingId(template.id)}
 													class="grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
 												>
@@ -181,15 +190,13 @@ export default function ManageTemplates() {
 											<span class="text-sm text-zinc-400">Delete?</span>
 											<button
 												onClick={() => confirmDelete(template)}
-												disabled={isDeleting()}
-												class="cursor-pointer rounded-md bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+												class="cursor-pointer rounded-md bg-red-600 px-3 py-1 text-sm text-white transition-colors hover:bg-red-500"
 											>
-												{isDeleting() ? 'Deleting...' : 'Yes'}
+												Yes
 											</button>
 											<button
 												onClick={() => setDeletingId(null)}
-												disabled={isDeleting()}
-												class="cursor-pointer rounded-md border border-zinc-600 px-3 py-1 text-sm text-zinc-300 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+												class="cursor-pointer rounded-md border border-zinc-600 px-3 py-1 text-sm text-zinc-300 transition-colors hover:bg-zinc-700"
 											>
 												No
 											</button>
@@ -200,14 +207,14 @@ export default function ManageTemplates() {
 						)}
 					</For>
 				</div>
+			</Show>
 
-				<Show when={!templates.loading && templates()?.length === 0}>
-					<div class="flex flex-col items-center gap-2 py-4 text-center">
-						<i class="bi bi-grid-3x3 text-2xl text-zinc-500" />
-						<p class="text-zinc-400">No templates yet</p>
-						<p class="text-sm text-zinc-500">Select tiles and use "Create Template" to make one</p>
-					</div>
-				</Show>
+			<Show when={templates().length === 0}>
+				<div class="flex flex-col items-center gap-2 py-4 text-center">
+					<i class="bi bi-grid-3x3 text-2xl text-zinc-500" />
+					<p class="text-zinc-400">No templates yet</p>
+					<p class="text-sm text-zinc-500">Select tiles and use "Create Template" to make one</p>
+				</div>
 			</Show>
 
 			<div class="flex justify-end border-t border-zinc-700 pt-4">

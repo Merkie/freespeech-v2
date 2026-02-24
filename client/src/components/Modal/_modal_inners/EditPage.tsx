@@ -2,10 +2,10 @@ import { createSignal, Show } from 'solid-js';
 import { blobRenamePage } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
-import { pageBeingEdited, setActiveModalId, setPageBeingEdited } from '@/lib/state';
+import { currentPageId, getPageFromBlob, setActiveModalId } from '@/lib/state';
 
 export default function EditPage() {
-	const page = pageBeingEdited();
+	const page = getPageFromBlob(currentPageId());
 	const [name, setName] = createSignal(page?.name || '');
 	const [error, setError] = createSignal('');
 
@@ -20,8 +20,7 @@ export default function EditPage() {
 			// Instant rename via blob mutation
 			blobRenamePage(pageId, name().trim());
 
-			// Clear the page being edited and go back to manage pages
-			setPageBeingEdited(null);
+			// Go back to manage pages
 			setActiveModalId(MODAL_ID.MANAGE_PAGES);
 		} catch (_err) {
 			setError('Failed to update page');
@@ -52,7 +51,6 @@ export default function EditPage() {
 				<button
 					type="button"
 					onClick={() => {
-						setPageBeingEdited(null);
 						setActiveModalId(MODAL_ID.MANAGE_PAGES);
 					}}
 					class="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:bg-zinc-700 hover:text-white"
