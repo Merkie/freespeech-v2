@@ -10,8 +10,7 @@ datasource db {
 model User {
   id String @id @default(cuid())
 
-  Project  Project[]
-  TilePage TilePage[]
+  Project Project[]
 
   email                    String  @unique
   name                     String
@@ -30,8 +29,6 @@ model Project {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
-  connectedPages TilePageInProject[]
-
   name        String
   description String?
   imageUrl    String?
@@ -40,63 +37,12 @@ model Project {
   isPublic    Boolean @default(false)
   homePageId  String?
 
+  // Full project blob (all pages, tiles, templates) stored as JSON
+  blob Json @default("{\"name\":\"\",\"description\":null,\"imageUrl\":null,\"columns\":6,\"rows\":4,\"homePageId\":null,\"pages\":[]}")
+
   // For cache invalidation - updated when any tile/page in project changes
   lastEditedAt DateTime @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model TilePage {
-  id String @id @default(cuid())
-
-  // Tiles stored as JSON array instead of separate table
-  // Each tile: { x, y, page, text, displayText, backgroundColor, borderColor, image, navigation }
-  tiles Json @default("[]")
-
-  connectedProjects TilePageInProject[]
-  templateLink      PageTemplateLink?   @relation("PageWithTemplate")
-  pagesUsingAsTemplate PageTemplateLink[] @relation("TemplateSource")
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-
-  name       String
-  isPublic   Boolean @default(false)
-  isTemplate Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model TilePageInProject {
-  id String @id @default(cuid())
-
-  tilePage   TilePage @relation(fields: [tilePageId], references: [id], onDelete: Cascade)
-  tilePageId String
-
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([tilePageId])
-  @@index([projectId])
-}
-
-// Tile model removed - tiles are now embedded as JSON in TilePage.tiles
-// Each tile in the JSON array has: x, y, page, text, displayText, backgroundColor, borderColor, image, navigation
-
-model PageTemplateLink {
-  id             String   @id @default(cuid())
-  tilePage       TilePage @relation("PageWithTemplate", fields: [tilePageId], references: [id], onDelete: Cascade)
-  tilePageId     String   @unique
-  templatePage   TilePage @relation("TemplateSource", fields: [templatePageId], references: [id], onDelete: Cascade)
-  templatePageId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([templatePageId])
-  @@index([tilePageId])
 }
