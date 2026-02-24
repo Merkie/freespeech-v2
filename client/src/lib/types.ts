@@ -114,3 +114,44 @@ export type PageTemplateLink = {
 	createdAt: string | Date;
 	updatedAt: string | Date;
 };
+
+// --- Blob types (for offline-first sync) ---
+
+export type TileBlob = {
+	x: number;
+	y: number;
+	page: number;
+	text: string;
+	displayText?: string;
+	backgroundColor?: string;
+	borderColor?: string;
+	image?: string;
+	navigation?: string;
+};
+
+export type PageBlob = {
+	id: string;
+	name: string;
+	tiles: TileBlob[];
+	templatePageId?: string;
+	templateTiles?: TileBlob[];
+};
+
+export type ProjectBlob = {
+	id: string;
+	name: string;
+	description: string | null;
+	imageUrl: string | null;
+	columns: number;
+	rows: number;
+	homePageId: string | null;
+	lastEditedAt: string;
+	pages: PageBlob[];
+};
+
+export type CachedProjectBlob = {
+	id: string;
+	blob: ProjectBlob;
+	cachedAt: number;
+	dirty: boolean;
+};

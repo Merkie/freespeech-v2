@@ -2,9 +2,12 @@ import { createEffect, createRoot, createSignal } from 'solid-js';
 import type { ModalIdType } from './constants';
 import type {
 	LocalSettings,
+	PageBlob,
 	Project,
+	ProjectBlob,
 	Template,
 	Tile,
+	TileBlob,
 	TilePage,
 	TilePageInProject,
 	TilePosition,
@@ -106,6 +109,51 @@ export const [projectPagesLoading, setProjectPagesLoading] = createSignal(false)
 export const [projectLoading, setProjectLoading] = createSignal(false);
 export const [pageLoading, setPageLoading] = createSignal(false);
 
+// --- Blob state (offline-first sync) ---
+export type SyncStatus = 'synced' | 'syncing' | 'dirty' | 'conflict' | 'offline' | 'error';
+export const [projectBlob, setProjectBlob] = createSignal<ProjectBlob | null>(null);
+export const [syncStatus, setSyncStatus] = createSignal<SyncStatus>('synced');
+
+// Derived helpers — call within tracking scopes for reactivity
+const DEFAULT_BG = '#fafafa';
+const DEFAULT_BORDER = '#71717a';
+
+function expandTileBlob(t: TileBlob): Tile {
+	return {
+		x: t.x,
+		y: t.y,
+		page: t.page,
+		text: t.text,
+		displayText: t.displayText ?? '',
+		backgroundColor: t.backgroundColor ?? DEFAULT_BG,
+		borderColor: t.borderColor ?? DEFAULT_BORDER,
+		image: t.image ?? '',
+		navigation: t.navigation ?? '',
+	};
+}
+
+export function getPageFromBlob(pageId: string): PageBlob | undefined {
+	return projectBlob()?.pages.find((p) => p.id === pageId);
+}
+
+export function getCurrentPageTiles(): Tile[] {
+	const page = getPageFromBlob(currentPageId());
+	if (!page) return [];
+	return page.tiles.map(expandTileBlob);
+}
+
+export function getCurrentPageTemplateTilesFromBlob(): Tile[] {
+	const page = getPageFromBlob(currentPageId());
+	if (!page?.templateTiles) return [];
+	return page.templateTiles.map(expandTileBlob);
+}
+
+export function getProjectPagesFromBlob(): { id: string; name: string }[] {
+	const blob = projectBlob();
+	if (!blob) return [];
+	return blob.pages.map((p) => ({ id: p.id, name: p.name }));
+}
+
 // Reset all project-related state when switching projects
 export function resetProjectState() {
 	setSentence([]);
@@ -124,6 +172,8 @@ export function resetProjectState() {
 	setCurrentPageTemplateTiles([]);
 	setEditingTemplate(null);
 	setPageIdBeforeTemplateEdit(null);
+	setProjectBlob(null);
+	setSyncStatus('synced');
 }
 
 export const [voiceEngineStatus, setVoiceEngineStatus] = createSignal<'ready' | 'speaking' | 'synthesizing' | 'failed'>(
