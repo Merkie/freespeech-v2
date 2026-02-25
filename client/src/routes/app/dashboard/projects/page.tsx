@@ -3,7 +3,7 @@ import type { Component } from 'solid-js';
 import { createMemo, createResource, createSignal, For, onMount, Show } from 'solid-js';
 import api from '@/lib/api';
 import { MODAL_ID } from '@/lib/constants';
-import { localSettings, setActiveModalId } from '@/lib/state';
+import { setActiveModalId } from '@/lib/state';
 import type { Project } from '@/lib/types';
 import ProjectCard from '@/routes/app/dashboard/projects/_components/ProjectCard';
 import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
@@ -14,10 +14,14 @@ const ProjectsPage: Component = () => {
 	const [sortBy, setSortBy] = createSignal<SortOption>('updated');
 	const [sortDirection, setSortDirection] = createSignal<SortDirection>('desc');
 
-	const [projects] = createResource<Project[]>(async () => {
+	const [projects, { mutate: mutateProjects }] = createResource<Project[]>(async () => {
 		const response = await api.project.list();
 		return response.projects;
 	});
+
+	const handleToggleFavorite = (projectId: string, newValue: boolean) => {
+		mutateProjects((prev) => prev?.map((p) => (p.id === projectId ? { ...p, isFavorite: newValue } : p)));
+	};
 
 	const searchedProjects = createMemo(() => {
 		const query = searchQuery();
@@ -40,18 +44,21 @@ const ProjectsPage: Component = () => {
 		const direction = sortDirection();
 		const multiplier = direction === 'asc' ? 1 : -1;
 
-		return [...projectList].sort((a, b) => {
-			// Last visited project always first
-			if (a.id === localSettings().lastVisitedProjectId) return -1;
-			if (b.id === localSettings().lastVisitedProjectId) return 1;
-
+		const compare = (a: Project, b: Project) => {
 			if (sort === 'name') {
 				return multiplier * a.name.localeCompare(b.name);
 			}
-
 			const dateA = new Date(sort === 'created' ? a.createdAt : a.updatedAt).getTime();
 			const dateB = new Date(sort === 'created' ? b.createdAt : b.updatedAt).getTime();
 			return multiplier * (dateA - dateB);
+		};
+
+		return [...projectList].sort((a, b) => {
+			const aFav = a.isFavorite;
+			const bFav = b.isFavorite;
+			if (aFav && !bFav) return -1;
+			if (!aFav && bFav) return 1;
+			return compare(a, b);
 		});
 	});
 
@@ -123,7 +130,7 @@ const ProjectsPage: Component = () => {
 						}
 					>
 						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-							<For each={sortedProjects()}>{(project) => <ProjectCard project={project} />}</For>
+							<For each={sortedProjects()}>{(project) => <ProjectCard project={project} onToggleFavorite={handleToggleFavorite} />}</For>
 						</div>
 					</Show>
 				</Show>

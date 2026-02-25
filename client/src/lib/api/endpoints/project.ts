@@ -10,6 +10,7 @@ const project = {
 	syncCheck: syncCheckProject,
 	fetchBlob: fetchProjectBlob,
 	syncBlob: syncProjectBlob,
+	toggleFavorite: toggleFavorite,
 };
 
 export default project;
@@ -106,6 +107,18 @@ async function fetchProjectBlob(projectId: string) {
 		method: 'GET',
 	})) as {
 		blob: ProjectBlob;
+		error?: string;
+	};
+
+	return response;
+}
+
+async function toggleFavorite(projectId: string) {
+	const response = (await fetchFromAPI({
+		path: `/project/${projectId}/favorite`,
+		method: 'POST',
+	})) as {
+		isFavorite: boolean;
 		error?: string;
 	};
 

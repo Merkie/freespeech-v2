@@ -4,11 +4,13 @@ import { createSignal, onMount, Show } from "solid-js";
 import { isBlobCached } from "@/lib/cache/blob-cache";
 import useOutsideClick from "@/hooks/useOutsideClick";
 import { MODAL_ID } from "@/lib/constants";
+import api from "@/lib/api";
 import { project, setActiveModalId, setProjectToOptimize } from "@/lib/state";
 import type { Project } from "@/lib/types";
 
 interface ProjectCardProps {
   project: Project;
+  onToggleFavorite?: (projectId: string, newValue: boolean) => void;
 }
 
 const ProjectCard: Component<ProjectCardProps> = (props) => {
@@ -18,11 +20,13 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
     undefined,
   );
   const [cached, setCached] = createSignal(false);
+  const [favoriteOverride, setFavoriteOverride] = createSignal<boolean | null>(null);
 
   onMount(async () => {
     setCached(await isBlobCached(props.project.id));
   });
 
+  const isFavorite = () => favoriteOverride() ?? props.project.isFavorite;
   const projectUrl = () => `/app/project/${props.project.id}`;
 
   useOutsideClick(cardRef, () => {
@@ -34,6 +38,20 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(!menuOpen());
+  };
+
+  const handleToggleFavorite = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuOpen(false);
+    const newValue = !isFavorite();
+    setFavoriteOverride(newValue);
+    try {
+      await api.project.toggleFavorite(props.project.id);
+      props.onToggleFavorite?.(props.project.id, newValue);
+    } catch {
+      setFavoriteOverride(null);
+    }
   };
 
   const handleOptimizeImages = (e: MouseEvent) => {
@@ -100,6 +118,16 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
               href={projectUrl()}
               class="flex-1 truncate text-left text-xl font-medium text-zinc-800"
             >
+              <Show when={isFavorite()}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="mr-1 inline-block h-4 w-4 text-amber-400"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </Show>
               {props.project.name}
             </A>
             <button
@@ -164,6 +192,23 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
         }}
         class="absolute right-4 z-10 flex w-fit flex-col whitespace-nowrap rounded-md border border-zinc-200 bg-white p-2 text-sm shadow-lg transition-all"
       >
+        <button
+          onClick={handleToggleFavorite}
+          class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill={isFavorite() ? "currentColor" : "none"}
+            stroke="currentColor"
+            stroke-width="2"
+            classList={{ "text-amber-400": isFavorite() }}
+          >
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+          {isFavorite() ? "Remove from Favorites" : "Add to Favorites"}
+        </button>
         <button
           onClick={handleRename}
           class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"

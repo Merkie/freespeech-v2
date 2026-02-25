@@ -36,6 +36,7 @@ export type Project = {
 	columns: number;
 	rows: number;
 	isPublic: boolean;
+	isFavorite: boolean;
 	homePageId: string | null;
 	lastEditedAt: string | Date;
 	createdAt: string | Date;
