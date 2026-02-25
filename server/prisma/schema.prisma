@@ -35,6 +35,7 @@ model Project {
   columns     Int     @default(6)
   rows        Int     @default(4)
   isPublic    Boolean @default(false)
+  isFavorite  Boolean @default(false)
   homePageId  String?
 
   // Full project blob (all pages, tiles, templates) stored as JSON
