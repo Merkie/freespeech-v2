@@ -13,7 +13,7 @@ export function blobCreateTile(
 		x: position.x,
 		y: position.y,
 		page: position.page,
-		text: data?.text ?? '',
+		text: data?.text ?? 'New tile',
 		...(data?.displayText && { displayText: data.displayText }),
 		...(data?.backgroundColor && { backgroundColor: data.backgroundColor }),
 		...(data?.borderColor && { borderColor: data.borderColor }),
