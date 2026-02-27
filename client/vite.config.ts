@@ -5,11 +5,14 @@ import { VitePWA } from 'vite-plugin-pwa';
 import solid from 'vite-plugin-solid';
 
 export default defineConfig({
+	define: {
+		__APP_VERSION__: JSON.stringify(process.env.APP_VERSION || '1.0.0'),
+	},
 	plugins: [
 		solid(),
 		tailwindcss(),
 		VitePWA({
-			registerType: 'autoUpdate',
+			registerType: 'prompt',
 			strategies: 'injectManifest',
 			srcDir: 'src',
 			filename: 'sw.ts',

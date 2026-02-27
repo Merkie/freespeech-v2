@@ -4,6 +4,7 @@ import InstallPrompt from '@/components/InstallPrompt';
 import Modal from '@/components/Modal';
 import OfflineBanner from '@/components/OfflineBanner';
 import ToastContainer from '@/components/ToastContainer';
+import UpdateBanner from '@/components/UpdateBanner';
 import { localSettings, user } from '@/lib/state';
 import BottomNavigation from '@/routes/app/_components/BottomNavigation';
 
@@ -38,6 +39,7 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 
 	return (
 		<Show when={show()} fallback={<div>One moment...</div>}>
+			<UpdateBanner />
 			<OfflineBanner />
 			<main class="flex h-[100dvh] flex-col">
 				<div class="relative flex-1 overflow-auto">

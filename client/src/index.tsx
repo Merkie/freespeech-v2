@@ -3,6 +3,7 @@ import './index.css';
 import { Route, Router } from '@solidjs/router';
 import { render } from 'solid-js/web';
 import { TooltipProvider } from '@/hooks/useTooltip';
+import { registerServiceWorker } from '@/lib/sw-update';
 
 // --- Direct Component Imports ---
 
@@ -76,3 +77,5 @@ render(
 	),
 	wrapper,
 );
+
+registerServiceWorker();

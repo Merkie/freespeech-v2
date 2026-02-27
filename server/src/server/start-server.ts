@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import { router } from 'express-file-routing';
+import AppVersionMiddleware from '@/middleware/app-version';
 import HandleErrorMiddleware from '@/middleware/handle-error';
 import LogRequestMiddleware from '@/middleware/log-request';
 // import { WebsocketServer } from "./websocket/websocket-server";
@@ -17,11 +18,12 @@ export default async function StartServer() {
 	const app: Express = express();
 	const port = parseInt(PORT, 10);
 
-	app.use(cors());
-	app.options('*', cors());
+	app.use(cors({ exposedHeaders: ['x-app-version'] }));
+	app.options('*', cors({ exposedHeaders: ['x-app-version'] }));
 
 	app.use(express.json({ limit: '100mb' }));
 
+	app.use(AppVersionMiddleware);
 	app.use(LogRequestMiddleware);
 
 	app.use(await router({ directory: path.join(__dirname, '..', 'routes') }));

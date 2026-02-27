@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { checkVersionHeader } from '@/lib/version-check';
+
 export class OfflineError extends Error {
 	constructor() {
 		super('No internet connection');
@@ -48,6 +50,8 @@ export async function fetchFromAPI({
 		headers,
 		body: JSON.stringify(body),
 	});
+
+	checkVersionHeader(response);
 
 	if (options?.parseResponseJson === false) {
 		return response;
