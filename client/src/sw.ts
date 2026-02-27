@@ -163,3 +163,90 @@ self.addEventListener('message', (event) => {
 self.addEventListener('activate', (event) => {
 	event.waitUntil(self.clients.claim());
 });
+
+// --- Background Sync: sync dirty blobs when connectivity returns ---
+const API_BASE_URL = import.meta.env.VITE_API_URL as string;
+const DB_NAME = 'freespeech-cache';
+const DB_VERSION = 4;
+
+function openIDB(): Promise<IDBDatabase> {
+	return new Promise((resolve, reject) => {
+		const req = indexedDB.open(DB_NAME, DB_VERSION);
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+}
+
+async function syncDirtyBlobs() {
+	const db = await openIDB();
+
+	// Read auth token from meta store
+	const token: string | null = await new Promise((resolve) => {
+		const tx = db.transaction('meta', 'readonly');
+		const req = tx.objectStore('meta').get('authToken');
+		req.onsuccess = () => resolve(req.result?.value ?? null);
+		req.onerror = () => resolve(null);
+	});
+
+	if (!token) {
+		db.close();
+		return;
+	}
+
+	// Get all dirty blobs
+	const dirtyBlobs: Array<{ id: string; blob: any; lastEditedAt: string }> = await new Promise((resolve) => {
+		const tx = db.transaction('projectBlobs', 'readonly');
+		const store = tx.objectStore('projectBlobs');
+		const req = store.getAll();
+		req.onsuccess = () => {
+			const all = req.result || [];
+			resolve(all.filter((e: any) => e.dirty).map((e: any) => ({ id: e.id, blob: e.blob, lastEditedAt: e.blob.lastEditedAt })));
+		};
+		req.onerror = () => resolve([]);
+	});
+
+	for (const entry of dirtyBlobs) {
+		const res = await fetch(`${API_BASE_URL}/project/${entry.id}/sync`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${token}`,
+			},
+			body: JSON.stringify({ blob: entry.blob, lastEditedAt: entry.lastEditedAt, force: true }),
+		});
+
+		if (res.ok) {
+			const data = await res.json();
+			// Mark blob as clean in IndexedDB
+			await new Promise<void>((resolve, reject) => {
+				const tx = db.transaction('projectBlobs', 'readwrite');
+				const store = tx.objectStore('projectBlobs');
+				const getReq = store.get(entry.id);
+				getReq.onsuccess = () => {
+					const record = getReq.result;
+					if (record) {
+						record.dirty = false;
+						if (data.lastEditedAt) {
+							record.blob.lastEditedAt = data.lastEditedAt;
+						}
+						store.put(record);
+					}
+					tx.oncomplete = () => resolve();
+					tx.onerror = () => reject(tx.error);
+				};
+				getReq.onerror = () => reject(getReq.error);
+			});
+		} else {
+			// Non-OK response — throw so sync manager can retry
+			throw new Error(`Sync failed for ${entry.id}: ${res.status}`);
+		}
+	}
+
+	db.close();
+}
+
+self.addEventListener('sync', (event: any) => {
+	if (event.tag === 'sync-dirty-blobs') {
+		event.waitUntil(syncDirtyBlobs());
+	}
+});

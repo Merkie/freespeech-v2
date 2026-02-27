@@ -1,6 +1,7 @@
 import { useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, onMount, Show } from 'solid-js';
 import api from '@/lib/api';
+import { cacheAuthToken } from '@/lib/cache/meta-cache';
 import { setUser } from '@/lib/state';
 
 function Page() {
@@ -24,6 +25,7 @@ function Page() {
 			}
 
 			localStorage.setItem('token', response.token);
+			cacheAuthToken(response.token).catch(() => {});
 
 			// Fetch user data
 			const userData = await api.auth.me(response.token);

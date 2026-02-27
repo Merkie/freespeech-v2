@@ -5,6 +5,18 @@ import { MODAL_ID } from './constants';
 import { conflictServerBlob, projectBlob, setActiveModalId, setConflictServerBlob, setProjectBlob, setSyncStatus } from './state';
 import type { ProjectBlob } from './types';
 
+// --- Background Sync registration ---
+async function requestBackgroundSync() {
+	try {
+		const reg = await navigator.serviceWorker?.ready;
+		if (reg && 'sync' in reg) {
+			await (reg as any).sync.register('sync-dirty-blobs');
+		}
+	} catch {
+		// Background Sync not supported or failed — non-critical
+	}
+}
+
 // --- Debounce timer ---
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 const SYNC_DEBOUNCE_MS = 2000;
@@ -95,7 +107,9 @@ export function mutateBlob(mutator: (blob: ProjectBlob) => void): void {
 	}
 
 	// Persist to IndexedDB (dirty)
-	cacheBlob(clone, true).catch((err) => console.error('Failed to cache blob:', err));
+	cacheBlob(clone, true)
+		.then(() => requestBackgroundSync())
+		.catch((err) => console.error('Failed to cache blob:', err));
 
 	// Update sync status
 	setSyncStatus('dirty');
@@ -142,7 +156,8 @@ export async function syncBlobToServer(): Promise<boolean> {
 		setSyncStatus('synced');
 		return true;
 	} catch {
-		// Network error
+		// Network error — register for background sync retry
+		requestBackgroundSync();
 		setSyncStatus('offline');
 		return false;
 	}

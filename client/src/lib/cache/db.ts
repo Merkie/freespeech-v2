@@ -7,10 +7,14 @@ interface FreeSpeechDB extends DBSchema {
 		value: CachedProjectBlob;
 		indexes: { 'by-cachedAt': number; 'by-dirty': number };
 	};
+	meta: {
+		key: string;
+		value: { key: string; value: string };
+	};
 }
 
 const DB_NAME = 'freespeech-cache';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // Max cache size in bytes (50MB) - generous for AAC boards
 const MAX_CACHE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -33,6 +37,11 @@ export function getDB(): Promise<IDBPDatabase<FreeSpeechDB>> {
 					const blobStore = db.createObjectStore('projectBlobs', { keyPath: 'id' });
 					blobStore.createIndex('by-cachedAt', 'cachedAt');
 					blobStore.createIndex('by-dirty', 'dirty');
+				}
+
+				// Meta store for auth token (used by background sync in SW)
+				if (!db.objectStoreNames.contains('meta')) {
+					db.createObjectStore('meta', { keyPath: 'key' });
 				}
 			},
 		});
