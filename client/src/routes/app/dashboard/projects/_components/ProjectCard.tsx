@@ -162,7 +162,7 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
         />
 
         {/* Footer with time and selected badge */}
-        <div class="flex items-center justify-between">
+        <div class="flex h-6 items-center justify-between">
           <div class="flex items-center gap-2">
             <p class="text-xs font-light text-zinc-500">
               <span>{getTimeAgo()}</span>
