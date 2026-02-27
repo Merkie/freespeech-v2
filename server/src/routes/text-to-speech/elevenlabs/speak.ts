@@ -44,6 +44,7 @@ export const POST = [
 				},
 				body: JSON.stringify({
 					text: body.text,
+					model_id: 'eleven_flash_v2_5',
 				}),
 			},
 		);
