@@ -3,6 +3,7 @@ import { type Component, createEffect, createSignal, Show } from 'solid-js';
 import InstallPrompt from '@/components/InstallPrompt';
 import Modal from '@/components/Modal';
 import OfflineBanner from '@/components/OfflineBanner';
+import ToastContainer from '@/components/ToastContainer';
 import { localSettings, user } from '@/lib/state';
 import BottomNavigation from '@/routes/app/_components/BottomNavigation';
 
@@ -46,6 +47,7 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 			</main>
 			<Modal />
 			<InstallPrompt />
+			<ToastContainer />
 		</Show>
 	);
 };
