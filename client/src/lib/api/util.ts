@@ -1,5 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+export class OfflineError extends Error {
+	constructor() {
+		super('No internet connection');
+		this.name = 'OfflineError';
+	}
+}
+
 export async function fetchFromAPI({
 	path,
 	method,
@@ -15,6 +22,10 @@ export async function fetchFromAPI({
 		parseResponseJson?: boolean;
 	};
 }) {
+	if (!navigator.onLine) {
+		throw new OfflineError();
+	}
+
 	let headers: HeadersInit = {
 		'Content-Type': 'application/json',
 	};

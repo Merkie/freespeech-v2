@@ -1,5 +1,6 @@
 import { type Component, createEffect, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
+import { OfflineError } from '@/lib/api/util';
 import { blobUpdateTile } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { type SkinTone, SkinTones } from '@/lib/opensymbols';
@@ -14,6 +15,7 @@ import {
 	setLocalSettings,
 	setUsingOnlineSearch,
 } from '@/lib/state';
+import { showToast } from '@/lib/toast';
 
 type SearchResult = {
 	image_url: string;
@@ -81,19 +83,28 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 
 		const filename = `${url.split('/').pop()}`;
 
-		const blob = await api.media.fetchFromUrl(url);
+		try {
+			const blob = await api.media.fetchFromUrl(url);
 
-		setLoading(true);
-		const key = await uploadBlob(filename, blob);
-		setLoading(false);
+			setLoading(true);
+			const key = await uploadBlob(filename, blob);
+			setLoading(false);
 
-		if (key) {
-			setUsingOnlineSearch(false);
-			blobUpdateTile(
-				currentPageId(),
-				{ x: tile.x, y: tile.y, page: tile.page },
-				{ image: `https://media.freespeechaac.com/${key}` },
-			);
+			if (key) {
+				setUsingOnlineSearch(false);
+				blobUpdateTile(
+					currentPageId(),
+					{ x: tile.x, y: tile.y, page: tile.page },
+					{ image: `https://media.freespeechaac.com/${key}` },
+				);
+			}
+		} catch (err) {
+			setLoading(false);
+			if (err instanceof OfflineError) {
+				showToast('This requires an internet connection', 'error');
+			} else {
+				showToast('Failed to upload image', 'error');
+			}
 		}
 	};
 
@@ -102,28 +113,37 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 		setImagesReady(false);
 		setSearchResults([]);
 
-		let images: SearchResult[] = [];
-		if (searchStrategy() === 'google') {
-			const response = await api.media.searchImages.google({
-				query: searchTerm(),
-				skinColor: selectedSkinTone(),
-			});
-			if (response.results) images = response.results;
-		} else {
-			const response = await api.media.searchImages.openSymbols({
-				query: searchTerm(),
-				skinColor: selectedSkinTone(),
-			});
-			if (response.results) images = response.results;
-		}
+		try {
+			let images: SearchResult[] = [];
+			if (searchStrategy() === 'google') {
+				const response = await api.media.searchImages.google({
+					query: searchTerm(),
+					skinColor: selectedSkinTone(),
+				});
+				if (response.results) images = response.results;
+			} else {
+				const response = await api.media.searchImages.openSymbols({
+					query: searchTerm(),
+					skinColor: selectedSkinTone(),
+				});
+				if (response.results) images = response.results;
+			}
 
-		if (images.length > 0) {
-			const validImages = await preloadImages(images);
-			setSearchResults(validImages);
-		}
+			if (images.length > 0) {
+				const validImages = await preloadImages(images);
+				setSearchResults(validImages);
+			}
 
-		setImagesReady(true);
-		setSearching(false);
+			setImagesReady(true);
+		} catch (err) {
+			if (err instanceof OfflineError) {
+				showToast('This requires an internet connection', 'error');
+			} else {
+				showToast('Image search failed', 'error');
+			}
+		} finally {
+			setSearching(false);
+		}
 	};
 
 	// Auto-refresh when skin tone changes (only for Open Symbols)

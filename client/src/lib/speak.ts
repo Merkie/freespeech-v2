@@ -1,5 +1,6 @@
 import { Howl } from 'howler';
 import api from './api';
+import { OfflineError } from './api/util';
 import {
 	elevenLabsVoiceId,
 	enableThirdPartyVoiceProviders,
@@ -7,6 +8,7 @@ import {
 	setSpeakingTilePosition,
 	setVoiceEngineStatus,
 } from './state';
+import { showToast } from './toast';
 import type { TilePositionKey } from './types';
 
 // speakText accepts a position key string (e.g., "0-1-0") for tile speaking indicator
@@ -16,25 +18,32 @@ export async function speakText(text: string, tilePositionKey?: TilePositionKey)
 
 	if (!enableThirdPartyVoiceProviders() || !elevenLabsVoiceId()) return speakSynth(text);
 
-	const data = await api.tts.speak.elevenlabs(joinWordsInSentence(text));
+	try {
+		const data = await api.tts.speak.elevenlabs(joinWordsInSentence(text));
 
-	const sound = new Howl({
-		src: [URL.createObjectURL(data)],
-		format: ['mp3'],
-	});
+		const sound = new Howl({
+			src: [URL.createObjectURL(data)],
+			format: ['mp3'],
+		});
 
-	setVoiceEngineStatus('speaking');
+		setVoiceEngineStatus('speaking');
 
-	sound.play();
+		sound.play();
 
-	sound.on('end', () => {
-		setVoiceEngineStatus('ready');
-		setSpeakingTilePosition(null);
-	});
+		sound.on('end', () => {
+			setVoiceEngineStatus('ready');
+			setSpeakingTilePosition(null);
+		});
 
-	sound.on('loaderror', () => {
+		sound.on('loaderror', () => {
+			speakSynth(text);
+		});
+	} catch (err) {
+		if (!(err instanceof OfflineError)) {
+			showToast('Voice failed, using offline voice', 'error');
+		}
 		speakSynth(text);
-	});
+	}
 }
 
 function speakSynth(text: string) {
