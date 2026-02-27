@@ -9,6 +9,7 @@ import ManagePages from './_modal_inners/ManagePages';
 import ManageTemplates from './_modal_inners/ManageTemplates';
 import OptimizeImages from './_modal_inners/OptimizeImages';
 import SaveEditMode from './_modal_inners/SaveEditMode';
+import SyncConflict from './_modal_inners/SyncConflict';
 
 type ModalConfig = {
 	title: string | (() => string);
@@ -55,5 +56,9 @@ export const MODAL_REGISTRY: Record<ModalIdType, ModalConfig> = {
 	[MODAL_ID.SAVE_EDIT_MODE]: {
 		title: 'Unsaved Changes',
 		innerElement: SaveEditMode,
+	},
+	[MODAL_ID.SYNC_CONFLICT]: {
+		title: 'Sync Conflict',
+		innerElement: SyncConflict,
 	},
 };

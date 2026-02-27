@@ -89,6 +89,7 @@ export const [pageLoading, setPageLoading] = createSignal(false);
 export type SyncStatus = 'synced' | 'syncing' | 'dirty' | 'conflict' | 'offline' | 'error';
 export const [projectBlob, setProjectBlob] = createSignal<ProjectBlob | null>(null);
 export const [syncStatus, setSyncStatus] = createSignal<SyncStatus>('synced');
+export const [conflictServerBlob, setConflictServerBlob] = createSignal<ProjectBlob | null>(null);
 
 // Derived helpers — call within tracking scopes for reactivity
 const DEFAULT_BG = '#fafafa';

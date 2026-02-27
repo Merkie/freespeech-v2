@@ -312,8 +312,13 @@ function SyncStatusIndicator() {
 					<span>Offline — saved locally</span>
 				</Show>
 				<Show when={status() === 'conflict'}>
-					<i class="bi bi-exclamation-triangle" />
-					<span>Sync conflict</span>
+					<button
+						onClick={() => setActiveModalId(MODAL_ID.SYNC_CONFLICT)}
+						class="flex items-center gap-1.5"
+					>
+						<i class="bi bi-exclamation-triangle" />
+						<span class="underline">Sync conflict</span>
+					</button>
 				</Show>
 				<Show when={status() === 'error'}>
 					<i class="bi bi-exclamation-circle" />

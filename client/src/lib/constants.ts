@@ -9,6 +9,7 @@ export const MODAL_ID = {
 	MANAGE_TEMPLATES: 'manage-templates',
 	OPTIMIZE_IMAGES: 'optimize-images',
 	SAVE_EDIT_MODE: 'save-edit-mode',
+	SYNC_CONFLICT: 'sync-conflict',
 } as const;
 
 export type ModalIdType = (typeof MODAL_ID)[keyof typeof MODAL_ID];

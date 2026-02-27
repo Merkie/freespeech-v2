@@ -1,7 +1,8 @@
 import { createSignal } from 'solid-js';
 import api from './api';
 import { cacheBlob, getCachedBlob, getDirtyBlobIds, markBlobClean } from './cache/blob-cache';
-import { projectBlob, setProjectBlob, setSyncStatus } from './state';
+import { MODAL_ID } from './constants';
+import { conflictServerBlob, projectBlob, setActiveModalId, setConflictServerBlob, setProjectBlob, setSyncStatus } from './state';
 import type { ProjectBlob } from './types';
 
 // --- Debounce timer ---
@@ -118,7 +119,9 @@ export async function syncBlobToServer(): Promise<boolean> {
 
 		if (result.error && result.serverBlob) {
 			// 409 conflict
+			setConflictServerBlob(result.serverBlob);
 			setSyncStatus('conflict');
+			setActiveModalId(MODAL_ID.SYNC_CONFLICT);
 			return false;
 		}
 
@@ -199,4 +202,37 @@ export async function forceSyncNow(): Promise<boolean> {
 		syncTimer = null;
 	}
 	return syncBlobToServer();
+}
+
+// --- Conflict resolution ---
+export async function resolveConflictKeepLocal(): Promise<void> {
+	const blob = projectBlob();
+	if (!blob) return;
+
+	setConflictServerBlob(null);
+	setActiveModalId('');
+	setSyncStatus('syncing');
+
+	try {
+		const result = await api.project.syncBlob(blob.id, blob, blob.lastEditedAt, true);
+		if (result.lastEditedAt) {
+			const updated = { ...blob, lastEditedAt: result.lastEditedAt };
+			setProjectBlob(updated);
+			await cacheBlob(updated, false);
+		}
+		setSyncStatus('synced');
+	} catch {
+		setSyncStatus('error');
+	}
+}
+
+export async function resolveConflictUseServer(): Promise<void> {
+	const server = conflictServerBlob();
+	if (!server) return;
+
+	setProjectBlob(server);
+	await cacheBlob(server, false);
+	setConflictServerBlob(null);
+	setActiveModalId('');
+	setSyncStatus('synced');
 }
