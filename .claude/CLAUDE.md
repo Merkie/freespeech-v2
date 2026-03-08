@@ -1,6 +1,6 @@
 # FreeSpeech
 
-AAC (Augmentative and Alternative Communication) web app. SolidJS + Express + Prisma + offline-first blob sync.
+AAC (Augmentative and Alternative Communication) web app. SolidJS + Express + Prisma + offline-first blob sync + PWA.
 
 ## Commands
 
@@ -8,12 +8,11 @@ AAC (Augmentative and Alternative Communication) web app. SolidJS + Express + Pr
 # Client
 cd client && npm install && npm run dev  # Port 5173
 
-# Server
-cd server && npm install && npx prisma generate && npm run dev  # Port 3000
+# Server (uses Bun)
+cd server && npm install && npx prisma generate && bun --watch src/index.ts
 
-# Build
-cd client && npm run build   # Vite
-cd server && npm run build   # tsup
+# Build client
+cd client && npm run build   # tsc -b && vite build
 ```
 
 ## Architecture
@@ -26,8 +25,8 @@ Browser (SolidJS)              Express Server              External
 │ IndexedDB cache  │◀────────▶│ Prisma + PG  │──────────▶│ Cloudflare  │
 │ projectBlob sig  │  blob    │ Project.blob │           │ R2, OAuth,  │
 │ mutateBlob()     │  sync    │ Zod validate │           │ ElevenLabs, │
-└──────────────────┘          └──────────────┘           │ FAL.ai      │
-                                                         └─────────────┘
+│ Background Sync  │          │ app-version  │           │ FAL.ai      │
+└──────────────────┘          └──────────────┘           └─────────────┘
 ```
 
 ### Sync flow
@@ -38,6 +37,8 @@ GET /project/:id/blob → IndexedDB → projectBlob signal
 IndexedDB (dirty: true) → debounce 2s → POST /project/:id/sync
   ↓ server validates lastEditedAt → 200 OK or 409 conflict
 IndexedDB (dirty: false)
+  ↓ on 409: conflict modal → keep local (force sync) or use server version
+  ↓ on offline: Background Sync API registers retry (Chrome)
 ```
 
 ## Data Model
@@ -45,7 +46,7 @@ IndexedDB (dirty: false)
 ```prisma
 User     // id, email, name, password (hashed), profileImgUrl, elevenLabsApiKey (encrypted)
 Project  // id, userId, name, description, imageUrl, columns, rows, homePageId,
-         // isPublic, blob (JSON — full ProjectBlob), lastEditedAt
+         // isPublic, isFavorite, blob (JSON — full ProjectBlob), lastEditedAt
 ```
 
 Everything else is in the blob:
@@ -73,7 +74,6 @@ type ProjectBlob = {
 - Tile identity: position `(x, y, page)` — no tile IDs
 - Page IDs: client-generated `crypto.randomUUID()`
 - Templates: pages with `isTemplate: true`, linked via `templatePageId`
-- Template tiles resolved client-side from the blob's pages array
 - Default colors: `#fafafa` (bg), `#71717a` (border) — stripped from wire format
 
 ## Structure
@@ -82,26 +82,39 @@ type ProjectBlob = {
 client/src/
   lib/
     state.ts              # All signals + derived blob helpers
-    blob-sync.ts          # Core sync engine (load, mutate, sync, flush)
+    blob-sync.ts          # Core sync engine (load, mutate, sync, flush, conflict resolution)
     blob-actions.ts       # Mutation helpers (tiles, pages, templates)
     page-actions.ts       # loadProject(), navigateToPageInProject()
     types.ts              # TypeScript types (blob types, Tile, Project, etc.)
-    api/endpoints/        # project.ts (blob sync), media.ts, tts.ts, auth.ts, user.ts
-    cache/                # IndexedDB schema + blob cache helpers
-    speak.ts              # TTS (ElevenLabs + Web Speech API)
-  components/Modal/       # Modal system (registry pattern)
+    constants.ts          # MODAL_ID enum
+    toast.ts              # Signal-based toast store (showToast)
+    speak.ts              # TTS (ElevenLabs + Web Speech API fallback)
+    sw-update.ts          # Service worker update prompt (workbox-window)
+    version-check.ts      # API version mismatch detection
+    api/endpoints/        # project.ts, media.ts, tts.ts, auth.ts, user.ts
+    api/util.ts           # fetchFromAPI + OfflineError + version header check
+    cache/db.ts           # IndexedDB schema (projectBlobs + meta stores)
+    cache/blob-cache.ts   # Blob CRUD helpers
+    cache/meta-cache.ts   # Auth token cache (for SW background sync)
+  components/
+    Modal/                # Modal system (registry pattern)
+    ToastContainer.tsx    # Toast notifications (bottom of screen)
+    UpdateBanner.tsx      # SW update / API version mismatch banner
+    OfflineBanner.tsx     # Offline/reconnect status banner
+    InstallPrompt.tsx     # PWA install prompt
+  hooks/                  # useNetworkStatus, useOutsideClick, useTooltip
   routes/app/
-    dashboard/            # Projects list, templates, settings
+    dashboard/            # Projects list, templates, settings, profile
     project/[project_id]/ # Main project page + components
 
 server/src/
   routes/                 # File-based routing (express-file-routing)
     auth/                 # Login, register, OAuth
-    project/              # list, create, [id]/{blob, sync, sync-check, optimize-images, update-thumbnail}
+    project/              # list, create, [id]/{blob, sync, sync-check, optimize-images, update-thumbnail, favorite}
     media/                # Image search, upload, fetch, background removal
     text-to-speech/       # ElevenLabs TTS
+  middleware/             # authenticate-request, validate-schema, handle-error, log-request, app-version
   utils/project-blob.ts   # buildProjectBlob(), applyProjectBlob(), Zod schema
-  scripts/                # One-time migration scripts
   prisma/schema.prisma
 ```
 
@@ -140,6 +153,17 @@ getTemplateForPage(pageId)              // Linked template or null
 3. Register in `modal-registry.tsx`
 4. Open: `setActiveModalId(MODAL_ID.YOUR_MODAL)`
 
+### Toast notifications
+
+```typescript
+import { showToast } from '@/lib/toast';
+showToast('Message', 'info' | 'success' | 'error');  // auto-dismiss 4s
+```
+
+### Offline awareness
+
+`fetchFromAPI()` throws `OfflineError` when `navigator.onLine` is false. Catch it in UI code to show user-friendly toasts. TTS auto-falls back to Web Speech API offline.
+
 ### File-based routing (server)
 
 ```typescript
@@ -163,7 +187,9 @@ export const GET = [
 |----------|--------|-----------|
 | Storage | Single `Project.blob` JSON column | All data in one place, simple sync |
 | Sync | Full blob replacement + `lastEditedAt` guard | Blob is small (~83KB compressed for 6K tiles) |
-| Conflict | Last-write-wins + 409 if server newer | Single-user AAC boards |
+| Conflict | 409 → modal (keep local or use server) | User chooses, no silent data loss |
 | Tile identity | Position `(x,y,page)` | No IDs needed, saves wire size |
 | Templates | `isTemplate` flag on pages in blob | No separate tables, all through blob sync |
 | Path alias | `@/*` → `src/*` | Both client and server |
+| PWA | Prompt-mode SW + Background Sync API | User controls updates; offline edits survive tab close |
+| API versioning | `x-app-version` header + client check | Detects stale clients, shows update banner |

@@ -1,5 +1,5 @@
 ---
-globs: freespeech-api/**/*
+globs: server/**/*
 ---
 
 # Backend Rules (Express + Prisma)
@@ -10,7 +10,7 @@ This is the production backend. Test changes thoroughly.
 
 ## Tech Stack
 
-- Express.js + TypeScript
+- Express.js + TypeScript (runs with Bun)
 - PostgreSQL + Prisma ORM
 - Cloudflare R2 for media storage
 - ElevenLabs for premium TTS
@@ -20,16 +20,24 @@ This is the production backend. Test changes thoroughly.
 ## Key Routes
 
 ```
-/auth/*           - Login, register, OAuth
-/project/*        - Project CRUD, blob sync, image optimization
-/media/*          - Image search, upload, fetch
+/auth/*           - Login, register, OAuth (Google)
+/project/*        - Project CRUD, blob sync, image optimization, favorites
+/media/*          - Image search, upload, fetch, background removal
 /text-to-speech/* - ElevenLabs TTS
 ```
 
+## Middleware
+
+- `authenticate-request.ts` — JWT auth guard
+- `validate-schema.ts` — Zod request validation
+- `app-version.ts` — Sets `x-app-version` response header
+- `log-request.ts` — Request logging
+- `handle-error.ts` — Global error handler
+
 ## Data Model
 
-- **User** - Auth, optional ElevenLabs API key
-- **Project** - Board project with grid settings, `blob` JSON column (full source of truth for all pages/tiles)
+- **User** — Auth, optional ElevenLabs API key, `usePersonalElevenLabsKey` flag
+- **Project** — Board with grid settings, `isFavorite`, `blob` JSON column (full source of truth)
 
 All pages and tiles are stored as JSON in `Project.blob`. No separate tile/page tables.
 
@@ -38,10 +46,9 @@ All pages and tiles are stored as JSON in `Project.blob`. No separate tile/page 
 ```
 server/src/
 ├── routes/           # File-based routing
-├── prisma/           # Schema
+├── middleware/        # Auth, validation, versioning, error handling
 ├── utils/            # project-blob.ts, env, token, etc.
-├── scripts/          # One-time migration scripts
-└── middleware/        # Auth, validation, error handling
+└── prisma/           # Schema (in server/prisma/)
 ```
 
 ## Path Alias

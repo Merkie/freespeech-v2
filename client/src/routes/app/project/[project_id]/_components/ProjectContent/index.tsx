@@ -25,7 +25,7 @@ export default function ProjectContent() {
 			<Show when={containerHeight() > 0}>
 				{/* Tile grid container */}
 				<div
-					class="absolute overflow-auto"
+					class="thin-scrollbar absolute overflow-auto"
 					style={{
 						height: `${containerHeight()}px`,
 						width: showEditPanel() ? 'calc(100% - 350px)' : '100%',

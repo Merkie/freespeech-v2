@@ -41,7 +41,7 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 	const [searchResults, setSearchResults] = createSignal<SearchResult[]>([]);
 	const [searching, setSearching] = createSignal(false);
 	const [imagesReady, setImagesReady] = createSignal(false);
-	const [searchStrategy, setSearchStrategy] = createSignal<'google' | 'open-symbols'>('google');
+	const [searchStrategy, setSearchStrategy] = createSignal<'brave' | 'open-symbols'>('brave');
 
 	const selectedSkinTone = () => (localSettings().skinTone || 'medium') as SkinTone;
 
@@ -51,21 +51,21 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 		return new Promise((resolve) => {
 			let loadedCount = 0;
 			const totalImages = images.length;
-			const validImages: SearchResult[] = [];
+			const loaded = new Array<boolean>(totalImages).fill(false);
 
-			images.forEach((image) => {
+			images.forEach((image, index) => {
 				const img = new Image();
 				img.onload = () => {
-					validImages.push(image);
+					loaded[index] = true;
 					loadedCount++;
 					if (loadedCount >= totalImages) {
-						resolve(validImages);
+						resolve(images.filter((_, i) => loaded[i]));
 					}
 				};
 				img.onerror = () => {
 					loadedCount++;
 					if (loadedCount >= totalImages) {
-						resolve(validImages);
+						resolve(images.filter((_, i) => loaded[i]));
 					}
 				};
 				img.src = image.thumbnail_url;
@@ -115,8 +115,8 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 
 		try {
 			let images: SearchResult[] = [];
-			if (searchStrategy() === 'google') {
-				const response = await api.media.searchImages.google({
+			if (searchStrategy() === 'brave') {
+				const response = await api.media.searchImages.brave({
 					query: searchTerm(),
 					skinColor: selectedSkinTone(),
 				});
@@ -164,7 +164,7 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 		}
 	};
 
-	const handleStrategyChange = (strategy: 'google' | 'open-symbols') => {
+	const handleStrategyChange = (strategy: 'brave' | 'open-symbols') => {
 		setSearchStrategy(strategy);
 		setSearchResults([]);
 		setImagesReady(false);
@@ -176,7 +176,7 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 
 	return (
 		<div
-			class="flex w-[350px] flex-col overflow-y-auto border border-zinc-800 bg-zinc-900 p-4 text-zinc-200 shadow-md"
+			class="thin-scrollbar-dark flex w-[350px] flex-col overflow-y-auto border border-zinc-800 bg-zinc-900 p-4 text-zinc-200 shadow-md"
 			style={{ height: `${props.height}px` }}
 		>
 			<button
@@ -190,14 +190,14 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 			{/* Search strategy tabs */}
 			<div class="flex gap-4 py-4">
 				<button
-					onClick={() => handleStrategyChange('google')}
+					onClick={() => handleStrategyChange('brave')}
 					class={cn('hover:text-white', {
-						'underline text-white': searchStrategy() === 'google',
-						'text-zinc-400': searchStrategy() !== 'google',
+						'underline text-white': searchStrategy() === 'brave',
+						'text-zinc-400': searchStrategy() !== 'brave',
 					})}
 				>
-					<i class="bi bi-google mr-1" />
-					<span>Google Images</span>
+					<i class="bi bi-search mr-1" />
+					<span>Image Search</span>
 				</button>
 				<button
 					onClick={() => handleStrategyChange('open-symbols')}
@@ -238,7 +238,7 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 						onInput={(e) => setSearchTerm(e.currentTarget.value)}
 						onKeyDown={handleKeyDown}
 						placeholder={
-							searchStrategy() === 'google' ? 'Search for images online...' : 'Search for symbols on Open Symbols...'
+							searchStrategy() === 'brave' ? 'Search for images online...' : 'Search for symbols on Open Symbols...'
 						}
 						class="w-full rounded-md border-none p-1 px-2 outline-none"
 					/>
@@ -269,13 +269,13 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 			{/* Search results */}
 			<Show when={imagesReady() && searchResults().length > 0}>
 				<div class="mt-2 flex-1 overflow-y-auto">
-					<div class="columns-2 gap-4">
+					<div class="grid grid-cols-2 gap-4">
 						<For each={searchResults()}>
 							{(image) => (
 								<button
 									disabled={searching()}
 									onClick={() => handleUploadFromInternet(image.image_url)}
-									class="mb-4 w-full hover:opacity-80"
+									class="w-full hover:opacity-80"
 								>
 									<img class="mx-auto rounded" src={image.thumbnail_url} alt={image.alt} loading="lazy" />
 								</button>

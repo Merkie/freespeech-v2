@@ -20,6 +20,36 @@
 	--color-primary-400: #f59f67;
 }
 
+.thin-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: #a1a1aa transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+	width: 4px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+	background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+	background: #a1a1aa;
+	border-radius: 2px;
+}
+
+.thin-scrollbar-dark {
+	scrollbar-width: thin;
+	scrollbar-color: #52525b transparent;
+}
+.thin-scrollbar-dark::-webkit-scrollbar {
+	width: 4px;
+}
+.thin-scrollbar-dark::-webkit-scrollbar-track {
+	background: transparent;
+}
+.thin-scrollbar-dark::-webkit-scrollbar-thumb {
+	background: #52525b;
+	border-radius: 2px;
+}
+
 .animate-shine {
 	@apply relative overflow-hidden;
 }
