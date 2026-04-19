@@ -25,6 +25,7 @@ import AppLayout from './routes/app/layout.tsx';
 import AppEntryPage from './routes/app/page.tsx';
 import LegacyPageRedirect from './routes/app/project/[project_id]/[page_id].tsx';
 import AppProjectPage from './routes/app/project/[project_id]/page.tsx';
+import ThumbnailPage from './routes/app/project/[project_id]/thumbnail.tsx';
 // Root Layouts
 import Layout from './routes/layout.tsx';
 import NotFound from './routes/NotFound.tsx';
@@ -65,6 +66,8 @@ render(
 						</Route>
 
 						<Route path="/project/:project_id" component={AppProjectPage} />
+						{/* Thumbnail route - chromeless tile grid for puppeteer screenshots */}
+						<Route path="/project/:project_id/:page_id/thumbnail" component={ThumbnailPage} />
 						{/* Legacy route - redirects old URLs with page_id to new format */}
 						<Route path="/project/:project_id/:page_id" component={LegacyPageRedirect} />
 					</Route>

@@ -23,6 +23,10 @@ const ProjectsPage: Component = () => {
 		mutateProjects((prev) => prev?.map((p) => (p.id === projectId ? { ...p, isFavorite: newValue } : p)));
 	};
 
+	const handleDelete = (projectId: string) => {
+		mutateProjects((prev) => prev?.filter((p) => p.id !== projectId));
+	};
+
 	const searchedProjects = createMemo(() => {
 		const query = searchQuery();
 		const projectList = projects();
@@ -130,7 +134,7 @@ const ProjectsPage: Component = () => {
 						}
 					>
 						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-							<For each={sortedProjects()}>{(project) => <ProjectCard project={project} onToggleFavorite={handleToggleFavorite} />}</For>
+							<For each={sortedProjects()}>{(project) => <ProjectCard project={project} onToggleFavorite={handleToggleFavorite} onDelete={handleDelete} />}</For>
 						</div>
 					</Show>
 				</Show>

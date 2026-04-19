@@ -4,6 +4,7 @@ import { fetchFromAPI } from '../util';
 const project = {
 	list: listProjects,
 	create: createProject,
+	delete: deleteProject,
 	updateThumbnail: updateProjectThumbnail,
 	getImageStats: getImageStats,
 	optimizeImages: optimizeImages,
@@ -11,9 +12,54 @@ const project = {
 	fetchBlob: fetchProjectBlob,
 	syncBlob: syncProjectBlob,
 	toggleFavorite: toggleFavorite,
+	listTemplates: listTemplates,
+	importTemplate: importTemplate,
 };
 
+async function deleteProject(projectId: string) {
+	const response = (await fetchFromAPI({
+		path: `/project/${projectId}/delete`,
+		method: 'POST',
+	})) as {
+		success: boolean;
+		error?: string;
+	};
+	return response;
+}
+
 export default project;
+
+export type TemplateSummary = {
+	slug: string;
+	name: string;
+	description: string;
+	creatorName: string;
+	thumbnailUrl: string;
+	blobUrl: string;
+};
+
+async function listTemplates() {
+	const response = (await fetchFromAPI({
+		path: '/project/templates',
+		method: 'GET',
+	})) as { templates: TemplateSummary[] };
+
+	return response;
+}
+
+async function importTemplate(slug: string) {
+	const response = (await fetchFromAPI({
+		path: '/project/import-template',
+		method: 'POST',
+		body: { slug },
+	})) as {
+		success: boolean;
+		projectId?: string;
+		error?: string;
+	};
+
+	return response;
+}
 
 async function listProjects(token?: string) {
 	const response = (await fetchFromAPI({

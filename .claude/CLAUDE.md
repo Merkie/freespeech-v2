@@ -176,6 +176,26 @@ All uploads (device picker + online image search) funnel through `uploadFile()` 
 - **Passthrough**: SVG/GIF skip compression (vector / animated). Decode errors pass through to preserve originals.
 - **Templates share URLs**: template pages reference the same R2 URLs — no image duplication when a template is linked to another page.
 
+### Starter templates (OBF/OBZ)
+
+Pre-built vocabulary sets (CommuniKate, Quick Core, Vocal Flair, Sequoia, Project Core) defined in `server/src/data/templates.ts`. Each has a `sourceObjectKey` (pre-existing `.obz`/`.obf` at `r2://template-projects/`) plus a `sourceThumbnailUrl` (external image).
+
+**One-time seeding** via `cd server && npm run seed:templates`:
+- Parses each `.obz` (JSZip) — walks every tile image (URL, zip-internal path, or `data:` URL).
+- Dedupes by source bytes → `sha256`. Uploads to `r2://template-assets/{hash}.{webp|svg|gif}` (SVG/GIF passthrough, raster → 512px WebP @ 85). Idempotent (HEAD-checks before upload).
+- Rehosts card thumbnail → `r2://template-thumbnails/{slug}.{webp|svg}` (raster resized to 400px).
+- Builds a complete `ProjectBlob` with new page UUIDs and rehosted image URLs; writes to `r2://template-blobs/{slug}.json`.
+
+**User import** via `POST /project/import-template { slug }`:
+- Fetches `template-blobs/{slug}.json` from R2.
+- Generates new page UUIDs and rewrites tile `navigation` fields to match.
+- Creates a `Project` row owned by the requesting user.
+- **No image copying** — every imported project references the same shared `template-assets/{hash}` URLs.
+
+**Shared-asset guardrail**: `update-thumbnail.ts` skips R2 deletion when `project.imageUrl` starts with `/template-`, so regenerating a thumbnail for a template-imported project doesn't blow away the shared template thumbnail.
+
+**Discoverability**: `/app/dashboard/templates` (real browser, not a redirect) + "Starter Templates" nav link in `DashboardHeader`.
+
 ### Offline awareness
 
 `fetchFromAPI()` throws `OfflineError` when `navigator.onLine` is false. Catch it in UI code to show user-friendly toasts. TTS auto-falls back to Web Speech API offline.

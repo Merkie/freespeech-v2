@@ -30,6 +30,11 @@ export default function DashboardHeader() {
 			path: '/app/dashboard/projects',
 		},
 		{
+			name: 'Starter Templates',
+			icon: 'collection',
+			path: '/app/dashboard/templates',
+		},
+		{
 			name: 'Application Settings',
 			icon: 'sliders',
 			path: '/app/dashboard/settings',

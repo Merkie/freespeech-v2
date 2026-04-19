@@ -1,16 +1,18 @@
 import { A } from "@solidjs/router";
 import type { Component } from "solid-js";
 import { createSignal, onMount, Show } from "solid-js";
-import { isBlobCached } from "@/lib/cache/blob-cache";
+import { deleteCachedBlob, isBlobCached } from "@/lib/cache/blob-cache";
 import useOutsideClick from "@/hooks/useOutsideClick";
 import { MODAL_ID } from "@/lib/constants";
 import api from "@/lib/api";
-import { project, setActiveModalId, setProjectToOptimize } from "@/lib/state";
+import { localSettings, project, setActiveModalId, setLocalSettings, setProjectToOptimize } from "@/lib/state";
+import { showToast } from "@/lib/toast";
 import type { Project } from "@/lib/types";
 
 interface ProjectCardProps {
   project: Project;
   onToggleFavorite?: (projectId: string, newValue: boolean) => void;
+  onDelete?: (projectId: string) => void;
 }
 
 const ProjectCard: Component<ProjectCardProps> = (props) => {
@@ -76,11 +78,34 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
     // TODO: Implement duplicate functionality
   };
 
-  const handleDelete = (e: MouseEvent) => {
+  const handleDelete = async (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
-    // TODO: Implement delete functionality
+
+    const confirmed = window.confirm(`Delete "${props.project.name}"? This can't be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await api.project.delete(props.project.id);
+      if (!response.success) {
+        showToast(response.error || "Failed to delete project", "error");
+        return;
+      }
+      await deleteCachedBlob(props.project.id).catch(() => undefined);
+      const settings = localSettings();
+      if (settings.lastVisitedProjectId === props.project.id) {
+        setLocalSettings({
+          ...settings,
+          lastVisitedProjectId: "",
+          lastVisitedPageId: "",
+        });
+      }
+      props.onDelete?.(props.project.id);
+      showToast("Project deleted", "success");
+    } catch {
+      showToast("Failed to delete project", "error");
+    }
   };
 
   const getTimeAgo = () => {

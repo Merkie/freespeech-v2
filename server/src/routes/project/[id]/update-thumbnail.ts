@@ -44,10 +44,17 @@ export const POST = [
 		const browser = await getBrowserInstance();
 		const page = await browser.newPage();
 
-		// Set the cookies
+		const token = generateToken(req.userId!).token;
+
+		// Inject token into localStorage before any scripts run (fetchFromAPI reads it from localStorage).
+		await page.evaluateOnNewDocument((t) => {
+			localStorage.setItem('token', t);
+		}, token);
+
+		// Also set as a cookie for good measure (some flows may read it).
 		await page.setCookie({
 			name: 'token',
-			value: generateToken(req.userId!).token,
+			value: token,
 			domain: new URL(CLIENT_HOST).hostname,
 			path: '/',
 		});
@@ -64,7 +71,8 @@ export const POST = [
 			type: 'image/png',
 		});
 
-		if (project.imageUrl) {
+		// Skip deletion for shared template thumbnails — they're referenced by every user who imported that template.
+		if (project.imageUrl && !project.imageUrl.startsWith('/template-')) {
 			const deleteCommand = new DeleteObjectCommand({
 				Bucket: R2_BUCKET,
 				Key: project.imageUrl.split('/').filter(Boolean).join('/'),
