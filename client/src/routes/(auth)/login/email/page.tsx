@@ -1,4 +1,4 @@
-import { A, useNavigate } from '@solidjs/router';
+import { A, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import api from '@/lib/api';
 import { cacheAuthToken } from '@/lib/cache/meta-cache';
@@ -6,7 +6,8 @@ import { setUser } from '@/lib/state';
 
 function Page() {
 	const navigate = useNavigate();
-	const [email, setEmail] = createSignal('');
+	const [searchParams] = useSearchParams();
+	const [email, setEmail] = createSignal(searchParams.email ?? '');
 	const [password, setPassword] = createSignal('');
 	const [error, setError] = createSignal('');
 	const [isSubmitting, setIsSubmitting] = createSignal(false);
@@ -25,7 +26,6 @@ function Page() {
 				localStorage.setItem('token', data.token);
 				cacheAuthToken(data.token).catch(() => {});
 
-				// Fetch user data and set in state
 				const userData = await api.auth.me(data.token);
 				if (userData.user) {
 					setUser(userData.user);
@@ -51,44 +51,61 @@ function Page() {
 	};
 
 	return (
-		<main class="grid h-screen place-items-center bg-zinc-100">
-			<div class="flex w-full max-w-[800px] flex-col gap-16">
-				<div class="text-center">
-					<h1 class="text-4xl font-bold text-zinc-900">Login To Free Speech</h1>
+		<main class="flex min-h-screen items-start justify-center pt-[12vh] bg-white px-4">
+			<div class="w-full max-w-md">
+				{/* Logo & Header */}
+				<div class="mb-8 text-center">
+					<A href="/" class="mb-5 inline-block">
+						<img src="/logo.png" class="mx-auto h-14 w-14" alt="FreeSpeech AAC Logo" />
+					</A>
+					<h1 class="text-2xl font-bold tracking-tight text-gray-900">Enter your password</h1>
 				</div>
-				<div class="flex flex-col border-y border-zinc-200 bg-zinc-50 p-4 sm:rounded-md sm:border">
-					<input
-						class="mb-4 rounded-md border border-zinc-300 p-4 text-zinc-800"
-						type="email"
-						placeholder="Email"
-						value={email()}
-						onInput={(e) => setEmail(e.currentTarget.value)}
-						onKeyPress={handleKeyPress}
-					/>
-					<input
-						class="mb-4 rounded-md border border-zinc-300 p-4 text-zinc-800"
-						type="password"
-						placeholder="Password"
-						value={password()}
-						onInput={(e) => setPassword(e.currentTarget.value)}
-						onKeyPress={handleKeyPress}
-					/>
+
+				{/* Card */}
+				<div class="rounded-2xl border border-gray-200 p-8">
+					<div class="space-y-4">
+						<div>
+							<label class="mb-1.5 block text-sm font-semibold text-gray-900">Email</label>
+							<input
+								class="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+								type="email"
+								placeholder="Your email address"
+								value={email()}
+								onInput={(e) => setEmail(e.currentTarget.value)}
+								onKeyPress={handleKeyPress}
+							/>
+						</div>
+						<div>
+							<label class="mb-1.5 block text-sm font-semibold text-gray-900">Password</label>
+							<input
+								class="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+								type="password"
+								placeholder="Your password"
+								value={password()}
+								onInput={(e) => setPassword(e.currentTarget.value)}
+								onKeyPress={handleKeyPress}
+								autofocus
+							/>
+						</div>
+					</div>
+
 					<Show when={error()}>
-						<small class="mb-4 text-red-500">{error()}</small>
+						<div class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error()}</div>
 					</Show>
+
 					<button
 						onClick={submitLogin}
 						disabled={isSubmitting()}
-						class="rounded-md bg-blue-600 p-2 text-lg font-bold text-blue-50 disabled:opacity-50"
+						class="mt-6 w-full cursor-pointer rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						{isSubmitting() ? 'Logging in...' : 'Log In'}
+						<span class="pointer-events-none select-none">{isSubmitting() ? 'Signing in...' : 'Continue'}</span>
 					</button>
-					<A href="/register" class="mt-4 p-4 text-zinc-400">
-						<span class="mr-4">Don't have an account?</span>
-						<svg class="inline h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-						</svg>
-					</A>
+
+					<p class="mt-8 text-center text-sm text-gray-500">
+						<A href="/login" class="font-medium text-blue-600 hover:text-blue-500">
+							&larr; All sign in options
+						</A>
+					</p>
 				</div>
 			</div>
 		</main>
