@@ -7,16 +7,21 @@ import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
-import type { PageBlob, TileBlob } from '@/utils/project-blob';
+import type { PageBlob } from '@/utils/project-blob';
 
 const schema = z.object({
 	dryRun: z.boolean(),
 });
 
 const MEDIA_HOST = 'media.freespeechaac.com';
-const OPTIMIZED_SUFFIX = '-optimized.webp';
-const TARGET_SIZE = 250;
-const WEBP_QUALITY = 80;
+const VARIANT_SUFFIX = '-512.webp';
+const LEGACY_SUFFIX = '-optimized.webp';
+const TARGET_SIZE = 512;
+const WEBP_QUALITY = 85;
+
+function isAlreadyProcessed(url: string): boolean {
+	return url.endsWith(VARIANT_SUFFIX) || url.endsWith(LEGACY_SUFFIX);
+}
 
 interface TileWithContext {
 	pageId: string;
@@ -57,10 +62,10 @@ export const POST = [
 			}
 		}
 
-		// Filter to media host URLs and skip already-optimized
+		// Filter to media host URLs and skip already-processed (current -512 or legacy -optimized)
 		const tilesToOptimize = tilesWithImages.filter((tile) => {
 			if (!tile.image.includes(MEDIA_HOST)) return false;
-			if (tile.image.endsWith(OPTIMIZED_SUFFIX)) return false;
+			if (isAlreadyProcessed(tile.image)) return false;
 			return true;
 		});
 
@@ -68,7 +73,7 @@ export const POST = [
 			return res.json({
 				imageCount: tilesToOptimize.length,
 				totalTilesWithImages: tilesWithImages.length,
-				alreadyOptimized: tilesWithImages.filter((t) => t.image.endsWith(OPTIMIZED_SUFFIX)).length,
+				alreadyOptimized: tilesWithImages.filter((t) => isAlreadyProcessed(t.image)).length,
 			});
 		}
 
@@ -103,8 +108,8 @@ export const POST = [
 				newTotalSize += optimizedBuffer.length;
 
 				const originalKey = new URL(tile.image).pathname.slice(1);
-				const baseName = originalKey.replace(/\.[^.]+$/, '');
-				const newKey = `${baseName}${OPTIMIZED_SUFFIX}`;
+				const baseName = originalKey.replace(/\.[^.]+$/, '').replace(/-(512|original|optimized)$/i, '');
+				const newKey = `${baseName}${VARIANT_SUFFIX}`;
 
 				await s3.send(
 					new PutObjectCommand({

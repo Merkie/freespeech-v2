@@ -56,11 +56,11 @@ async function searchOpenSymbols(body: { query: string; skinColor: string }) {
 	return response;
 }
 
-async function presignUpload(filename: string) {
+async function presignUpload(filename: string, fileSize: number) {
 	const response = (await fetchFromAPI({
 		path: `/media/upload/presign`,
 		method: 'POST',
-		body: { filename },
+		body: { filename, fileSize },
 	})) as {
 		presignedUrl: string;
 		key: string;

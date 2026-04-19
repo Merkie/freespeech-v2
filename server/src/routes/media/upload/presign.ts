@@ -9,8 +9,11 @@ import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
 import slugify from '@/utils/slugify';
 
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
 const schema = z.object({
-	filename: z.string(), // someimage.png
+	filename: z.string().min(1).max(255),
+	fileSize: z.number().int().positive().max(MAX_UPLOAD_BYTES),
 });
 
 export const POST = [

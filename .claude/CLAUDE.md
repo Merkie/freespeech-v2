@@ -2,6 +2,12 @@
 
 AAC (Augmentative and Alternative Communication) web app. SolidJS + Express + Prisma + offline-first blob sync + PWA.
 
+## Hosting
+
+- **Client**: static hosting (CDN/edge).
+- **API (Express)**: self-hosted on the user's personal Linux server as a **systemd service** — not Render, not Fly, not any managed platform. CPU and bandwidth on this box are the user's own, so image processing (sharp resize/WebP) runs "for free" but should stay fast. Prefer client-side work when it meaningfully reduces server load (e.g., resize huge uploads before they hit the API).
+- **Media CDN**: Cloudflare R2 at `https://media.freespeechaac.com/{key}`.
+
 ## Commands
 
 ```bash
@@ -159,6 +165,16 @@ getTemplateForPage(pageId)              // Linked template or null
 import { showToast } from '@/lib/toast';
 showToast('Message', 'info' | 'success' | 'error');  // auto-dismiss 4s
 ```
+
+### Image uploads
+
+All uploads (device picker + online image search) funnel through `uploadFile()` in `client/src/lib/presigned-uploads.ts`, which runs `compressImage()` first (`client/src/lib/image-compress.ts`) before presigning.
+
+- **Client-side compression**: resize to **512px longest side**, encode as **WebP @ 0.85** (fallback: JPEG @ 0.85 on old Safari where `canvas.toBlob('image/webp')` returns null). Uses `createImageBitmap` + `OffscreenCanvas` when available, with `HTMLImageElement` + `HTMLCanvasElement` fallback for broad device support.
+- **Naming scheme**: compressed uploads get a `-512.{webp|jpg}` suffix so future variants (e.g. `-original.*`) can be added without ambiguity.
+- **Size limit**: 2MB cap enforced client-side (toast on reject) and server-side via Zod in `server/src/routes/media/upload/presign.ts`. After 512px WebP compression, real uploads are typically 20–100KB — the cap exists as a guardrail, not the common path.
+- **Passthrough**: SVG/GIF skip compression (vector / animated). Decode errors pass through to preserve originals.
+- **Templates share URLs**: template pages reference the same R2 URLs — no image duplication when a template is linked to another page.
 
 ### Offline awareness
 
