@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Self-hosted so the icon font is precached with the app shell. Loading it from a CDN meant a
+   device that opened the app offline rendered every <i class="bi ..."> as a blank box. */
+@import "bootstrap-icons/font/bootstrap-icons.css";
 
 @theme {
 	/* Grey palette */

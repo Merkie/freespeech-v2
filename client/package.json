@@ -12,6 +12,7 @@
 		"@solidjs/router": "^0.15.3",
 		"@tailwindcss/vite": "^4.1.14",
 		"@types/howler": "^2.2.12",
+		"bootstrap-icons": "1.13.1",
 		"clsx": "^2.1.1",
 		"fuse.js": "^7.1.0",
 		"howler": "^2.2.4",

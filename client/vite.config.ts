@@ -17,7 +17,10 @@ export default defineConfig({
 			srcDir: 'src',
 			filename: 'sw.ts',
 			injectManifest: {
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+				// manifest.json is included so an offline launch can still read the PWA manifest.
+				// The landing page's parallax hero images are deliberately left out: they are
+				// ~900 KB of marketing art, and an installed app starts at /app, never at /.
+				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}'],
 			},
 			manifest: false, // We use our own manifest.json in public/
 			devOptions: {

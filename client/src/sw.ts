@@ -8,11 +8,23 @@ import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategi
 
 declare let self: ServiceWorkerGlobalScope;
 
-// Precache all static assets
-precacheAndRoute(self.__WB_MANIFEST);
+// Precache all static assets.
+//
+// Bootstrap Icons ships a @font-face whose src carries a bare 32-hex cache-buster
+// (bootstrap-icons.woff2?e348…). Vite hashes and rewrites the path but keeps that query, while
+// the precache manifest stores the bare path — so without this the font lookup misses the
+// precache, falls through to the network, and every icon is a blank box offline.
+precacheAndRoute(self.__WB_MANIFEST, {
+	ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^[0-9a-f]{32}$/],
+});
 
 // Clean up old caches
 cleanupOutdatedCaches();
+
+// The API this build talks to. Deployments differ (api.freespeechaac.com in production,
+// api-v2.freespeechaac.com for the v2 preview), so routes match on it instead of a literal.
+const API_BASE_URL = import.meta.env.VITE_API_URL as string;
+const API_ORIGIN = new URL(API_BASE_URL).origin;
 
 // Cache names
 const CACHE_NAMES = {
@@ -101,9 +113,12 @@ registerRoute(
 );
 
 // Cache API responses - Stale While Revalidate
-// This complements the IndexedDB caching for API responses
+// This complements the IndexedDB caching for API responses.
+// The host is derived from VITE_API_URL rather than hard-coded: a literal
+// 'api.freespeechaac.com' check never matched api-v2.freespeechaac.com, so this route
+// silently did nothing on every deployment except production.
 registerRoute(
-	({ url }) => url.hostname.includes('api.freespeechaac.com') || url.pathname.startsWith('/api/'),
+	({ url }) => url.origin === API_ORIGIN || url.pathname.startsWith('/api/'),
 	new StaleWhileRevalidate({
 		cacheName: CACHE_NAMES.api,
 		plugins: [
@@ -136,22 +151,9 @@ registerRoute(
 	}),
 );
 
-// Cache Bootstrap Icons CSS - Cache First
-registerRoute(
-	({ url }) => url.hostname === 'cdn.jsdelivr.net' && url.pathname.includes('bootstrap-icons'),
-	new CacheFirst({
-		cacheName: CACHE_NAMES.static,
-		plugins: [
-			new CacheableResponsePlugin({
-				statuses: [0, 200],
-			}),
-			new ExpirationPlugin({
-				maxEntries: 10,
-				maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
-			}),
-		],
-	}),
-);
+// Bootstrap Icons used to be fetched from cdn.jsdelivr.net and cached at runtime, which meant
+// the very first offline launch had no icons at all. The font is now bundled and precached
+// with the app shell, so no runtime route is needed.
 
 // Skip waiting and claim clients immediately
 self.addEventListener('message', (event) => {
@@ -165,7 +167,6 @@ self.addEventListener('activate', (event) => {
 });
 
 // --- Background Sync: sync dirty blobs when connectivity returns ---
-const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 const DB_NAME = 'freespeech-cache';
 const DB_VERSION = 4;
 
