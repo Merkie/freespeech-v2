@@ -8,7 +8,9 @@ function Page() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 	const [name, setName] = createSignal('');
-	const [email, setEmail] = createSignal(searchParams.email ?? '');
+	// useSearchParams widens repeated keys to string[], so take the first value.
+	const emailParam = Array.isArray(searchParams.email) ? searchParams.email[0] : searchParams.email;
+	const [email, setEmail] = createSignal(emailParam ?? '');
 	const [password, setPassword] = createSignal('');
 	const [confirmPassword, setConfirmPassword] = createSignal('');
 	const [error, setError] = createSignal('');
@@ -133,7 +135,9 @@ function Page() {
 						disabled={isSubmitting()}
 						class="mt-6 w-full cursor-pointer rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						<span class="pointer-events-none select-none">{isSubmitting() ? 'Creating account...' : 'Create Account'}</span>
+						<span class="pointer-events-none select-none">
+							{isSubmitting() ? 'Creating account...' : 'Create Account'}
+						</span>
 					</button>
 
 					<p class="mt-8 text-center text-sm text-gray-500">

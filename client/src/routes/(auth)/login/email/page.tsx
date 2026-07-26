@@ -7,7 +7,9 @@ import { setUser } from '@/lib/state';
 function Page() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
-	const [email, setEmail] = createSignal(searchParams.email ?? '');
+	// useSearchParams widens repeated keys to string[], so take the first value.
+	const emailParam = Array.isArray(searchParams.email) ? searchParams.email[0] : searchParams.email;
+	const [email, setEmail] = createSignal(emailParam ?? '');
 	const [password, setPassword] = createSignal('');
 	const [error, setError] = createSignal('');
 	const [isSubmitting, setIsSubmitting] = createSignal(false);

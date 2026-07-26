@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from '@solidjs/router';
 import { type Component, createEffect, on, onCleanup, onMount, Show } from 'solid-js';
 import { flushDirtyBlobs } from '@/lib/blob-sync';
-import { loadProject, navigateToPageInProject } from '@/lib/page-actions';
+import { loadProject } from '@/lib/page-actions';
 import {
 	currentPageId,
 	editingTiles,
