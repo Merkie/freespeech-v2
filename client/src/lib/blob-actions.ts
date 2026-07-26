@@ -128,67 +128,12 @@ export function blobUpdateProject(updates: {
 	});
 }
 
-// --- Template operations ---
-
-export function blobCreateTemplate(name: string, tiles: TileBlob[]): string {
-	const templateId = crypto.randomUUID();
-
-	mutateBlob((blob) => {
-		blob.pages.push({
-			id: templateId,
-			name,
-			tiles,
-			isTemplate: true,
-		});
-	});
-
-	return templateId;
-}
-
-export function blobRenameTemplate(templateId: string, newName: string): void {
-	mutateBlob((blob) => {
-		const page = blob.pages.find((p) => p.id === templateId && p.isTemplate);
-		if (page) {
-			page.name = newName;
-		}
-	});
-}
-
-export function blobDeleteTemplate(templateId: string): void {
-	mutateBlob((blob) => {
-		// Remove the template page
-		blob.pages = blob.pages.filter((p) => p.id !== templateId);
-		// Clear templatePageId references on pages that used this template
-		for (const page of blob.pages) {
-			if (page.templatePageId === templateId) {
-				delete page.templatePageId;
-			}
-		}
-	});
-}
-
-export function blobLinkTemplate(pageId: string, templatePageId: string): void {
-	mutateBlob((blob) => {
-		const page = blob.pages.find((p) => p.id === pageId);
-		if (page) {
-			page.templatePageId = templatePageId;
-		}
-	});
-}
-
-export function blobUnlinkTemplate(pageId: string): void {
-	mutateBlob((blob) => {
-		const page = blob.pages.find((p) => p.id === pageId);
-		if (page) {
-			delete page.templatePageId;
-		}
-	});
-}
-
 // --- Helpers ---
 
 // For blob wire format: strip fields that match defaults to keep blob small
-function stripEmptyUpdates(updates: Partial<Omit<TileBlob, 'x' | 'y' | 'page'>>): Partial<Omit<TileBlob, 'x' | 'y' | 'page'>> {
+function stripEmptyUpdates(
+	updates: Partial<Omit<TileBlob, 'x' | 'y' | 'page'>>,
+): Partial<Omit<TileBlob, 'x' | 'y' | 'page'>> {
 	const result: Partial<Omit<TileBlob, 'x' | 'y' | 'page'>> = {};
 
 	if (updates.text !== undefined) result.text = updates.text;

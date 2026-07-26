@@ -24,10 +24,7 @@ function trackVisit(projectId: string, pageId?: string) {
 // Guard to prevent duplicate concurrent loads
 let currentlyLoadingProjectId: string | null = null;
 
-export async function loadProject(
-	projectId: string,
-	options?: { setHomePage?: boolean },
-): Promise<boolean> {
+export async function loadProject(projectId: string, options?: { setHomePage?: boolean }): Promise<boolean> {
 	// Guard: prevent duplicate loads for same project
 	if (currentlyLoadingProjectId === projectId) {
 		return false;
@@ -61,6 +58,7 @@ export async function loadProject(
 			columns: blob.columns,
 			rows: blob.rows,
 			isPublic: false,
+			isFavorite: false,
 			homePageId: blob.homePageId,
 			lastEditedAt: blob.lastEditedAt,
 			createdAt: blob.lastEditedAt,
@@ -115,10 +113,8 @@ export function navigateToPageInProject(pageId: string): boolean {
 }
 
 // Get home page ID from blob
-function getHomePageId(blob: { homePageId: string | null; pages: { id: string; name: string; isTemplate?: boolean }[] }): string {
+function getHomePageId(blob: { homePageId: string | null; pages: { id: string; name: string }[] }): string {
 	if (blob.homePageId) return blob.homePageId;
-	// Only consider non-template pages
-	const nonTemplatePages = blob.pages.filter((p) => !p.isTemplate);
-	const homePage = nonTemplatePages.find((p) => p.name.toLowerCase().trim() === 'home');
-	return homePage?.id ?? nonTemplatePages[0]?.id ?? '';
+	const homePage = blob.pages.find((p) => p.name.toLowerCase().trim() === 'home');
+	return homePage?.id ?? blob.pages[0]?.id ?? '';
 }

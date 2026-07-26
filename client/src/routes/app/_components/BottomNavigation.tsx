@@ -7,14 +7,12 @@ import { MODAL_ID } from '@/lib/constants';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import {
 	editingTiles,
-	pageIdBeforeTemplateEdit,
 	project,
 	projectHomePageId,
 	setActiveModalId,
 	setEditingTilePositions,
 	setEditingTiles,
 	setMultiSelectMode,
-	setPageIdBeforeTemplateEdit,
 	setUsingOnlineSearch,
 } from '@/lib/state';
 
@@ -63,26 +61,12 @@ const BottomNavigation: Component = () => {
 			// Exiting edit mode
 			if (editModeHasChanges()) {
 				// Has changes — show save/discard modal
-				const previousPageId = pageIdBeforeTemplateEdit();
-				if (previousPageId) {
-					setPendingEditModeAction(() => {
-						navigateToPageInProject(previousPageId);
-						setPageIdBeforeTemplateEdit(null);
-					});
-				} else {
-					setPendingEditModeAction(null);
-				}
+				setPendingEditModeAction(null);
 				setActiveModalId(MODAL_ID.SAVE_EDIT_MODE);
 			} else {
 				// No changes — exit immediately
 				discardEditMode();
 				exitEditModeClean();
-
-				const previousPageId = pageIdBeforeTemplateEdit();
-				if (previousPageId) {
-					navigateToPageInProject(previousPageId);
-					setPageIdBeforeTemplateEdit(null);
-				}
 			}
 		} else {
 			// Entering edit mode

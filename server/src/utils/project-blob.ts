@@ -19,8 +19,6 @@ export type PageBlob = {
 	id: string;
 	name: string;
 	tiles: TileBlob[];
-	isTemplate?: boolean;
-	templatePageId?: string;
 };
 
 export type ProjectBlob = {
@@ -79,12 +77,12 @@ const TileBlobSchema = z.object({
 	navigation: z.string().optional(),
 });
 
+// Unknown keys are stripped by default, so blobs still carrying the removed
+// template fields (isTemplate / templatePageId) validate and drop them.
 const PageBlobSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	tiles: z.array(TileBlobSchema),
-	isTemplate: z.boolean().optional(),
-	templatePageId: z.string().optional(),
 });
 
 export const ProjectBlobSchema = z.object({

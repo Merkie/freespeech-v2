@@ -4,11 +4,9 @@ import type { Tile as TileType } from '@/lib/types';
 
 export type TileProps = {
 	tile: TileType;
-	isTemplate?: boolean;
 	isSelected?: boolean;
 	isDimmed?: boolean;
 	isSpeaking?: boolean;
-	isEditMode?: boolean;
 	onClick: (e: MouseEvent) => void;
 };
 
@@ -44,18 +42,8 @@ export default function Tile(props: TileProps) {
 					'absolute top-0 left-0 flex h-full w-full cursor-pointer flex-col justify-center gap-1 rounded-md border p-2 px-1 text-black brightness-100 hover:brightness-[102%] active:brightness-[98%]',
 					{ 'opacity-40': props.isDimmed },
 					{ 'opacity-50': props.isSpeaking },
-					{
-						'cursor-not-allowed opacity-60': props.isTemplate && props.isEditMode,
-					},
 				)}
 			>
-				{/* Template badge - shown in edit mode */}
-				<Show when={props.isTemplate && props.isEditMode}>
-					<div class="absolute top-1 right-1 rounded bg-purple-600 px-1 text-[10px] font-medium text-white">
-						Template
-					</div>
-				</Show>
-
 				{/* Navigation bump */}
 				<Show when={props.tile.navigation}>
 					<div

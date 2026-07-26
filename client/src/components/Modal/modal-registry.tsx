@@ -1,12 +1,8 @@
 import { MODAL_ID, type ModalIdType } from '@/lib/constants';
-import ApplyTemplate from './_modal_inners/ApplyTemplate';
 import CreatePage from './_modal_inners/CreatePage';
 import CreateProject from './_modal_inners/CreateProject';
-import CreateTemplate from './_modal_inners/CreateTemplate';
 import EditPage from './_modal_inners/EditPage';
-import EditTemplateDetails from './_modal_inners/EditTemplateDetails';
 import ManagePages from './_modal_inners/ManagePages';
-import ManageTemplates from './_modal_inners/ManageTemplates';
 import OptimizeImages from './_modal_inners/OptimizeImages';
 import SaveEditMode from './_modal_inners/SaveEditMode';
 import SyncConflict from './_modal_inners/SyncConflict';
@@ -32,22 +28,6 @@ export const MODAL_REGISTRY: Record<ModalIdType, ModalConfig> = {
 	[MODAL_ID.EDIT_PAGE]: {
 		title: 'Edit Page',
 		innerElement: EditPage,
-	},
-	[MODAL_ID.CREATE_TEMPLATE]: {
-		title: 'Create Template',
-		innerElement: CreateTemplate,
-	},
-	[MODAL_ID.APPLY_TEMPLATE]: {
-		title: 'Apply Template',
-		innerElement: ApplyTemplate,
-	},
-	[MODAL_ID.EDIT_TEMPLATE_DETAILS]: {
-		title: 'Edit Template',
-		innerElement: EditTemplateDetails,
-	},
-	[MODAL_ID.MANAGE_TEMPLATES]: {
-		title: 'Manage Templates',
-		innerElement: ManageTemplates,
 	},
 	[MODAL_ID.OPTIMIZE_IMAGES]: {
 		title: 'Optimize Images',

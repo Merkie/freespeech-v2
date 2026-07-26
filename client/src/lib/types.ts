@@ -85,8 +85,6 @@ export type PageBlob = {
 	id: string;
 	name: string;
 	tiles: TileBlob[];
-	isTemplate?: boolean;
-	templatePageId?: string;
 };
 
 export type ProjectBlob = {

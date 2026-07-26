@@ -35,9 +35,6 @@ export const [project, setProject] = createSignal<Project>(null as unknown as Pr
 export const [projectHomePageId, setProjectHomePageId] = createSignal('');
 export const [currentPageId, setCurrentPageId] = createSignal('');
 
-// Track page ID before entering template edit mode (to return to after exiting)
-export const [pageIdBeforeTemplateEdit, setPageIdBeforeTemplateEdit] = createSignal<string | null>(null);
-
 // --- this is stuff claude code mostly generated ---
 
 // User state
@@ -119,35 +116,10 @@ export function getCurrentPageTiles(): Tile[] {
 	return page.tiles.map(expandTileBlob);
 }
 
-// Resolve template tiles from the blob's own pages array
-export function getCurrentPageTemplateTilesFromBlob(): Tile[] {
-	const page = getPageFromBlob(currentPageId());
-	if (!page?.templatePageId) return [];
-	const templatePage = projectBlob()?.pages.find((p) => p.id === page.templatePageId);
-	if (!templatePage) return [];
-	return templatePage.tiles.map(expandTileBlob);
-}
-
 export function getProjectPagesFromBlob(): { id: string; name: string }[] {
 	const blob = projectBlob();
 	if (!blob) return [];
-	return blob.pages.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name }));
-}
-
-// Get template pages from blob
-export function getTemplatePagesFromBlob(): PageBlob[] {
-	const blob = projectBlob();
-	if (!blob) return [];
-	return blob.pages.filter((p) => p.isTemplate === true);
-}
-
-// Get the template linked to a specific page
-export function getTemplateForPage(pageId: string): PageBlob | null {
-	const page = getPageFromBlob(pageId);
-	if (!page?.templatePageId) return null;
-	const blob = projectBlob();
-	if (!blob) return null;
-	return blob.pages.find((p) => p.id === page.templatePageId) ?? null;
+	return blob.pages.map((p) => ({ id: p.id, name: p.name }));
 }
 
 // Reset all project-related state when switching projects
@@ -159,7 +131,6 @@ export function resetProjectState() {
 	setUsingOnlineSearch(false);
 	setEditingPages(false);
 	setAddingPage(false);
-	setPageIdBeforeTemplateEdit(null);
 	setProjectBlob(null);
 	setSyncStatus('synced');
 }

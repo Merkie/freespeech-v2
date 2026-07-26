@@ -3,16 +3,12 @@ import { cn } from '@/lib/cn';
 import { navigateToPageInProject } from '@/lib/page-actions';
 import { speakText } from '@/lib/speak';
 import {
-	currentPageId,
-	getCurrentPageTemplateTilesFromBlob,
-	getCurrentPageTiles,
 	editingTilePositions,
 	editingTiles,
-	getPageFromBlob,
+	getCurrentPageTiles,
 	localSettings,
 	multiSelectMode,
 	project,
-	projectBlob,
 	setEditingTilePositions,
 	setSentence,
 	speakingTilePosition,
@@ -22,9 +18,6 @@ import {
 import type { Tile as TileType } from '@/lib/types';
 import AddTileButton from './AddTileButton';
 import Tile from './Tile';
-
-// Extended tile type that tracks whether a tile is from a template
-type RenderTile = TileType & { isTemplate?: boolean };
 
 export default function TileSubpages({ containerHeight }: { containerHeight: () => number }) {
 	const [reducedTiles, setReducedTiles] = createSignal<TileType[][]>([]);
@@ -48,49 +41,7 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 		return reduced;
 	};
 
-	// Check if current page is a template (editing the template source directly)
-	const isCurrentPageATemplate = () => {
-		const page = getPageFromBlob(currentPageId());
-		if (!page) return false;
-		// Check both: page has isTemplate flag, or another page references it as template
-		if (page.isTemplate) return true;
-		const blob = projectBlob();
-		if (!blob) return false;
-		return blob.pages.some((p) => p.templatePageId === page.id);
-	};
-
-	// Merge page tiles with template tiles for a given subpage
-	// Template tiles take precedence (overlay on top of page tiles at same position)
-	const getMergedTilesForSubpage = (pageTiles: TileType[], pageIndex: number): RenderTile[] => {
-		// Only merge template tiles on page 0, and not when editing the template itself
-		if (pageIndex !== 0 || isCurrentPageATemplate()) {
-			return pageTiles.map((t) => ({ ...t, isTemplate: false }));
-		}
-
-		const templateTiles = getCurrentPageTemplateTilesFromBlob();
-		const templatePositions = new Set(templateTiles.map((t) => `${t.x},${t.y}`));
-
-		// Filter out page tiles that are covered by template tiles
-		const visiblePageTiles: RenderTile[] = pageTiles
-			.filter((t) => !templatePositions.has(`${t.x},${t.y}`))
-			.map((t) => ({ ...t, isTemplate: false }));
-
-		// Add template tiles with isTemplate flag
-		const templateRenderTiles: RenderTile[] = templateTiles.map((t) => ({
-			...t,
-			isTemplate: true,
-		}));
-
-		return [...visiblePageTiles, ...templateRenderTiles];
-	};
-
-	const handleTileClick = (tile: RenderTile, event: MouseEvent) => {
-		// Template tiles have different click handling
-		if (tile.isTemplate) {
-			handleTemplateTileClick(tile);
-			return;
-		}
-
+	const handleTileClick = (tile: TileType, event: MouseEvent) => {
 		const tileKey = tilePositionKey(tile);
 
 		if (editingTiles()) {
@@ -133,33 +84,6 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 		}
 	};
 
-	// Handle template tile click
-	const handleTemplateTileClick = (templateTile: TileType) => {
-		if (editingTiles()) {
-			// In edit mode, template tiles are not editable from the page
-			return;
-		}
-
-		// Block all tile interactions while speaking
-		if (isTileBusy()) return;
-
-		const tileKey = tilePositionKey(templateTile);
-
-		if (templateTile.navigation) {
-			navigateToPageInProject(templateTile.navigation);
-		} else {
-			const settings = localSettings();
-
-			if (settings.speakOnTap) {
-				speakText(templateTile.text, tileKey);
-			}
-
-			if (settings.sentenceBuilder) {
-				setSentence((prev) => [...prev, templateTile]);
-			}
-		}
-	};
-
 	const isTileBusy = () => {
 		const status = voiceEngineStatus();
 		return status === 'synthesizing' || status === 'speaking';
@@ -169,16 +93,12 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 		return speakingTilePosition() === tilePositionKey(tile) && isTileBusy();
 	};
 
-	const isTileSelected = (tile: RenderTile) => {
-		// Template tiles cannot be selected
-		if (tile.isTemplate) return false;
+	const isTileSelected = (tile: TileType) => {
 		return editingTilePositions().includes(tilePositionKey(tile));
 	};
 
-	const isTileDimmed = (tile: RenderTile) => {
+	const isTileDimmed = (tile: TileType) => {
 		if (!editingTiles()) return false;
-		// Template tiles are never dimmed (they have their own opacity styling)
-		if (tile.isTemplate) return false;
 		const selected = editingTilePositions();
 		// If any tiles are selected, dim tiles that aren't selected
 		if (selected.length > 0) {
@@ -188,19 +108,10 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 	};
 
 	// Calculate unused coordinates for a given subpage
-	const getUnusedCoords = (tiles: TileType[], pageIndex: number) => {
+	const getUnusedCoords = (tiles: TileType[]) => {
 		const columns = project().columns;
 		const rows = project().rows;
 		const usedCoords = new Set(tiles.map((t) => `${t.x},${t.y}`));
-
-		// Also exclude template tile positions on first subpage
-		// (but NOT when editing the template itself - we want all positions available)
-		if (pageIndex === 0 && !isCurrentPageATemplate()) {
-			const templateTiles = getCurrentPageTemplateTilesFromBlob();
-			for (const t of templateTiles) {
-				usedCoords.add(`${t.x},${t.y}`);
-			}
-		}
 
 		const unusedCoords: { x: number; y: number }[] = [];
 
@@ -230,24 +141,21 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 		<For each={subpagesToRender()}>
 			{(tiles, pageIndex) => (
 				<TileSubpageContainer containerHeight={containerHeight} pageIndex={pageIndex}>
-					{/* Merged tiles (page tiles + template tiles on page 0) */}
-					<For each={getMergedTilesForSubpage(tiles, pageIndex())}>
+					<For each={tiles}>
 						{(tile) => (
-						<Tile
-							tile={tile}
-							isTemplate={tile.isTemplate}
-							isSelected={isTileSelected(tile)}
-							isDimmed={isTileDimmed(tile)}
-							isSpeaking={isTileSpeaking(tile)}
-							isEditMode={editingTiles()}
-							onClick={(e) => handleTileClick(tile, e)}
-						/>
-					)}
+							<Tile
+								tile={tile}
+								isSelected={isTileSelected(tile)}
+								isDimmed={isTileDimmed(tile)}
+								isSpeaking={isTileSpeaking(tile)}
+								onClick={(e) => handleTileClick(tile, e)}
+							/>
+						)}
 					</For>
 
 					{/* Empty tile slots - only shown in edit mode */}
 					<Show when={editingTiles()}>
-						<For each={getUnusedCoords(tiles, pageIndex())}>
+						<For each={getUnusedCoords(tiles)}>
 							{(coord) => <AddTileButton x={coord.x} y={coord.y} page={getDbPageForSubpage(tiles)} />}
 						</For>
 					</Show>
