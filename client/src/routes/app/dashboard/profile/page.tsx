@@ -10,6 +10,10 @@ const ProfilePage: Component = () => {
 
 	const logout = () => {
 		localStorage.removeItem('token');
+		// The worker caches API responses keyed by URL alone, so they outlive the token unless it is
+		// told to drop them. Without this the next account on a shared iPad could be shown the
+		// previous one's project list while offline.
+		navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_API_CACHE' });
 		setUser(null);
 		navigate('/', { replace: true });
 	};

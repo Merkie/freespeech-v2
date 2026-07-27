@@ -12,7 +12,10 @@ export default defineConfig({
 		solid(),
 		tailwindcss(),
 		VitePWA({
-			registerType: 'prompt',
+			// 'prompt' parks a new worker in "waiting" until every client closes, and nothing in the
+			// app posts SKIP_WAITING. An installed iOS PWA is effectively never closed, so a device
+			// that picked up a broken worker would keep it — including through a fix for that worker.
+			registerType: 'autoUpdate',
 			strategies: 'injectManifest',
 			srcDir: 'src',
 			filename: 'sw.ts',

@@ -119,7 +119,10 @@ export default function Tile(props: TileProps) {
 						<img
 							src={props.tile.image}
 							alt={props.tile.displayText || props.tile.text}
-							loading="lazy"
+							/* No loading="lazy": a board sizes itself to the viewport, so every tile
+							   image is on screen the moment the page renders and there is nothing to
+							   defer. WebKit is also unreliable about lazy images that are absolutely
+							   positioned inside an overflow-hidden box, which is exactly this markup. */
 							decoding="async"
 							draggable={false}
 							class={cn('absolute inset-0 h-full w-full', tileImageFitClass())}

@@ -1,10 +1,8 @@
 /// <reference lib="webworker" />
 
-import { CacheableResponsePlugin } from 'workbox-cacheable-response';
-import { ExpirationPlugin } from 'workbox-expiration';
-import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
+import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { handleApi, handleImage } from '@/lib/sw-cache';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -18,7 +16,6 @@ precacheAndRoute(self.__WB_MANIFEST, {
 	ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^[0-9a-f]{32}$/],
 });
 
-// Clean up old caches
 cleanupOutdatedCaches();
 
 // The API this build talks to. Deployments differ (api.freespeechaac.com in production,
@@ -26,144 +23,76 @@ cleanupOutdatedCaches();
 const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 const API_ORIGIN = new URL(API_BASE_URL).origin;
 
-// Cache names
-const CACHE_NAMES = {
-	images: 'freespeech-images-v1',
-	api: 'freespeech-api-v1',
-	static: 'freespeech-static-v1',
-};
+const IMAGE_CACHE = 'freespeech-images-v2';
+const API_CACHE = 'freespeech-api-v2';
 
-// Image expiry: 30 days
-const IMAGE_EXPIRY_DAYS = 30;
+// Caches written by earlier versions of this worker. An installed PWA keeps them forever
+// otherwise, and the v1 image cache in particular is full of entries that should never have been
+// stored (see the note on best-effort caching below).
+const RETIRED_CACHES = ['freespeech-images-v1', 'freespeech-api-v1', 'freespeech-static-v1'];
 
-// API cache expiry: 1 day
-const API_EXPIRY_DAYS = 1;
+// Deliberately modest. iOS hands an installed PWA a small Cache Storage quota and pads every
+// opaque cross-origin response heavily against it, so "500 images" is not a limit that can
+// actually be reached on an iPad — it is just a number that gets hit as a quota error instead.
+const MAX_IMAGE_ENTRIES = 200;
+const MAX_API_ENTRIES = 50;
 
-// Handle navigation requests - Network First with timeout
-const navigationHandler = new NetworkFirst({
-	cacheName: CACHE_NAMES.static,
-	networkTimeoutSeconds: 3,
-	plugins: [
-		new CacheableResponsePlugin({
-			statuses: [0, 200],
-		}),
-	],
-});
+// Hosts the boards pull tile art from. `request.destination` covers these already on any current
+// browser; the list is the fallback for older WebKit, which leaves destination empty.
+const IMAGE_HOSTS = ['media.freespeechaac.com', 's3.amazonaws.com', 'coughdrop-usercontent.s3.amazonaws.com'];
+
+// Every cache write below is best-effort — see lib/sw-cache.ts for why that is the whole point of
+// this worker rather than defensive padding.
+
+function isImageRequest({ request, url }: { request: Request; url: URL }): boolean {
+	if (request.destination === 'image') return true;
+	// The media host serves extension-less keys, so there is nothing in the path to match on.
+	return IMAGE_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
+}
+
+registerRoute(isImageRequest, ({ request, event }) => handleImage(request, IMAGE_CACHE, MAX_IMAGE_ENTRIES, event));
 
 registerRoute(
-	new NavigationRoute(navigationHandler, {
-		// Don't cache auth pages
-		denylist: [/\/login/, /\/register/, /\/oauth/],
-	}),
+	({ url }) => url.origin === API_ORIGIN,
+	({ request, event }) => handleApi(request, API_CACHE, MAX_API_ENTRIES, event),
 );
 
-// Cache media.freespeechaac.com images - Cache First with long expiry
-registerRoute(
-	({ url }) => url.hostname === 'media.freespeechaac.com',
-	new CacheFirst({
-		cacheName: CACHE_NAMES.images,
-		plugins: [
-			new CacheableResponsePlugin({
-				statuses: [0, 200],
-			}),
-			new ExpirationPlugin({
-				maxEntries: 500,
-				maxAgeSeconds: IMAGE_EXPIRY_DAYS * 24 * 60 * 60,
-				purgeOnQuotaError: true,
-			}),
-		],
-	}),
-);
+// --- Navigation ------------------------------------------------------------------------------
+//
+// Every route is the same SPA shell, so serve the precached index.html rather than going to the
+// network for HTML that is identical each time. This is also what makes a cold offline launch
+// work: the previous handler only had a shell to fall back on if some earlier navigation had
+// happened to be cached.
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html')));
 
-// Cache CDN images (for optimized Cloudflare images) - Cache First
-registerRoute(
-	({ url }) => url.hostname.endsWith('freespeechaac.com') && url.pathname.startsWith('/cdn-cgi/image'),
-	new CacheFirst({
-		cacheName: CACHE_NAMES.images,
-		plugins: [
-			new CacheableResponsePlugin({
-				statuses: [0, 200],
-			}),
-			new ExpirationPlugin({
-				maxEntries: 500,
-				maxAgeSeconds: IMAGE_EXPIRY_DAYS * 24 * 60 * 60,
-				purgeOnQuotaError: true,
-			}),
-		],
-	}),
-);
+// --- Lifecycle -------------------------------------------------------------------------------
 
-// Cache external symbol images (Open Symbols, etc.) - Cache First
-registerRoute(
-	({ url }) =>
-		url.hostname.includes('opensymbols') || url.hostname.includes('arasaac') || url.hostname.includes('mulberry'),
-	new CacheFirst({
-		cacheName: CACHE_NAMES.images,
-		plugins: [
-			new CacheableResponsePlugin({
-				statuses: [0, 200],
-			}),
-			new ExpirationPlugin({
-				maxEntries: 200,
-				maxAgeSeconds: IMAGE_EXPIRY_DAYS * 24 * 60 * 60,
-				purgeOnQuotaError: true,
-			}),
-		],
-	}),
-);
-
-// Cache API responses - Stale While Revalidate
-// This complements the IndexedDB caching for API responses.
-// The host is derived from VITE_API_URL rather than hard-coded: a literal
-// 'api.freespeechaac.com' check never matched api-v2.freespeechaac.com, so this route
-// silently did nothing on every deployment except production.
-registerRoute(
-	({ url }) => url.origin === API_ORIGIN || url.pathname.startsWith('/api/'),
-	new StaleWhileRevalidate({
-		cacheName: CACHE_NAMES.api,
-		plugins: [
-			new CacheableResponsePlugin({
-				statuses: [0, 200],
-			}),
-			new ExpirationPlugin({
-				maxEntries: 100,
-				maxAgeSeconds: API_EXPIRY_DAYS * 24 * 60 * 60,
-				purgeOnQuotaError: true,
-			}),
-		],
-	}),
-);
-
-// Cache Google Fonts - Cache First
-registerRoute(
-	({ url }) => url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com',
-	new CacheFirst({
-		cacheName: CACHE_NAMES.static,
-		plugins: [
-			new CacheableResponsePlugin({
-				statuses: [0, 200],
-			}),
-			new ExpirationPlugin({
-				maxEntries: 30,
-				maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
-			}),
-		],
-	}),
-);
-
-// Bootstrap Icons used to be fetched from cdn.jsdelivr.net and cached at runtime, which meant
-// the very first offline launch had no icons at all. The font is now bundled and precached
-// with the app shell, so no runtime route is needed.
-
-// Skip waiting and claim clients immediately
-self.addEventListener('message', (event) => {
-	if (event.data && event.data.type === 'SKIP_WAITING') {
-		self.skipWaiting();
-	}
+self.addEventListener('install', () => {
+	// An installed iOS PWA is almost never fully closed, so a worker that waits for every client
+	// to go away is a worker that never activates. A device could sit on a broken version
+	// indefinitely; taking over immediately is the lesser problem.
+	void self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-	event.waitUntil(self.clients.claim());
+	event.waitUntil(
+		(async () => {
+			await Promise.all(RETIRED_CACHES.map((name) => caches.delete(name)));
+			await self.clients.claim();
+		})(),
+	);
+});
+
+self.addEventListener('message', (event) => {
+	if (!event.data) return;
+	if (event.data.type === 'SKIP_WAITING') {
+		void self.skipWaiting();
+	}
+	// Sent on sign-out. Cached API responses are keyed by URL alone, so without this the next
+	// account signed in on the same device could be served the previous one's data while offline.
+	if (event.data.type === 'CLEAR_API_CACHE') {
+		event.waitUntil(caches.delete(API_CACHE));
+	}
 });
 
 // --- Background Sync: sync dirty blobs when connectivity returns ---
