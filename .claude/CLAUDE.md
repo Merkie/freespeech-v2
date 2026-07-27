@@ -200,6 +200,8 @@ Pre-built vocabulary sets (CommuniKate, Quick Core, Vocal Flair, Sequoia, Projec
 
 `fetchFromAPI()` throws `OfflineError` when `navigator.onLine` is false. Catch it in UI code to show user-friendly toasts. TTS auto-falls back to Web Speech API offline.
 
+Cold offline launches keep a stored session unless `/auth/me` returns a definitive 401/403/404; transport failures never delete the token. A safe subset of the last authenticated user is cached in IndexedDB so the app shell can render without the API. The projects dashboard falls back to summaries built from `projectBlobs`, so it shows only boards that can actually open offline rather than a stale full server list or an indefinite loading state.
+
 ### File-based routing (server)
 
 ```typescript

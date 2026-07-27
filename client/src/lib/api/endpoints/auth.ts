@@ -105,10 +105,12 @@ async function me(token?: string) {
 		path: '/auth/me',
 		method: 'GET',
 		token,
-	})) as {
+		options: { parseResponseJson: false, timeoutMs: 5000 },
+	})) as Response;
+	const data = (await response.json()) as {
 		user: User;
 		error: string;
 	};
 
-	return response;
+	return { ...data, status: response.status };
 }

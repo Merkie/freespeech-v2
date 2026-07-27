@@ -1,6 +1,7 @@
 import { batch } from 'solid-js';
 import api from './api';
 import { loadProjectBlob } from './blob-sync';
+import { getCachedProjects } from './cache/blob-cache';
 import { pickDefaultProject } from './project-order';
 import {
 	localSettings,
@@ -51,7 +52,7 @@ export async function resolveStartProjectId(): Promise<string | null> {
 		const { projects } = await api.project.list();
 		return pickDefaultProject(projects ?? [])?.id ?? null;
 	} catch {
-		return null;
+		return pickDefaultProject(await getCachedProjects())?.id ?? null;
 	}
 }
 

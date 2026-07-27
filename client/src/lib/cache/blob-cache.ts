@@ -1,10 +1,36 @@
-import type { ProjectBlob } from '../types';
+import type { Project, ProjectBlob } from '../types';
 import { getDB } from './db';
 
 export async function getCachedBlob(projectId: string): Promise<ProjectBlob | null> {
 	const db = await getDB();
 	const entry = await db.get('projectBlobs', projectId);
 	return entry?.blob ?? null;
+}
+
+/**
+ * Builds dashboard-safe summaries from the blobs that are genuinely available offline. A blob
+ * does not carry server-only fields such as favourite/public state, so those use neutral defaults
+ * until the online project list can be reached again.
+ */
+export async function getCachedProjects(): Promise<Project[]> {
+	const db = await getDB();
+	const entries = await db.getAll('projectBlobs');
+
+	return entries.map(({ blob }) => ({
+		id: blob.id,
+		userId: '',
+		name: blob.name,
+		description: blob.description,
+		imageUrl: blob.imageUrl,
+		columns: blob.columns,
+		rows: blob.rows,
+		isPublic: false,
+		isFavorite: false,
+		homePageId: blob.homePageId,
+		lastEditedAt: blob.lastEditedAt,
+		createdAt: blob.lastEditedAt,
+		updatedAt: blob.lastEditedAt,
+	}));
 }
 
 export async function cacheBlob(blob: ProjectBlob, dirty = false): Promise<void> {

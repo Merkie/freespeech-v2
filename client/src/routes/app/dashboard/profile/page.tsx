@@ -1,20 +1,23 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, createSignal, Show } from 'solid-js';
 import api from '@/lib/api';
-import { setUser, user } from '@/lib/state';
+import { clearCachedAuth } from '@/lib/cache/meta-cache';
+import { setSessionStatus, setUser, user } from '@/lib/state';
 
 const ProfilePage: Component = () => {
 	const navigate = useNavigate();
 	const [_isUploadProfilePictureModalOpen, setIsUploadProfilePictureModalOpen] = createSignal(false);
 	const [name, setName] = createSignal(user()?.name || '');
 
-	const logout = () => {
+	const logout = async () => {
 		localStorage.removeItem('token');
+		await clearCachedAuth().catch(() => undefined);
 		// The worker caches API responses keyed by URL alone, so they outlive the token unless it is
 		// told to drop them. Without this the next account on a shared iPad could be shown the
 		// previous one's project list while offline.
 		navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_API_CACHE' });
 		setUser(null);
+		setSessionStatus('unauthenticated');
 		navigate('/', { replace: true });
 	};
 

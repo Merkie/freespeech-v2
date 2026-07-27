@@ -39,6 +39,8 @@ export const [currentPageId, setCurrentPageId] = createSignal('');
 
 // User state
 export const [user, setUser] = createSignal<User | null>(null);
+export type SessionStatus = 'checking' | 'authenticated' | 'offline' | 'unauthenticated';
+export const [sessionStatus, setSessionStatus] = createSignal<SessionStatus>('checking');
 
 // Speech synthesis
 export const [isSynthesizingSpeech, setIsSynthesizingSpeech] = createSignal(false);

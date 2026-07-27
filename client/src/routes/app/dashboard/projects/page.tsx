@@ -1,7 +1,9 @@
 import Fuse from 'fuse.js';
 import type { Component } from 'solid-js';
-import { createMemo, createResource, createSignal, For, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js';
+import { globalIsOnline } from '@/hooks/useNetworkStatus';
 import api from '@/lib/api';
+import { getCachedProjects } from '@/lib/cache/blob-cache';
 import { MODAL_ID } from '@/lib/constants';
 import { setActiveModalId } from '@/lib/state';
 import type { Project } from '@/lib/types';
@@ -13,11 +15,29 @@ const ProjectsPage: Component = () => {
 	const [searchQuery, setSearchQuery] = createSignal('');
 	const [sortBy, setSortBy] = createSignal<SortOption>('updated');
 	const [sortDirection, setSortDirection] = createSignal<SortDirection>('desc');
+	const [showingCached, setShowingCached] = createSignal(false);
 
-	const [projects, { mutate: mutateProjects }] = createResource<Project[]>(async () => {
-		const response = await api.project.list();
-		return response.projects;
-	});
+	const [projects, { mutate: mutateProjects }] = createResource(
+		() => (globalIsOnline() ? 'online' : 'offline'),
+		async (connection) => {
+			if (connection === 'offline') {
+				setShowingCached(true);
+				return getCachedProjects();
+			}
+
+			try {
+				const response = await api.project.list();
+				setShowingCached(false);
+				return response.projects;
+			} catch {
+				// navigator.onLine can remain true briefly after an iPad wakes with Wi-Fi disabled.
+				// A failed/expired request still resolves this resource from IndexedDB instead of
+				// leaving the dashboard on a spinner or an empty error state.
+				setShowingCached(true);
+				return getCachedProjects();
+			}
+		},
+	);
 
 	const handleToggleFavorite = (projectId: string, newValue: boolean) => {
 		mutateProjects((prev) => prev?.map((p) => (p.id === projectId ? { ...p, isFavorite: newValue } : p)));
@@ -66,9 +86,12 @@ const ProjectsPage: Component = () => {
 		});
 	});
 
-	onMount(() => {
+	let promptedForFirstProject = false;
+	createEffect(() => {
+		if (projects.loading || showingCached() || promptedForFirstProject) return;
 		const projectList = projects();
 		if (projectList && projectList.length === 0) {
+			promptedForFirstProject = true;
 			setActiveModalId(MODAL_ID.CREATE_PROJECT);
 		}
 	});
@@ -96,8 +119,9 @@ const ProjectsPage: Component = () => {
 					<button
 						type="button"
 						onClick={() => setActiveModalId(MODAL_ID.IMPORT_BOARD)}
+						disabled={showingCached()}
 						title="Import a .obf or .obz board from another AAC app"
-						class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-700 transition-all hover:border-zinc-400 hover:bg-zinc-50"
+						class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-700 transition-all hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						<i class="bi bi-file-earmark-arrow-up text-base leading-none" />
 						<span class="text-sm font-semibold uppercase tracking-wider">Import</span>
@@ -106,12 +130,23 @@ const ProjectsPage: Component = () => {
 					<button
 						type="button"
 						onClick={() => setActiveModalId(MODAL_ID.CREATE_PROJECT)}
-						class="flex items-center gap-2 rounded-md border border-blue-500 bg-blue-500 px-3 py-2 text-white transition-all hover:brightness-110 active:brightness-90"
+						disabled={showingCached()}
+						class="flex items-center gap-2 rounded-md border border-blue-500 bg-blue-500 px-3 py-2 text-white transition-all hover:brightness-110 active:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						<i class="bi bi-plus-lg text-base leading-none" />
 						<span class="text-sm font-semibold uppercase tracking-wider">New Project</span>
 					</button>
 				</SearchBar>
+
+				<Show when={showingCached() && !projects.loading}>
+					<div class="mb-4 flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+						<i class="bi bi-cloud-slash" />
+						<span>
+							Offline — showing {projects()?.length ?? 0} {(projects()?.length ?? 0) === 1 ? 'board' : 'boards'} saved
+							on this device.
+						</span>
+					</div>
+				</Show>
 
 				{/* Projects Grid */}
 				<Show
@@ -126,7 +161,20 @@ const ProjectsPage: Component = () => {
 					<Show
 						when={sortedProjects().length > 0}
 						fallback={
-							<Show when={searchQuery()}>
+							<Show
+								when={searchQuery()}
+								fallback={
+									<div class="flex flex-col items-center justify-center py-16 text-center text-zinc-400">
+										<i class={`bi ${showingCached() ? 'bi-cloud-slash' : 'bi-grid'} mb-4 text-5xl opacity-50`} />
+										<p class="text-lg">
+											{showingCached() ? 'No boards are available offline yet.' : 'No projects yet.'}
+										</p>
+										<Show when={showingCached()}>
+											<p class="mt-1 max-w-md text-sm">Reconnect and open a board once to save it for offline use.</p>
+										</Show>
+									</div>
+								}
+							>
 								<div class="flex flex-col items-center justify-center py-16 text-zinc-400">
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
@@ -143,7 +191,11 @@ const ProjectsPage: Component = () => {
 										/>
 									</svg>
 									<p class="text-lg">No projects found matching "{searchQuery()}"</p>
-									<button onClick={() => setSearchQuery('')} class="mt-4 text-sm text-blue-500 hover:text-blue-400">
+									<button
+										type="button"
+										onClick={() => setSearchQuery('')}
+										class="mt-4 text-sm text-blue-500 hover:text-blue-400"
+									>
 										Clear search
 									</button>
 								</div>

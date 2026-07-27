@@ -5,14 +5,16 @@ import Modal from '@/components/Modal';
 import OfflineBanner from '@/components/OfflineBanner';
 import ToastContainer from '@/components/ToastContainer';
 import UpdateBanner from '@/components/UpdateBanner';
-import { user } from '@/lib/state';
+import { sessionStatus, user } from '@/lib/state';
 import BottomNavigation from '@/routes/app/_components/BottomNavigation';
 
 const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 	const [show, setShow] = createSignal(false);
 
 	createEffect(() => {
-		if (user()) setShow(true);
+		// A cached token is enough to enter the offline shell. The user profile may not have been
+		// cached yet on an upgraded installation, but the board blobs are still independently usable.
+		if (user() || sessionStatus() === 'offline') setShow(true);
 	});
 
 	return (

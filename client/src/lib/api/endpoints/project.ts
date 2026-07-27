@@ -111,9 +111,13 @@ async function importTemplate(slug: string) {
 
 async function listProjects(token?: string) {
 	const response = (await fetchFromAPI({
-		path: '/project/list',
+		// The dashboard has its own IndexedDB fallback containing only boards that can really open
+		// offline. Bypass the worker's older cached full list so a stale navigator.onLine value does
+		// not make unavailable boards appear usable after an iPad wakes without connectivity.
+		path: '/project/list?sw-bypass=1',
 		method: 'GET',
 		token,
+		options: { timeoutMs: 5000 },
 	})) as {
 		projects: Project[];
 	};

@@ -1,8 +1,8 @@
 import { A, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, onMount, Show } from 'solid-js';
 import api from '@/lib/api';
-import { cacheAuthToken } from '@/lib/cache/meta-cache';
-import { setUser } from '@/lib/state';
+import { cacheAuthToken, cacheAuthUser } from '@/lib/cache/meta-cache';
+import { setSessionStatus, setUser } from '@/lib/state';
 
 function Page() {
 	const [searchParams] = useSearchParams();
@@ -30,6 +30,8 @@ function Page() {
 
 			if (userData.user) {
 				setUser(userData.user);
+				setSessionStatus('authenticated');
+				cacheAuthUser(userData.user).catch(() => {});
 			}
 
 			navigate('/app/dashboard/projects', { replace: true });
@@ -61,7 +63,13 @@ function Page() {
 					>
 						<div class="flex flex-col items-center gap-4 py-4">
 							<div class="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-								<svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+								<svg
+									class="h-6 w-6 text-red-600"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke-width="2"
+									stroke="currentColor"
+								>
 									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
 								</svg>
 							</div>

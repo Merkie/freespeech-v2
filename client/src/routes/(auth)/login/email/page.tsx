@@ -1,8 +1,8 @@
 import { A, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import api from '@/lib/api';
-import { cacheAuthToken } from '@/lib/cache/meta-cache';
-import { setUser } from '@/lib/state';
+import { cacheAuthToken, cacheAuthUser } from '@/lib/cache/meta-cache';
+import { setSessionStatus, setUser } from '@/lib/state';
 
 function Page() {
 	const navigate = useNavigate();
@@ -31,6 +31,8 @@ function Page() {
 				const userData = await api.auth.me(data.token);
 				if (userData.user) {
 					setUser(userData.user);
+					setSessionStatus('authenticated');
+					cacheAuthUser(userData.user).catch(() => {});
 				}
 
 				navigate('/app/dashboard/projects', { replace: true });

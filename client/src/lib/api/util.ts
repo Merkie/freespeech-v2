@@ -22,6 +22,7 @@ export async function fetchFromAPI({
 	token?: string;
 	options?: {
 		parseResponseJson?: boolean;
+		timeoutMs?: number;
 	};
 }) {
 	if (!navigator.onLine) {
@@ -49,6 +50,7 @@ export async function fetchFromAPI({
 		method,
 		headers,
 		body: JSON.stringify(body),
+		...(options?.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
 	});
 
 	checkVersionHeader(response);
