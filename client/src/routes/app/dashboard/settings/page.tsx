@@ -62,9 +62,9 @@ const SettingsPage: Component = () => {
 				</div>
 
 				<div class="flex flex-col gap-8 md:flex-row">
-					<a
-						href="/app/dashboard/settings/"
-						class="group pointer-events-none flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 opacity-50 grayscale transition-all select-none hover:border-amber-200 hover:bg-amber-50"
+					<A
+						href="/app/dashboard/settings/access-controls"
+						class="group flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 transition-all select-none hover:border-amber-200 hover:bg-amber-50"
 					>
 						<div class="grid h-[70px] w-[70px] place-items-center rounded-lg bg-amber-100">
 							<i class="bi bi-lock-fill text-[40px] text-amber-500"></i>
@@ -72,7 +72,7 @@ const SettingsPage: Component = () => {
 						<span class="text-3xl text-zinc-800 transition-all group-hover:text-amber-500">Access Controls</span>
 						<div class="flex-1"></div>
 						<i class="bi bi-arrow-right-short text-6xl text-zinc-500 transition-all group-hover:text-amber-500"></i>
-					</a>
+					</A>
 
 					<a
 						href="/app/dashboard/settings/"

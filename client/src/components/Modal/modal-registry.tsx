@@ -4,6 +4,8 @@ import CreateProject from './_modal_inners/CreateProject';
 import EditPage from './_modal_inners/EditPage';
 import ManagePages from './_modal_inners/ManagePages';
 import OptimizeImages from './_modal_inners/OptimizeImages';
+import PinEntry, { pinEntryTitle } from './_modal_inners/PinEntry';
+import PinSetup from './_modal_inners/PinSetup';
 import SaveEditMode from './_modal_inners/SaveEditMode';
 import SyncConflict from './_modal_inners/SyncConflict';
 
@@ -40,5 +42,13 @@ export const MODAL_REGISTRY: Record<ModalIdType, ModalConfig> = {
 	[MODAL_ID.SYNC_CONFLICT]: {
 		title: 'Sync Conflict',
 		innerElement: SyncConflict,
+	},
+	[MODAL_ID.PIN_ENTRY]: {
+		title: pinEntryTitle,
+		innerElement: PinEntry,
+	},
+	[MODAL_ID.PIN_SETUP]: {
+		title: 'Set Passcode',
+		innerElement: PinSetup,
 	},
 };

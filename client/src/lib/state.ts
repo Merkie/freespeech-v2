@@ -170,7 +170,28 @@ export const [localSettings, setLocalSettings] = createSignal<LocalSettings>({
 	skinTone: 'medium',
 	lastVisitedProjectId: '',
 	lastVisitedPageId: '',
+	editPinEnabled: false,
+	editPinMode: 'pin',
+	editPinHash: '',
+	editPinSalt: '',
+	editPinFailureCount: 0,
+	editPinLockoutUntil: 0,
 });
+
+// Passcode gate plumbing. The gated action is held here so the modal stays generic: whichever
+// button opened the prompt supplies both the wording and what to run once it is satisfied.
+export const [pinPromptText, setPinPromptText] = createSignal('');
+const [pinUnlockHandler, setPinUnlockHandler] = createSignal<() => void>(() => {});
+
+export function requestPinUnlock(prompt: string, onUnlock: () => void) {
+	setPinPromptText(prompt);
+	setPinUnlockHandler(() => onUnlock);
+}
+
+export function runPinUnlockHandler() {
+	pinUnlockHandler()();
+	setPinUnlockHandler(() => () => {});
+}
 
 // Initialize from localStorage and set up persistence
 if (typeof window !== 'undefined') {

@@ -1,14 +1,16 @@
-import { A, useLocation } from '@solidjs/router';
+import { A, useLocation, useNavigate } from '@solidjs/router';
 import type { Component } from 'solid-js';
 import { setPendingEditModeAction } from '@/components/Modal/_modal_inners/SaveEditMode';
 import { discardEditMode, editModeHasChanges, enterEditMode } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import { navigateToPageInProject } from '@/lib/page-actions';
+import { pinLockActive } from '@/lib/pin';
 import {
 	editingTiles,
 	project,
 	projectHomePageId,
+	requestPinUnlock,
 	setActiveModalId,
 	setEditingTilePositions,
 	setEditingTiles,
@@ -25,6 +27,21 @@ function exitEditModeClean() {
 
 const BottomNavigation: Component = () => {
 	const location = useLocation();
+	const navigate = useNavigate();
+
+	const inDashboard = () => location.pathname.startsWith('/app/dashboard');
+
+	// Runs `action` immediately, or behind the passcode prompt when the gate is on. The prompt is
+	// shown on every gated attempt rather than unlocking for the rest of the visit: otherwise a
+	// carer who unlocked edit mode would leave the dashboard open behind them.
+	const gate = (prompt: string, action: () => void) => {
+		if (!pinLockActive()) {
+			action();
+			return;
+		}
+		requestPinUnlock(prompt, action);
+		setActiveModalId(MODAL_ID.PIN_ENTRY);
+	};
 
 	const handleHomeClick = (e: MouseEvent) => {
 		if (!editingTiles()) {
@@ -69,10 +86,21 @@ const BottomNavigation: Component = () => {
 				exitEditModeClean();
 			}
 		} else {
-			// Entering edit mode
-			enterEditMode();
-			setEditingTiles(true);
+			// Entering edit mode. Leaving it is never gated — the lock exists to keep people out
+			// of edit mode, not to trap them in it.
+			gate('Enter your passcode to edit this board.', () => {
+				enterEditMode();
+				setEditingTiles(true);
+			});
 		}
+	};
+
+	// The dashboard is where projects can be renamed and deleted, so leaving the board for it is
+	// gated too. Navigating within the dashboard is not.
+	const handleDashboardClick = (e: MouseEvent) => {
+		if (inDashboard() || !pinLockActive()) return;
+		e.preventDefault();
+		gate('Enter your passcode to open the dashboard.', () => navigate('/app/dashboard/projects'));
 	};
 
 	// URL is now just the project ID - page is managed via state
@@ -97,6 +125,7 @@ const BottomNavigation: Component = () => {
 
 			{/* Edit Button */}
 			<button
+				type="button"
 				aria-label="Edit tiles"
 				onClick={handleEditClick}
 				class={cn('flex-1 rounded-md p-1 text-center transition-colors', {
@@ -111,8 +140,9 @@ const BottomNavigation: Component = () => {
 			<A
 				aria-label="Dashboard"
 				href="/app/dashboard/projects"
+				onClick={handleDashboardClick}
 				class={cn('flex-1 rounded-md p-1 text-center transition-colors', {
-					'bg-zinc-800': location.pathname.startsWith('/app/dashboard'),
+					'bg-zinc-800': inDashboard(),
 					'pointer-events-none opacity-50': editingTiles(),
 				})}
 			>

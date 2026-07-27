@@ -16,6 +16,7 @@ import RegisterPage from './routes/(auth)/register/page.tsx';
 import DashboardLayout from './routes/app/dashboard/layout.tsx';
 import ProfilePage from './routes/app/dashboard/profile/page.tsx';
 import ProjectsPage from './routes/app/dashboard/projects/page.tsx';
+import SettingsAccessControlsPage from './routes/app/dashboard/settings/access-controls/page.tsx';
 import SettingsBehaviorPage from './routes/app/dashboard/settings/behavior/page.tsx';
 import SettingsPage from './routes/app/dashboard/settings/page.tsx';
 import SettingsVoicePage from './routes/app/dashboard/settings/voice/page.tsx';
@@ -62,6 +63,7 @@ render(
 							<Route path="/settings" component={SettingsPage} />
 							<Route path="/settings/voice" component={SettingsVoicePage} />
 							<Route path="/settings/behavior" component={SettingsBehaviorPage} />
+							<Route path="/settings/access-controls" component={SettingsAccessControlsPage} />
 							<Route path="/profile" component={ProfilePage} />
 						</Route>
 

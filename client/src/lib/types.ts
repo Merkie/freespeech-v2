@@ -7,6 +7,9 @@ export type TileTextSize = 'small' | 'medium' | 'large' | 'x-large';
 export type TileTextOverflow = 'truncate' | 'wrap';
 export type TileImageFit = 'contain' | 'cover';
 
+/** 'pin' checks a stored 4-digit hash; 'math' asks a multiplication question and stores nothing. */
+export type EditPinMode = 'pin' | 'math';
+
 export type LocalSettings = {
 	offlineVoice: string;
 	elevenLabsVoice: IElevenLabsVoice;
@@ -20,6 +23,13 @@ export type LocalSettings = {
 	skinTone: SkinTone;
 	lastVisitedProjectId: string;
 	lastVisitedPageId: string;
+	// Passcode gate for edit mode / the dashboard. Device-local by design — see lib/pin.ts.
+	editPinEnabled: boolean;
+	editPinMode: EditPinMode;
+	editPinHash: string;
+	editPinSalt: string;
+	editPinFailureCount: number;
+	editPinLockoutUntil: number;
 };
 
 export type User = {
