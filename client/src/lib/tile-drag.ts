@@ -55,6 +55,9 @@ const [dragAnchor, setDragAnchor] = createSignal<Tile | null>(null);
 // The cell under the pointer, and which folder half is active over it.
 const [dragOverKey, setDragOverKey] = createSignal<TilePositionKey | null>(null);
 const [folderDropSide, setFolderDropSide] = createSignal<FolderDropSide>(null);
+// Every cell the group would land on, so the board can outline the whole footprint rather than
+// just the one cell under the pointer.
+const [dropPreviewKeys, setDropPreviewKeys] = createSignal<Set<TilePositionKey>>(new Set());
 // The lifted tile that follows the pointer. Split from its position so 60fps movement does not
 // re-render the face.
 const [dragGhost, setDragGhost] = createSignal<{
@@ -68,13 +71,60 @@ const [dragGhost, setDragGhost] = createSignal<{
 } | null>(null);
 const [dragGhostPosition, setDragGhostPosition] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
 
-export { draggedTiles, dragOverKey, folderDropSide, dragGhost, dragGhostPosition };
+export { draggedTiles, dragOverKey, folderDropSide, dragGhost, dragGhostPosition, dropPreviewKeys };
 
 export const isDraggingTiles = () => draggedTiles().length > 0;
 
 export function isTileBeingDragged(tile: TilePosition): boolean {
 	const key = tilePositionKey(tile);
 	return draggedTiles().some((t) => tilePositionKey(t) === key);
+}
+
+/** Whether this cell is one the group would land on, and so should be outlined. */
+export function isDropPreviewCell(cell: TilePosition): boolean {
+	return dropPreviewKeys().has(tilePositionKey(cell));
+}
+
+// --- Grid arithmetic ---
+
+type GridDelta = { dx: number; dy: number; dPage: number };
+
+function deltaBetween(anchor: TilePosition, cell: TilePosition): GridDelta {
+	return { dx: cell.x - anchor.x, dy: cell.y - anchor.y, dPage: cell.page - anchor.page };
+}
+
+/**
+ * Columns wrap. A tile pushed past the right edge reappears on the left of the same row, so a
+ * selection sitting near an edge can still be moved instead of the drop being refused outright.
+ * Rows and subpages do not wrap — only the horizontal axis.
+ */
+function wrapColumn(x: number, columns: number): number {
+	if (columns <= 0) return x;
+	return ((x % columns) + columns) % columns;
+}
+
+function translate(position: TilePosition, delta: GridDelta, columns: number): TilePosition {
+	return {
+		x: wrapColumn(position.x + delta.dx, columns),
+		y: position.y + delta.dy,
+		page: position.page + delta.dPage,
+	};
+}
+
+/**
+ * The cells the group would occupy if dropped here. Empty for an "Add" drop, whose tiles leave
+ * this page entirely — the folder's own overlay says that instead.
+ */
+function previewKeys(
+	group: Tile[],
+	anchor: Tile | null,
+	cell: TilePosition,
+	side: FolderDropSide,
+): Set<TilePositionKey> {
+	if (!anchor || side === 'add') return new Set();
+	const delta = deltaBetween(anchor, cell);
+	const columns = project()?.columns ?? 0;
+	return new Set(group.map((tile) => tilePositionKey(translate(tile, delta, columns))));
 }
 
 // --- Pointer session ---
@@ -279,6 +329,7 @@ function clearDragState(): void {
 		setDragAnchor(null);
 		setDragOverKey(null);
 		setFolderDropSide(null);
+		setDropPreviewKeys(new Set<TilePositionKey>());
 		setDragGhost(null);
 	});
 }
@@ -325,6 +376,7 @@ function updateDropTarget(clientX: number, clientY: number): void {
 	batch(() => {
 		setDragOverKey(tilePositionKey(cell));
 		setFolderDropSide(side);
+		setDropPreviewKeys(previewKeys(draggedTiles(), dragAnchor(), cell, side));
 	});
 }
 
@@ -334,6 +386,7 @@ function clearDropTarget(): void {
 	batch(() => {
 		setDragOverKey(null);
 		setFolderDropSide(null);
+		setDropPreviewKeys(new Set<TilePositionKey>());
 	});
 }
 
@@ -415,16 +468,12 @@ function moveTilesToCell(group: Tile[], anchor: Tile, cell: TilePosition): void 
 	const pageId = currentPageId();
 	if (!pageId || !groupFits(group, anchor, cell)) return;
 
-	const dx = cell.x - anchor.x;
-	const dy = cell.y - anchor.y;
-	const dPage = cell.page - anchor.page;
-	if (dx === 0 && dy === 0 && dPage === 0) return;
+	const columns = project()?.columns ?? 0;
+	const delta = deltaBetween(anchor, cell);
+	if (delta.dx === 0 && delta.dy === 0 && delta.dPage === 0) return;
 
 	const groupKeys = new Set(group.map(tilePositionKey));
-	const moves = group.map((tile) => ({
-		from: toPosition(tile),
-		to: { x: tile.x + dx, y: tile.y + dy, page: tile.page + dPage },
-	}));
+	const moves = group.map((tile) => ({ from: toPosition(tile), to: translate(tile, delta, columns) }));
 
 	const landingKeys = new Set(moves.map((m) => tilePositionKey(m.to)));
 
@@ -440,11 +489,13 @@ function moveTilesToCell(group: Tile[], anchor: Tile, cell: TilePosition): void 
 		(t) => !groupKeys.has(tilePositionKey(t)) && landingKeys.has(tilePositionKey(t)),
 	);
 
+	const inverse: GridDelta = { dx: -delta.dx, dy: -delta.dy, dPage: -delta.dPage };
 	const leftovers: Tile[] = [];
 	for (const tile of displaced) {
-		// Mirror the group's own move. This cell is always one the group is leaving, though not
-		// necessarily one it frees up when the group overlaps itself.
-		const mirrored = { x: tile.x - dx, y: tile.y - dy, page: tile.page - dPage };
+		// Mirror the group's own move. Wrapping is a rotation of each row, so reversing the delta
+		// inverts it exactly — this cell is always one the group is leaving, though not necessarily
+		// one it frees up when the group overlaps itself.
+		const mirrored = translate(tile, inverse, columns);
 		if (freeCells.delete(tilePositionKey(mirrored))) {
 			moves.push({ from: toPosition(tile), to: mirrored });
 		} else {
@@ -509,20 +560,21 @@ function toPosition(tile: TilePosition): TilePosition {
 	return { x: tile.x, y: tile.y, page: tile.page };
 }
 
-/** Whether translating the group onto `cell` keeps every tile inside the board. */
+/**
+ * Whether translating the group onto `cell` keeps every tile on the board. Columns wrap, so only
+ * the row and the subpage can actually run off it.
+ */
 function groupFits(group: Tile[], anchor: Tile | null, cell: TilePosition): boolean {
 	if (!anchor || group.length === 0) return false;
 
-	const dx = cell.x - anchor.x;
-	const dy = cell.y - anchor.y;
-	const dPage = cell.page - anchor.page;
 	const columns = project()?.columns ?? 0;
 	const rows = project()?.rows ?? 0;
+	if (columns <= 0 || rows <= 0) return false;
 
+	const delta = deltaBetween(anchor, cell);
 	return group.every((tile) => {
-		const x = tile.x + dx;
-		const y = tile.y + dy;
-		return x >= 0 && x < columns && y >= 0 && y < rows && tile.page + dPage >= 0;
+		const y = tile.y + delta.dy;
+		return y >= 0 && y < rows && tile.page + delta.dPage >= 0;
 	});
 }
 

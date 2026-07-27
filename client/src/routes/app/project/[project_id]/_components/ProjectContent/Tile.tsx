@@ -8,6 +8,7 @@ import {
 	folderDropSide,
 	handleTilePointerDown,
 	isDraggingTiles,
+	isDropPreviewCell,
 	isTileBeingDragged,
 } from '@/lib/tile-drag';
 import type { Tile as TileType } from '@/lib/types';
@@ -28,7 +29,9 @@ export default function Tile(props: TileProps) {
 	// Folders offer a choice between dropping inside and trading places, so they get the split
 	// overlay instead of the plain drop ring every other tile shows.
 	const showFolderOverlay = () => isHovered() && isFolder() && !isDragged();
-	const showDropRing = () => isHovered() && !isFolder();
+	// Outlines every cell the drop would fill, not just the one under the pointer, so a
+	// multi-select shows its whole landing footprint in the shape it is being carried in.
+	const showDropRing = () => isDraggingTiles() && isDropPreviewCell(props.tile) && !showFolderOverlay();
 
 	// A drag ends in a click on the tile it started from; without this the tile would toggle its
 	// own selection the instant the user lets go.

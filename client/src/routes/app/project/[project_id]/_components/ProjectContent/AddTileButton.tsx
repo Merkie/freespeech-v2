@@ -3,7 +3,7 @@ import api from '@/lib/api';
 import { blobCreateTile } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { currentPageId, project, projectHomePageId, setEditingTilePositions, tilePositionKey } from '@/lib/state';
-import { dragOverKey, isDraggingTiles } from '@/lib/tile-drag';
+import { isDraggingTiles, isDropPreviewCell } from '@/lib/tile-drag';
 
 interface AddTileButtonProps {
 	x: number;
@@ -14,7 +14,7 @@ interface AddTileButtonProps {
 const AddTileButton: Component<AddTileButtonProps> = (props) => {
 	const isHomePage = () => currentPageId() === projectHomePageId();
 	const cell = () => ({ x: props.x, y: props.y, page: props.page });
-	const isDropTarget = () => isDraggingTiles() && dragOverKey() === tilePositionKey(cell());
+	const isDropTarget = () => isDraggingTiles() && isDropPreviewCell(cell());
 
 	const handleAddTile = () => {
 		const pid = currentPageId();
