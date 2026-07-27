@@ -6,8 +6,8 @@ import { MODAL_ID } from '@/lib/constants';
 import { setActiveModalId } from '@/lib/state';
 import type { Project } from '@/lib/types';
 import ProjectCard from '@/routes/app/dashboard/projects/_components/ProjectCard';
-import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
 import type { SortDirection, SortOption } from '@/routes/app/dashboard/projects/_components/SearchBar';
+import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
 
 const ProjectsPage: Component = () => {
 	const [searchQuery, setSearchQuery] = createSignal('');
@@ -77,21 +77,30 @@ const ProjectsPage: Component = () => {
 		<div class="min-h-screen bg-zinc-100">
 			<div class="mx-auto max-w-[1500px] px-6 py-8 md:px-12 lg:px-[100px]">
 				{/* Search and Sort */}
-				<SearchBar query={searchQuery} setQuery={setSearchQuery} sortBy={sortBy} setSortBy={setSortBy} sortDirection={sortDirection} setSortDirection={setSortDirection}>
+				<SearchBar
+					query={searchQuery}
+					setQuery={setSearchQuery}
+					sortBy={sortBy}
+					setSortBy={setSortBy}
+					sortDirection={sortDirection}
+					setSortDirection={setSortDirection}
+				>
 					<button
+						type="button"
+						onClick={() => setActiveModalId(MODAL_ID.IMPORT_BOARD)}
+						title="Import a .obf or .obz board from another AAC app"
+						class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-zinc-700 transition-all hover:border-zinc-400 hover:bg-zinc-50"
+					>
+						<i class="bi bi-file-earmark-arrow-up text-lg" />
+						<span class="text-sm font-semibold uppercase tracking-wider">Import</span>
+					</button>
+
+					<button
+						type="button"
 						onClick={() => setActiveModalId(MODAL_ID.CREATE_PROJECT)}
 						class="flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-white transition-all hover:brightness-110 active:brightness-90"
 					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-						</svg>
+						<i class="bi bi-plus-lg text-lg" />
 						<span class="text-sm font-semibold uppercase tracking-wider">New Project</span>
 					</button>
 				</SearchBar>
@@ -134,7 +143,11 @@ const ProjectsPage: Component = () => {
 						}
 					>
 						<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-							<For each={sortedProjects()}>{(project) => <ProjectCard project={project} onToggleFavorite={handleToggleFavorite} onDelete={handleDelete} />}</For>
+							<For each={sortedProjects()}>
+								{(project) => (
+									<ProjectCard project={project} onToggleFavorite={handleToggleFavorite} onDelete={handleDelete} />
+								)}
+							</For>
 						</div>
 					</Show>
 				</Show>

@@ -1,5 +1,6 @@
 import type { Project, ProjectBlob } from '@/lib/types';
-import { fetchFromAPI } from '../util';
+import { checkVersionHeader } from '@/lib/version-check';
+import { fetchFromAPI, OfflineError } from '../util';
 
 const project = {
 	list: listProjects,
@@ -14,7 +15,54 @@ const project = {
 	toggleFavorite: toggleFavorite,
 	listTemplates: listTemplates,
 	importTemplate: importTemplate,
+	importOpenBoard: importOpenBoard,
 };
+
+export type OpenBoardImportResult = {
+	success?: boolean;
+	projectId?: string;
+	pageCount?: number;
+	tileCount?: number;
+	imagesResolved?: number;
+	imagesTotal?: number;
+	error?: string;
+};
+
+/**
+ * Uploads a .obf/.obz as raw bytes rather than through fetchFromAPI, which JSON-encodes its body.
+ * Base64 would inflate a large archive by a third for no benefit.
+ */
+async function importOpenBoard(file: File): Promise<OpenBoardImportResult> {
+	if (!navigator.onLine) throw new OfflineError();
+
+	// Read the file up front rather than handing the File straight to fetch. A File is a lazy
+	// handle onto the disk that the browser reads while the request is already in flight, so an
+	// unreadable file surfaces as a bare network error with nothing to report to the user. Reading
+	// first turns that into a catchable failure before anything is sent. Boards are capped at
+	// 50 MB, so holding one in memory briefly is cheap.
+	const bytes = await file.arrayBuffer();
+
+	const token = localStorage.getItem('token') ?? '';
+	const response = await fetch(
+		`${import.meta.env.VITE_API_URL}/project/import/open-board?filename=${encodeURIComponent(file.name)}`,
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/octet-stream',
+				...(token ? { Authorization: `Bearer ${token}` } : {}),
+			},
+			body: bytes,
+		},
+	);
+
+	checkVersionHeader(response);
+
+	try {
+		return (await response.json()) as OpenBoardImportResult;
+	} catch {
+		return { error: 'The server returned an unexpected response.' };
+	}
+}
 
 async function deleteProject(projectId: string) {
 	const response = (await fetchFromAPI({
@@ -172,12 +220,7 @@ async function toggleFavorite(projectId: string) {
 }
 
 // Sync local blob to server
-async function syncProjectBlob(
-	projectId: string,
-	blob: ProjectBlob,
-	lastEditedAt: string,
-	force = false,
-) {
+async function syncProjectBlob(projectId: string, blob: ProjectBlob, lastEditedAt: string, force = false) {
 	const response = (await fetchFromAPI({
 		path: `/project/${projectId}/sync`,
 		method: 'POST',

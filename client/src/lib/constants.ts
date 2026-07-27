@@ -6,6 +6,7 @@ export const MODAL_ID = {
 	OPTIMIZE_IMAGES: 'optimize-images',
 	SAVE_EDIT_MODE: 'save-edit-mode',
 	SYNC_CONFLICT: 'sync-conflict',
+	IMPORT_BOARD: 'import-board',
 	PIN_ENTRY: 'pin-entry',
 	PIN_SETUP: 'pin-setup',
 } as const;

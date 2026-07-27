@@ -7,7 +7,7 @@ export type TemplateSource = {
 	sourceThumbnailUrl: string;
 };
 
-const MEDIA_HOST = 'https://media.freespeechaac.com';
+export const MEDIA_HOST = 'https://media.freespeechaac.com';
 
 export const TEMPLATES: TemplateSource[] = [
 	{
