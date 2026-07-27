@@ -45,9 +45,16 @@ const [dragOverKey, setDragOverKey] = createSignal<TilePositionKey | null>(null)
 const [folderDropSide, setFolderDropSide] = createSignal<FolderDropSide>(null);
 // The lifted tile that follows the pointer. Split from its position so 60fps movement does not
 // re-render the face.
-const [dragGhost, setDragGhost] = createSignal<{ tile: Tile; count: number; width: number; height: number } | null>(
-	null,
-);
+const [dragGhost, setDragGhost] = createSignal<{
+	tile: Tile;
+	count: number;
+	width: number;
+	height: number;
+	// Where in the tile the pointer landed. The ghost scales around this point, so shrinking it
+	// keeps the spot the user grabbed exactly under the pointer.
+	grabOffsetX: number;
+	grabOffsetY: number;
+} | null>(null);
 const [dragGhostPosition, setDragGhostPosition] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
 
 export { draggedTiles, dragOverKey, folderDropSide, dragGhost, dragGhostPosition };
@@ -144,7 +151,14 @@ function activateDrag(started: PointerSession): void {
 	batch(() => {
 		setDragAnchor(started.tile);
 		setDraggedTiles(group);
-		setDragGhost({ tile: started.tile, count: group.length, width: started.width, height: started.height });
+		setDragGhost({
+			tile: started.tile,
+			count: group.length,
+			width: started.width,
+			height: started.height,
+			grabOffsetX: started.grabOffsetX,
+			grabOffsetY: started.grabOffsetY,
+		});
 		setDragGhostPosition({ x: started.lastX - started.grabOffsetX, y: started.lastY - started.grabOffsetY });
 	});
 

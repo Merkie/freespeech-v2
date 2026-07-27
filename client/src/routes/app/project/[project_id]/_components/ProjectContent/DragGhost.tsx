@@ -4,6 +4,9 @@ import { cn } from '@/lib/cn';
 import { tileImageFitClass, tileTextSizeClass, tileTextWraps } from '@/lib/tile-appearance';
 import { dragGhost, dragGhostPosition } from '@/lib/tile-drag';
 
+// Drawn smaller than the tile it came from, so the cells it is passing over stay visible.
+const GHOST_SCALE = 0.8;
+
 /**
  * The tile that follows the pointer during a drag. Touch has no native drag image, and the
  * browser's desktop one cannot show how many tiles a multi-select is carrying — so both platforms
@@ -19,7 +22,10 @@ export default function DragGhost() {
 						style={{
 							width: `${ghost().width}px`,
 							height: `${ghost().height}px`,
-							transform: `translate(${dragGhostPosition().x}px, ${dragGhostPosition().y}px) scale(1.05) rotate(-2deg)`,
+							// Scaling and rotating about the grab point leaves that exact spot under the
+							// pointer, so a smaller ghost does not drift away from the finger.
+							'transform-origin': `${ghost().grabOffsetX}px ${ghost().grabOffsetY}px`,
+							transform: `translate(${dragGhostPosition().x}px, ${dragGhostPosition().y}px) scale(${GHOST_SCALE}) rotate(-2deg)`,
 						}}
 					>
 						<div
