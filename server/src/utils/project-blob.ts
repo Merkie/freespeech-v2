@@ -90,8 +90,12 @@ export const ProjectBlobSchema = z.object({
 	name: z.string(),
 	description: z.string().nullable(),
 	imageUrl: z.string().nullable(),
-	columns: z.number().int().min(1).max(20),
-	rows: z.number().int().min(1).max(20),
+	// A sanity bound, not the product rule: new boards are capped at 12x12 in the client. It sits
+	// at 30 because two real boards in the production data are 23x23 and 22x12, and at the old
+	// bound of 20 those blobs failed to parse — which would have made those projects refuse to
+	// load at all rather than merely refuse to sync.
+	columns: z.number().int().min(1).max(30),
+	rows: z.number().int().min(1).max(30),
 	homePageId: z.string().nullable(),
 	lastEditedAt: z.string(),
 	pages: z.array(PageBlobSchema),
