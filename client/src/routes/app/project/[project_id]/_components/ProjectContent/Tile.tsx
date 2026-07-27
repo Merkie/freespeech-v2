@@ -72,14 +72,19 @@ export default function Tile(props: TileProps) {
 				</Show>
 			</Show>
 			<button
+				type="button"
 				onClick={handleClick}
 				style={{
 					'background-color': props.tile.backgroundColor ?? 'white',
 					'border-color': props.tile.borderColor ?? 'black',
-					transition: 'filter 0.1s ease-in-out, opacity 0.15s ease-in-out',
+					transition: 'opacity 0.15s ease-in-out',
 				}}
 				class={cn(
-					'absolute top-0 left-0 flex h-full w-full cursor-pointer flex-col justify-center gap-1 rounded-md border p-2 px-1 text-black brightness-100 hover:brightness-[102%] active:brightness-[98%]',
+					'absolute top-0 left-0 grid h-full w-full cursor-pointer rounded-md border p-2 px-1 text-black',
+					{
+						'grid-rows-[auto_minmax(0,1fr)] gap-1': !!props.tile.image,
+						'place-items-center': !props.tile.image,
+					},
 					{ 'cursor-grab active:cursor-grabbing': editingTiles() },
 					{ 'opacity-40': props.isDimmed || isDragged() },
 					{ 'opacity-50': props.isSpeaking },
@@ -115,19 +120,16 @@ export default function Tile(props: TileProps) {
 				</div>
 
 				<Show when={props.tile.image}>
-					<div class="relative min-h-0 flex-1 overflow-hidden">
-						<img
-							src={props.tile.image}
-							alt={props.tile.displayText || props.tile.text}
-							/* No loading="lazy": a board sizes itself to the viewport, so every tile
-							   image is on screen the moment the page renders and there is nothing to
-							   defer. WebKit is also unreliable about lazy images that are absolutely
-							   positioned inside an overflow-hidden box, which is exactly this markup. */
-							decoding="async"
-							draggable={false}
-							class={cn('absolute inset-0 h-full w-full', tileImageFitClass())}
-						/>
-					</div>
+					{/* Keep the image in normal grid flow. The old absolute image lived inside a
+					    shrinking flex item on a filtered button; WebKit could fetch and decode every
+					    image yet fail to paint that composited layer on an iPad. This mirrors the
+					    production Svelte renderer, which is known to work on the same device. */}
+					<img
+						src={props.tile.image}
+						alt={props.tile.displayText || props.tile.text}
+						draggable={false}
+						class={cn('block h-full min-h-0 w-full min-w-0', tileImageFitClass())}
+					/>
 				</Show>
 			</button>
 
