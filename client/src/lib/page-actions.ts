@@ -1,5 +1,7 @@
 import { batch } from 'solid-js';
+import api from './api';
 import { loadProjectBlob } from './blob-sync';
+import { pickDefaultProject } from './project-order';
 import {
 	localSettings,
 	projectBlob,
@@ -19,6 +21,38 @@ function trackVisit(projectId: string, pageId?: string) {
 		lastVisitedProjectId: projectId,
 		...(pageId && { lastVisitedPageId: pageId }),
 	});
+}
+
+/**
+ * The board the app should open when it is not already on one — after a refresh, or from the Home
+ * button anywhere outside a project. localStorage is the source of truth rather than the in-memory
+ * `project()` signal, which only exists once a board has been loaded this session and so is empty
+ * on every fresh page load.
+ */
+export function lastVisitedProjectId(): string {
+	return localSettings().lastVisitedProjectId;
+}
+
+/** Forgets the stored board, so the next start falls back to one that still exists. */
+export function clearLastVisitedProject(): void {
+	setLocalSettings({ ...localSettings(), lastVisitedProjectId: '', lastVisitedPageId: '' });
+}
+
+/**
+ * Resolves which board to open: the stored one, or the first in the dashboard's own order when
+ * nothing is stored yet. Returns null only when the account has no projects, or the list could not
+ * be fetched — a stored id never needs the network, so this stays offline-first.
+ */
+export async function resolveStartProjectId(): Promise<string | null> {
+	const stored = lastVisitedProjectId();
+	if (stored) return stored;
+
+	try {
+		const { projects } = await api.project.list();
+		return pickDefaultProject(projects ?? [])?.id ?? null;
+	} catch {
+		return null;
+	}
 }
 
 // Guard to prevent duplicate concurrent loads

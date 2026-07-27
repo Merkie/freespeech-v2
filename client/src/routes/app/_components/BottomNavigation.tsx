@@ -4,7 +4,7 @@ import { setPendingEditModeAction } from '@/components/Modal/_modal_inners/SaveE
 import { discardEditMode, editModeHasChanges, enterEditMode } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
-import { navigateToPageInProject } from '@/lib/page-actions';
+import { lastVisitedProjectId, navigateToPageInProject } from '@/lib/page-actions';
 import { pinLockActive } from '@/lib/pin';
 import {
 	editingTiles,
@@ -103,10 +103,14 @@ const BottomNavigation: Component = () => {
 		gate('Enter your passcode to open the dashboard.', () => navigate('/app/dashboard/projects'));
 	};
 
-	// URL is now just the project ID - page is managed via state
+	// URL is now just the project ID - page is managed via state.
+	//
+	// The stored board wins over the in-memory one: `project()` is only populated once a board has
+	// been loaded this session, so after a refresh on the dashboard it is empty and Home used to
+	// point straight back at the dashboard. With neither, /app resolves a board to open.
 	const homeUrl = () => {
-		const projectId = project()?.id;
-		return projectId ? `/app/project/${projectId}` : '/app/dashboard/projects';
+		const projectId = lastVisitedProjectId() || project()?.id;
+		return projectId ? `/app/project/${projectId}` : '/app';
 	};
 
 	return (

@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from '@solidjs/router';
 import { type Component, createEffect, on, onCleanup, onMount, Show } from 'solid-js';
 import { flushDirtyBlobs } from '@/lib/blob-sync';
-import { loadProject } from '@/lib/page-actions';
+import { clearLastVisitedProject, lastVisitedProjectId, loadProject } from '@/lib/page-actions';
 import {
 	currentPageId,
 	editingTiles,
@@ -53,6 +53,9 @@ const AppProjectPage: Component = () => {
 
 				const success = await loadProject(projectId, { setHomePage: true });
 				if (!success) {
+					// A stored board that no longer loads would keep hijacking Home, so forget it and let
+					// the next start fall back to one that still exists.
+					if (lastVisitedProjectId() === projectId) clearLastVisitedProject();
 					navigate('/app/dashboard/projects');
 					return;
 				}

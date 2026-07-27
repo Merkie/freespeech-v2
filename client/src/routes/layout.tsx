@@ -1,7 +1,7 @@
 import { type RouteSectionProps, useLocation, useNavigate } from '@solidjs/router';
 import { type Component, onMount } from 'solid-js';
 import api from '@/lib/api';
-import { localSettings, setUser } from '@/lib/state';
+import { setUser } from '@/lib/state';
 
 // Check if running as installed PWA (standalone mode)
 function isStandalone(): boolean {
@@ -18,19 +18,10 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 	onMount(async () => {
 		const token = localStorage.getItem('token');
 
-		// PWA standalone mode: never show landing page
-		// Redirect to last project, dashboard, or login
+		// PWA standalone mode: never show landing page. /app works out which board to open, so
+		// that decision lives in one place rather than being repeated here.
 		if (isStandalone() && location.pathname === '/') {
-			if (token) {
-				const lastProjectId = localSettings().lastVisitedProjectId;
-				if (lastProjectId) {
-					navigate(`/app/project/${lastProjectId}`, { replace: true });
-				} else {
-					navigate('/app/dashboard/projects', { replace: true });
-				}
-			} else {
-				navigate('/login', { replace: true });
-			}
+			navigate(token ? '/app' : '/login', { replace: true });
 			return;
 		}
 
