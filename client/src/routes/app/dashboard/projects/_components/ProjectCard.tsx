@@ -5,7 +5,8 @@ import { deleteCachedBlob, isBlobCached } from "@/lib/cache/blob-cache";
 import useOutsideClick from "@/hooks/useOutsideClick";
 import { MODAL_ID } from "@/lib/constants";
 import api from "@/lib/api";
-import { localSettings, project, setActiveModalId, setLocalSettings, setProjectToOptimize } from "@/lib/state";
+import { lastVisitedProjectId } from "@/lib/page-actions";
+import { localSettings, setActiveModalId, setLocalSettings, setProjectToOptimize } from "@/lib/state";
 import { showToast } from "@/lib/toast";
 import type { Project } from "@/lib/types";
 
@@ -16,7 +17,9 @@ interface ProjectCardProps {
 }
 
 const ProjectCard: Component<ProjectCardProps> = (props) => {
-  const selected = () => project()?.id === props.project.id;
+  // Read from localStorage, not the in-memory project() signal: that one is only populated once a
+  // board has been opened this session, so the badge vanished on every refresh of the dashboard.
+  const selected = () => lastVisitedProjectId() === props.project.id;
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [cardRef, setCardRef] = createSignal<HTMLDivElement | undefined>(
     undefined,
