@@ -45,9 +45,6 @@ const IMAGE_HOSTS = ['media.freespeechaac.com', 's3.amazonaws.com', 'coughdrop-u
 // this worker rather than defensive padding.
 
 function isImageRequest({ request, url }: { request: Request; url: URL }): boolean {
-	// The /debug page loads each probe twice, once with ?sw-bypass, to separate "this worker broke
-	// it" from "the device/network broke it". Unmatched requests fall through to the browser.
-	if (url.searchParams.has('sw-bypass')) return false;
 	if (request.destination === 'image') return true;
 	// The media host serves extension-less keys, so there is nothing in the path to match on.
 	return IMAGE_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
