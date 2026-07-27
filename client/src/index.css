@@ -23,6 +23,24 @@
 	--color-primary-400: #f59f67;
 }
 
+/* Installed-app feel. touch-action is not inherited, but the browser intersects it up the
+   ancestor chain when deciding a pan/zoom gesture, so declaring it on <body> covers touches that
+   start anywhere inside: pan-x pan-y leaves scrolling alone while ruling out pinch and
+   double-tap zoom. Double-tap matters most here — tapping a tile twice to repeat a word must not
+   zoom the board. See components/PreventZoom.tsx for the parts CSS cannot express.
+
+   Text selection is deliberately NOT disabled globally: only tiles suppress it, since they are
+   the thing being tapped and held. Everything else stays selectable and copyable. */
+body {
+	touch-action: pan-x pan-y;
+	overscroll-behavior: none;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
 .thin-scrollbar {
 	scrollbar-width: thin;
 	scrollbar-color: #a1a1aa transparent;

@@ -2,6 +2,7 @@ import './index.css';
 
 import { Route, Router } from '@solidjs/router';
 import { render } from 'solid-js/web';
+import PreventZoom from '@/components/PreventZoom';
 import { TooltipProvider } from '@/hooks/useTooltip';
 import { registerServiceWorker } from '@/lib/sw-update';
 
@@ -47,6 +48,7 @@ if (!wrapper) {
 render(
 	() => (
 		<>
+			<PreventZoom />
 			<TooltipProvider />
 			<Router>
 				<Route path="/" component={Layout}>
