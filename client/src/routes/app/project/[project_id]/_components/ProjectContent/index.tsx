@@ -22,13 +22,13 @@ export default function ProjectContent() {
 	const showEditPanel = () => editingTilePositions().length > 0;
 
 	return (
-		<div ref={handleRef} class="relative flex-1 bg-zinc-100">
+		<div ref={handleRef} class="relative min-h-0 flex-1 bg-zinc-100">
 			<Show when={containerHeight() > 0}>
 				{/* Tile grid container */}
 				{/* data-board-scroll lets a drag held near the top or bottom edge scroll this
 				    container — on touch the drag owns the gesture, so swiping is not available. */}
 				<div
-					class="thin-scrollbar absolute overflow-auto"
+					class="thin-scrollbar absolute inset-y-0 left-0 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain"
 					data-board-scroll
 					style={{
 						height: `${containerHeight()}px`,

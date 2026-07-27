@@ -97,7 +97,7 @@ const ProjectsPage: Component = () => {
 	});
 
 	return (
-		<div class="min-h-screen bg-zinc-100">
+		<div class="min-h-full bg-zinc-100">
 			<div class="mx-auto max-w-[1500px] px-6 py-8 md:px-12 lg:px-[100px]">
 				{/* Search and Sort */}
 				<SearchBar

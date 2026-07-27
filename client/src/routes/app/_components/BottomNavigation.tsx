@@ -114,7 +114,7 @@ const BottomNavigation: Component = () => {
 	};
 
 	return (
-		<div class="flex gap-2 border border-x-0 border-b-0 border-zinc-700 bg-zinc-900 p-2 text-[25px] font-light text-zinc-100">
+		<div class="flex shrink-0 touch-none gap-2 border border-x-0 border-b-0 border-zinc-700 bg-zinc-900 p-2 text-[25px] font-light text-zinc-100">
 			{/* Home button */}
 			<A
 				aria-label="Home"

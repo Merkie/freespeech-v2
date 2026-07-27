@@ -13,7 +13,7 @@ const TemplatesPage: Component = () => {
 	});
 
 	return (
-		<div class="min-h-screen bg-zinc-100">
+		<div class="min-h-full bg-zinc-100">
 			<div class="mx-auto max-w-[1500px] px-6 py-8 md:px-12 lg:px-[100px]">
 				<div class="mb-6">
 					<h1 class="text-2xl font-semibold text-zinc-800">Starter Templates</h1>

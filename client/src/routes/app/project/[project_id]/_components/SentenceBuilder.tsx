@@ -36,7 +36,7 @@ export default function SentenceBuilder() {
 	return (
 		<div class="relative flex min-h-[100px] items-center gap-2 overflow-hidden border-b border-zinc-200 bg-zinc-50 p-2">
 			{/* Sentence tiles */}
-			<div class="flex h-full flex-1 items-center gap-2 overflow-x-auto">
+			<div class="flex h-full flex-1 touch-pan-x items-center gap-2 overflow-x-auto overscroll-contain">
 				<For each={sentence()}>
 					{(tile, index) => (
 						<button onClick={() => removeTile(index())} class="shrink-0">

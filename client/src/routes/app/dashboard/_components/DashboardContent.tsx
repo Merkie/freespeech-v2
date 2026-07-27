@@ -13,7 +13,7 @@ const DashboardContent: ParentComponent = (props) => {
 	return (
 		<div
 			// ref={setContainerRef}
-			class="flex flex-1 flex-col bg-zinc-100"
+			class="flex min-h-0 flex-1 touch-pan-y flex-col overflow-y-auto overscroll-contain bg-zinc-100"
 		>
 			{/* <p>
         {containerSize()?.width}px x {containerSize()?.height}px

@@ -263,7 +263,7 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 
 	return (
 		<div
-			class="flex w-[350px] flex-col overflow-y-auto border border-zinc-800 bg-zinc-900 p-4 text-zinc-200 shadow-md"
+			class="flex w-[350px] touch-pan-y flex-col overflow-y-auto overscroll-contain border border-zinc-800 bg-zinc-900 p-4 text-zinc-200 shadow-md"
 			style={{ height: `${props.height}px` }}
 		>
 			<Show when={editingTilePositions().length > 0} fallback={<EmptyState />}>

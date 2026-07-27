@@ -44,7 +44,7 @@ export default function ProjectHeader() {
 	};
 
 	return (
-		<div class="relative flex h-14 items-center bg-zinc-900 px-3 text-zinc-100">
+		<div class="relative flex h-14 shrink-0 touch-none items-center bg-zinc-900 px-3 text-zinc-100">
 			{/* Left side - Page Actions (only in edit mode) */}
 			<div class="flex flex-1 gap-2">
 				<Show when={editingTiles()}>

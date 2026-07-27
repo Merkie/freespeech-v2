@@ -21,9 +21,9 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 		<Show when={show()} fallback={<div>One moment...</div>}>
 			<UpdateBanner />
 			<OfflineBanner />
-			<main class="flex h-[100dvh] flex-col">
-				<div class="relative flex-1 overflow-auto">
-					<div class="absolute top-0 left-0 flex max-h-full min-h-full w-full flex-col">{props.children}</div>
+			<main class="fixed inset-0 flex overflow-hidden flex-col">
+				<div class="relative min-h-0 flex-1 overflow-hidden">
+					<div class="absolute inset-0 flex min-h-0 w-full flex-col overflow-hidden">{props.children}</div>
 				</div>
 				<BottomNavigation />
 			</main>

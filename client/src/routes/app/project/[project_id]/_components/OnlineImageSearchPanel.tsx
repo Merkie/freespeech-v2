@@ -176,7 +176,7 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 
 	return (
 		<div
-			class="thin-scrollbar-dark flex w-[350px] flex-col overflow-y-auto border border-zinc-800 bg-zinc-900 p-4 text-zinc-200 shadow-md"
+			class="thin-scrollbar-dark flex w-[350px] touch-pan-y flex-col overflow-y-auto overscroll-contain border border-zinc-800 bg-zinc-900 p-4 text-zinc-200 shadow-md"
 			style={{ height: `${props.height}px` }}
 		>
 			<button

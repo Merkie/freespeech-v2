@@ -57,7 +57,7 @@ export default function DashboardHeader() {
 	];
 
 	return (
-		<div class="flex items-center gap-2 bg-zinc-900 font-light text-zinc-100">
+		<div class="flex shrink-0 touch-none items-center gap-2 bg-zinc-900 font-light text-zinc-100">
 			{links.map((link) => (
 				<Show when={!link.hidden}>
 					<A
