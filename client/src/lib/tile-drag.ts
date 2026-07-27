@@ -19,6 +19,18 @@ import type { Tile, TilePosition, TilePositionKey } from './types';
 /** Which half of a folder tile the pointer is over: "add" drops inside it, "swap" trades places. */
 export type FolderDropSide = 'add' | 'swap' | null;
 
+/**
+ * One tile in the lifted ghost. The offsets are measured from the grabbed tile's cell at pickup,
+ * so a multi-select keeps its shape on screen instead of collapsing into a single card.
+ */
+export type DragGhostTile = {
+	tile: Tile;
+	offsetX: number;
+	offsetY: number;
+	width: number;
+	height: number;
+};
+
 // Hit-testing contract with the board. Tile and AddTileButton declare `data-drop-cell` with their
 // position key; ProjectContent declares `data-board-scroll` on the scroll container. They are
 // written literally in that JSX, since an attribute name cannot be interpolated there.
@@ -46,12 +58,11 @@ const [folderDropSide, setFolderDropSide] = createSignal<FolderDropSide>(null);
 // The lifted tile that follows the pointer. Split from its position so 60fps movement does not
 // re-render the face.
 const [dragGhost, setDragGhost] = createSignal<{
-	tile: Tile;
+	// Ordered with the grabbed tile last, so it paints on top of the rest.
+	tiles: DragGhostTile[];
 	count: number;
-	width: number;
-	height: number;
-	// Where in the tile the pointer landed. The ghost scales around this point, so shrinking it
-	// keeps the spot the user grabbed exactly under the pointer.
+	// Where in the grabbed tile the pointer landed. The ghost scales around this point, so
+	// shrinking it keeps the spot the user grabbed exactly under the pointer.
 	grabOffsetX: number;
 	grabOffsetY: number;
 } | null>(null);
@@ -152,10 +163,8 @@ function activateDrag(started: PointerSession): void {
 		setDragAnchor(started.tile);
 		setDraggedTiles(group);
 		setDragGhost({
-			tile: started.tile,
+			tiles: buildGhostTiles(group, started),
 			count: group.length,
-			width: started.width,
-			height: started.height,
 			grabOffsetX: started.grabOffsetX,
 			grabOffsetY: started.grabOffsetY,
 		});
@@ -165,6 +174,36 @@ function activateDrag(started: PointerSession): void {
 	// A short buzz makes a hold that has "taken" obvious without looking at the screen.
 	navigator.vibrate?.(10);
 	updateDropTarget(started.lastX, started.lastY);
+}
+
+/**
+ * Measures each dragged tile against the grabbed one, reading the real cells so gaps, tile sizes
+ * and subpage offsets all come out right without re-deriving the grid's geometry. The grabbed tile
+ * goes last so it paints above the others, and is the card the rest gather onto when stacked.
+ */
+function buildGhostTiles(group: Tile[], started: PointerSession): DragGhostTile[] {
+	const anchorKey = tilePositionKey(started.tile);
+	const anchorRect = cellRect(started.tile);
+
+	const measured = group.map((tile) => {
+		const rect = cellRect(tile);
+		return {
+			tile,
+			offsetX: rect && anchorRect ? rect.left - anchorRect.left : 0,
+			offsetY: rect && anchorRect ? rect.top - anchorRect.top : 0,
+			width: rect?.width ?? started.width,
+			height: rect?.height ?? started.height,
+		};
+	});
+
+	const others = measured.filter((item) => tilePositionKey(item.tile) !== anchorKey);
+	const anchor = measured.find((item) => tilePositionKey(item.tile) === anchorKey);
+	return anchor ? [...others, anchor] : others;
+}
+
+function cellRect(position: TilePosition): DOMRect | null {
+	const cell = document.querySelector(`[${DROP_CELL_ATTRIBUTE}="${tilePositionKey(position)}"]`);
+	return cell?.getBoundingClientRect() ?? null;
 }
 
 function onPointerMove(event: PointerEvent): void {
