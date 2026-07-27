@@ -85,22 +85,30 @@ const ProjectsPage: Component = () => {
 					sortDirection={sortDirection}
 					setSortDirection={setSortDirection}
 				>
+					{/*
+					  These two sit alongside the search field and the sort button, so they have to match their
+					  38px height. `leading-none` is what does it: a bootstrap icon is sized by its line box, not
+					  its glyph, so a bare `text-base` would contribute 24px and push the whole bar taller — which
+					  in turn made the bar's uniform padding look bottom-heavy around the shorter controls.
+					  The blue button carries a border it doesn't show for the same reason: without it, it lands
+					  2px shorter than the bordered ones.
+					*/}
 					<button
 						type="button"
 						onClick={() => setActiveModalId(MODAL_ID.IMPORT_BOARD)}
 						title="Import a .obf or .obz board from another AAC app"
-						class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-zinc-700 transition-all hover:border-zinc-400 hover:bg-zinc-50"
+						class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-700 transition-all hover:border-zinc-400 hover:bg-zinc-50"
 					>
-						<i class="bi bi-file-earmark-arrow-up text-lg" />
+						<i class="bi bi-file-earmark-arrow-up text-base leading-none" />
 						<span class="text-sm font-semibold uppercase tracking-wider">Import</span>
 					</button>
 
 					<button
 						type="button"
 						onClick={() => setActiveModalId(MODAL_ID.CREATE_PROJECT)}
-						class="flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-white transition-all hover:brightness-110 active:brightness-90"
+						class="flex items-center gap-2 rounded-md border border-blue-500 bg-blue-500 px-3 py-2 text-white transition-all hover:brightness-110 active:brightness-90"
 					>
-						<i class="bi bi-plus-lg text-lg" />
+						<i class="bi bi-plus-lg text-base leading-none" />
 						<span class="text-sm font-semibold uppercase tracking-wider">New Project</span>
 					</button>
 				</SearchBar>
