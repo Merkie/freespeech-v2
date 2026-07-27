@@ -201,7 +201,11 @@ async function syncDirtyBlobs() {
 		const req = store.getAll();
 		req.onsuccess = () => {
 			const all = req.result || [];
-			resolve(all.filter((e: any) => e.dirty).map((e: any) => ({ id: e.id, blob: e.blob, lastEditedAt: e.blob.lastEditedAt })));
+			resolve(
+				all
+					.filter((e: any) => e.dirty)
+					.map((e: any) => ({ id: e.id, blob: e.blob, lastEditedAt: e.blob.lastEditedAt })),
+			);
 		};
 		req.onerror = () => resolve([]);
 	});

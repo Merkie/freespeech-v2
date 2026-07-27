@@ -11,6 +11,7 @@ import {
 	getCurrentPageTiles,
 	getProjectPagesFromBlob,
 	isBulkEditing,
+	localSettings,
 	project,
 	projectHomePageId,
 	setEditingTilePositions,
@@ -114,9 +115,13 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		if (key) {
 			const tile = firstSelectedTile();
 			if (tile) {
-				blobUpdateTile(pageId(), { x: tile.x, y: tile.y, page: tile.page }, {
-					image: `https://media.freespeechaac.com/${key}`,
-				});
+				blobUpdateTile(
+					pageId(),
+					{ x: tile.x, y: tile.y, page: tile.page },
+					{
+						image: `https://media.freespeechaac.com/${key}`,
+					},
+				);
 			}
 		}
 	};
@@ -152,10 +157,14 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		} else {
 			const tile = firstSelectedTile();
 			if (tile) {
-				blobUpdateTile(currentPid, { x: tile.x, y: tile.y, page: tile.page }, {
-					backgroundColor: colorValues.background_color,
-					borderColor: colorValues.border_color,
-				});
+				blobUpdateTile(
+					currentPid,
+					{ x: tile.x, y: tile.y, page: tile.page },
+					{
+						backgroundColor: colorValues.background_color,
+						borderColor: colorValues.border_color,
+					},
+				);
 			}
 		}
 	};
@@ -237,10 +246,14 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 		} else {
 			const tile = firstSelectedTile();
 			if (tile) {
-				blobUpdateTile(currentPid, { x: tile.x, y: tile.y, page: tile.page }, {
-					backgroundColor: bgColor,
-					borderColor,
-				});
+				blobUpdateTile(
+					currentPid,
+					{ x: tile.x, y: tile.y, page: tile.page },
+					{
+						backgroundColor: bgColor,
+						borderColor,
+					},
+				);
 			}
 		}
 	};
@@ -297,12 +310,14 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 									>
 										<i class="bi bi-upload mr-1" /> Upload Image From Device
 									</button>
-									<button
-										onClick={() => setUsingOnlineSearch(true)}
-										class="rounded-md border border-zinc-700 bg-zinc-800 p-1 px-3 text-sm"
-									>
-										<i class="bi bi-search" /> Search for Images Online
-									</button>
+									<Show when={localSettings().webImageSearch}>
+										<button
+											onClick={() => setUsingOnlineSearch(true)}
+											class="rounded-md border border-zinc-700 bg-zinc-800 p-1 px-3 text-sm"
+										>
+											<i class="bi bi-search" /> Search for Images Online
+										</button>
+									</Show>
 								</div>
 							}
 						>

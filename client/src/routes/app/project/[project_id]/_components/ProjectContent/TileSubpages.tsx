@@ -74,7 +74,9 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 			// Non-navigation tile - speak and/or add to sentence
 			const settings = localSettings();
 
-			if (settings.speakOnTap) {
+			// With the sentence builder hidden there is nowhere for a word to queue, so a tap has to
+			// speak — otherwise turning the builder off would make every tile do nothing.
+			if (settings.speakOnTap || !settings.sentenceBuilder) {
 				speakText(tile.text, tileKey);
 			}
 

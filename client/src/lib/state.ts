@@ -162,6 +162,11 @@ export const [localSettings, setLocalSettings] = createSignal<LocalSettings>({
 	voiceGenerator: 'offline',
 	speakOnTap: true,
 	sentenceBuilder: true,
+	// Defaults below match how the app already behaved, so upgrading changes nothing on screen.
+	webImageSearch: true,
+	tileTextSize: 'medium',
+	tileTextOverflow: 'truncate',
+	tileImageFit: 'contain',
 	skinTone: 'medium',
 	lastVisitedProjectId: '',
 	lastVisitedPageId: '',

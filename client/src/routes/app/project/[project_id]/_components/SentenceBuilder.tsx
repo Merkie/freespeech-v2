@@ -2,6 +2,7 @@ import { createSignal, For, Show } from 'solid-js';
 import { cn } from '@/lib/cn';
 import { speakText } from '@/lib/speak';
 import { enableSentenceCopyButton, sentence, setSentence } from '@/lib/state';
+import { tileImageFitClass } from '@/lib/tile-appearance';
 
 export default function SentenceBuilder() {
 	const [copied, setCopied] = createSignal(false);
@@ -47,7 +48,8 @@ export default function SentenceBuilder() {
 								class="flex h-[70px] w-[100px] flex-col items-center justify-center gap-1 rounded-md border p-1"
 							>
 								<Show when={tile.image}>
-									<img src={tile.image} alt="" class="h-[40px] w-full object-contain" />
+									{/* Same fit as the board so a tile does not change shape when it is queued. */}
+									<img src={tile.image} alt="" class={cn('h-[40px] w-full', tileImageFitClass())} />
 								</Show>
 								<p class="w-full truncate text-center text-sm">{tile.displayText || tile.text}</p>
 							</div>

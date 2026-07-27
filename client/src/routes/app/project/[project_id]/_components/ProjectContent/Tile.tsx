@@ -1,5 +1,6 @@
 import { Show } from 'solid-js';
 import { cn } from '@/lib/cn';
+import { tileImageFitClass, tileTextRowHeightClass, tileTextSizeClass, tileTextWraps } from '@/lib/tile-appearance';
 import type { Tile as TileType } from '@/lib/types';
 
 export type TileProps = {
@@ -55,20 +56,32 @@ export default function Tile(props: TileProps) {
 					/>
 				</Show>
 
-				<div class="relative h-[24px] w-full truncate text-lg">
-					<p class="absolute top-1/2 left-0 w-full -translate-y-1/2 truncate text-center">
+				{/* Truncating keeps the label on one centred line of fixed height. Wrapping has to let
+				    the row grow instead, or extra lines would be clipped by the fixed strip. */}
+				<div
+					class={cn('relative w-full shrink-0', tileTextSizeClass(), {
+						[tileTextRowHeightClass()]: !tileTextWraps(),
+						truncate: !tileTextWraps(),
+					})}
+				>
+					<p
+						class={cn('w-full text-center', {
+							'absolute top-1/2 left-0 -translate-y-1/2 truncate': !tileTextWraps(),
+							'leading-tight break-words': tileTextWraps(),
+						})}
+					>
 						{(props.tile.displayText || props.tile.text).trim()}
 					</p>
 				</div>
 
 				<Show when={props.tile.image}>
-					<div class="relative flex-1 overflow-hidden">
+					<div class="relative min-h-0 flex-1 overflow-hidden">
 						<img
 							src={props.tile.image}
 							alt={props.tile.displayText || props.tile.text}
 							loading="lazy"
 							decoding="async"
-							class="absolute inset-0 h-full w-full object-contain"
+							class={cn('absolute inset-0 h-full w-full', tileImageFitClass())}
 						/>
 					</div>
 				</Show>

@@ -3,12 +3,20 @@ export type IElevenLabsVoice = 'Rachel' | 'Domi' | 'Bella' | 'Antoni' | 'Elli' |
 
 export type SkinTone = 'dark' | 'medium-dark' | 'medium' | 'medium-light' | 'light';
 
+export type TileTextSize = 'small' | 'medium' | 'large' | 'x-large';
+export type TileTextOverflow = 'truncate' | 'wrap';
+export type TileImageFit = 'contain' | 'cover';
+
 export type LocalSettings = {
 	offlineVoice: string;
 	elevenLabsVoice: IElevenLabsVoice;
 	voiceGenerator: IVoiceGenerator;
 	speakOnTap: boolean;
 	sentenceBuilder: boolean;
+	webImageSearch: boolean;
+	tileTextSize: TileTextSize;
+	tileTextOverflow: TileTextOverflow;
+	tileImageFit: TileImageFit;
 	skinTone: SkinTone;
 	lastVisitedProjectId: string;
 	lastVisitedPageId: string;
