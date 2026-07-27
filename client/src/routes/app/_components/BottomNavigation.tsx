@@ -117,6 +117,8 @@ const BottomNavigation: Component = () => {
 		<div
 			class="flex shrink-0 touch-none gap-2 border border-x-0 border-b-0 border-zinc-700 bg-zinc-900 p-2 text-[25px] font-light text-zinc-100"
 			style={{
+				'padding-left': 'max(1.5rem, calc(0.5rem + env(safe-area-inset-left, 0px)))',
+				'padding-right': 'max(1.5rem, calc(0.5rem + env(safe-area-inset-right, 0px)))',
 				'padding-bottom': 'max(1.5rem, calc(0.5rem + env(safe-area-inset-bottom, 0px)))',
 			}}
 		>
