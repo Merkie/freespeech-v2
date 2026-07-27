@@ -1,4 +1,5 @@
 import { type Component, createSignal, For, onMount } from 'solid-js';
+import { getCachedBlob } from '@/lib/cache/blob-cache';
 import { CLIENT_VERSION } from '@/lib/version-check';
 
 /**
@@ -41,6 +42,16 @@ interface ProbeResult {
 	fetchNoCors: string;
 }
 
+interface LayoutProbeResult {
+	label: string;
+	outerRect: string;
+	buttonRect: string;
+	mediaRect: string;
+	imageRect: string;
+	imageState: string;
+	computed: string;
+}
+
 function loadImage(src: string): Promise<string> {
 	return new Promise((resolve) => {
 		const img = new Image();
@@ -70,13 +81,61 @@ function withBypass(url: string): string {
 	return `${url}${url.includes('?') ? '&' : '?'}sw-bypass=1`;
 }
 
+function formatRect(element: Element): string {
+	const rect = element.getBoundingClientRect();
+	const round = (value: number) => Math.round(value * 10) / 10;
+	return `${round(rect.width)}x${round(rect.height)} at ${round(rect.left)},${round(rect.top)}`;
+}
+
+function afterPaint(): Promise<void> {
+	return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
+async function collectBoardImageProbes(): Promise<Array<{ label: string; url: string }>> {
+	try {
+		const stored = JSON.parse(localStorage.getItem('localSettings') ?? '{}') as { lastVisitedProjectId?: string };
+		if (!stored.lastVisitedProjectId) return [];
+
+		const blob = await getCachedBlob(stored.lastVisitedProjectId);
+		if (!blob) return [];
+
+		const unique = [
+			...new Set(
+				blob.pages.flatMap((page) => page.tiles.map((tile) => tile.image).filter((url): url is string => !!url)),
+			),
+		];
+		return unique.slice(0, 10).map((url, index) => ({ label: `actual board tile ${index + 1}`, url }));
+	} catch {
+		return [];
+	}
+}
+
 async function collectEnvironment(): Promise<Record<string, string>> {
 	const env: Record<string, string> = {
 		userAgent: navigator.userAgent,
 		standalone: String(window.matchMedia('(display-mode: standalone)').matches),
 		online: String(navigator.onLine),
 		appVersion: CLIENT_VERSION,
+		viewport: `${window.innerWidth}x${window.innerHeight}`,
+		visualViewport: window.visualViewport
+			? `${Math.round(window.visualViewport.width)}x${Math.round(window.visualViewport.height)} scale=${window.visualViewport.scale}`
+			: 'unavailable',
+		screen: `${screen.width}x${screen.height} @${window.devicePixelRatio}x`,
 	};
+
+	// Only include display choices relevant to layout. The same localSettings object also contains
+	// the edit-lock hash and salt, which must never leave the device in a diagnostic report.
+	try {
+		const stored = JSON.parse(localStorage.getItem('localSettings') ?? '{}') as Record<string, unknown>;
+		env.tileSettings = JSON.stringify({
+			tileTextSize: stored.tileTextSize,
+			tileTextOverflow: stored.tileTextOverflow,
+			tileImageFit: stored.tileImageFit,
+			sentenceBuilder: stored.sentenceBuilder,
+		});
+	} catch {
+		env.tileSettings = 'invalid localStorage JSON';
+	}
 
 	try {
 		env.swController = navigator.serviceWorker?.controller?.scriptURL ?? 'none';
@@ -123,9 +182,37 @@ async function collectEnvironment(): Promise<Record<string, string>> {
 const DebugPage: Component = () => {
 	const [environment, setEnvironment] = createSignal<Record<string, string>>({});
 	const [probes, setProbes] = createSignal<ProbeResult[]>([]);
+	const [layoutProbes, setLayoutProbes] = createSignal<LayoutProbeResult[]>([]);
 	const [done, setDone] = createSignal(false);
 	const [copied, setCopied] = createSignal(false);
 	const [uploadState, setUploadState] = createSignal('waiting for probes…');
+	let currentOuter!: HTMLDivElement;
+	let currentButton!: HTMLButtonElement;
+	let currentImage!: HTMLImageElement;
+	let legacyOuter!: HTMLDivElement;
+	let legacyButton!: HTMLButtonElement;
+	let legacyMedia!: HTMLDivElement;
+	let legacyImage!: HTMLImageElement;
+
+	const measureLayout = (
+		label: string,
+		outer: HTMLElement,
+		button: HTMLButtonElement,
+		media: HTMLElement,
+		img: HTMLImageElement,
+	): LayoutProbeResult => {
+		const imageStyle = getComputedStyle(img);
+		const buttonStyle = getComputedStyle(button);
+		return {
+			label,
+			outerRect: formatRect(outer),
+			buttonRect: formatRect(button),
+			mediaRect: formatRect(media),
+			imageRect: formatRect(img),
+			imageState: `complete=${img.complete} natural=${img.naturalWidth}x${img.naturalHeight}`,
+			computed: `display=${imageStyle.display} position=${imageStyle.position} objectFit=${imageStyle.objectFit} opacity=${imageStyle.opacity} visibility=${imageStyle.visibility} buttonFilter=${buttonStyle.filter}`,
+		};
+	};
 
 	// Getting the report OFF the failing device is the hard part — copying JSON out of a
 	// misbehaving iPad is its own failure mode — so it uploads itself when the probes finish.
@@ -135,7 +222,7 @@ const DebugPage: Component = () => {
 			const response = await fetch(`${import.meta.env.VITE_API_URL}/debug-report?sw-bypass=1`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ environment: environment(), probes: probes() }),
+				body: JSON.stringify({ environment: environment(), probes: probes(), layoutProbes: layoutProbes() }),
 				signal: AbortSignal.timeout(TIMEOUT_MS),
 			});
 			setUploadState(response.ok ? 'sent ✓ — the server has a copy' : `failed (status ${response.status})`);
@@ -146,7 +233,8 @@ const DebugPage: Component = () => {
 
 	onMount(async () => {
 		setEnvironment(await collectEnvironment());
-		for (const probe of IMAGE_PROBES) {
+		const allImageProbes = [...IMAGE_PROBES, ...(await collectBoardImageProbes())];
+		for (const probe of allImageProbes) {
 			const [img, imgBypass, fetchNoCors] = await Promise.all([
 				loadImage(probe.url),
 				loadImage(withBypass(probe.url)),
@@ -154,11 +242,18 @@ const DebugPage: Component = () => {
 			]);
 			setProbes((prev) => [...prev, { label: probe.label, url: probe.url, img, imgBypass, fetchNoCors }]);
 		}
+
+		await afterPaint();
+		setLayoutProbes([
+			measureLayout('current grid layout', currentOuter, currentButton, currentImage, currentImage),
+			measureLayout('legacy flex/absolute/filter layout', legacyOuter, legacyButton, legacyMedia, legacyImage),
+		]);
 		setDone(true);
 		await uploadReport();
 	});
 
-	const report = () => JSON.stringify({ environment: environment(), probes: probes() }, null, 2);
+	const report = () =>
+		JSON.stringify({ environment: environment(), probes: probes(), layoutProbes: layoutProbes() }, null, 2);
 
 	const copyReport = async () => {
 		try {
@@ -205,6 +300,63 @@ const DebugPage: Component = () => {
 								</p>
 								<p class="break-all text-zinc-500">fetch: {probe.fetchNoCors}</p>
 							</div>
+						</div>
+					)}
+				</For>
+
+				<h2 class="mt-4 mb-2 font-semibold">Board-layout probes</h2>
+				<p class="mb-2 text-zinc-500">
+					Both cards should show the word and image. The first uses the current renderer; the second recreates the old
+					WebKit-sensitive renderer.
+				</p>
+				<div class="mb-3 flex flex-wrap gap-3">
+					<div ref={currentOuter} class="relative h-36 w-44 rounded-md bg-zinc-200">
+						<button
+							ref={currentButton}
+							type="button"
+							class="absolute top-0 left-0 grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-1 rounded-md border border-black bg-white p-2 px-1 text-black"
+						>
+							<div class="relative h-[24px] w-full shrink-0 text-lg">
+								<p class="absolute top-1/2 left-0 w-full -translate-y-1/2 truncate text-center">Current</p>
+							</div>
+							<img
+								ref={currentImage}
+								src={IMAGE_PROBES[1].url}
+								alt="Current board layout probe"
+								class="block h-full min-h-0 w-full min-w-0 object-contain"
+							/>
+						</button>
+					</div>
+					<div ref={legacyOuter} class="relative h-36 w-44 rounded-md bg-zinc-200">
+						<button
+							ref={legacyButton}
+							type="button"
+							class="absolute top-0 left-0 flex h-full w-full flex-col justify-center gap-1 rounded-md border border-black bg-white p-2 px-1 text-black brightness-100"
+						>
+							<div class="relative h-[24px] w-full shrink-0 text-lg">
+								<p class="absolute top-1/2 left-0 w-full -translate-y-1/2 truncate text-center">Legacy</p>
+							</div>
+							<div ref={legacyMedia} class="relative min-h-0 flex-1 overflow-hidden">
+								<img
+									ref={legacyImage}
+									src={IMAGE_PROBES[1].url}
+									alt="Legacy board layout probe"
+									decoding="async"
+									class="absolute inset-0 h-full w-full object-contain"
+								/>
+							</div>
+						</button>
+					</div>
+				</div>
+				<For each={layoutProbes()}>
+					{(probe) => (
+						<div class="mb-2 rounded-md border border-zinc-300 bg-white p-3">
+							<p class="font-medium">{probe.label}</p>
+							<p class="break-all text-zinc-500">
+								outer {probe.outerRect}; button {probe.buttonRect}; media {probe.mediaRect}; image {probe.imageRect}
+							</p>
+							<p class="break-all text-zinc-500">{probe.imageState}</p>
+							<p class="break-all text-zinc-500">{probe.computed}</p>
 						</div>
 					)}
 				</For>
