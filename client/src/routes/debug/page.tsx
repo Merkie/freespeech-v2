@@ -125,6 +125,24 @@ const DebugPage: Component = () => {
 	const [probes, setProbes] = createSignal<ProbeResult[]>([]);
 	const [done, setDone] = createSignal(false);
 	const [copied, setCopied] = createSignal(false);
+	const [uploadState, setUploadState] = createSignal('waiting for probes…');
+
+	// Getting the report OFF the failing device is the hard part — copying JSON out of a
+	// misbehaving iPad is its own failure mode — so it uploads itself when the probes finish.
+	const uploadReport = async () => {
+		setUploadState('uploading…');
+		try {
+			const response = await fetch(`${import.meta.env.VITE_API_URL}/debug-report?sw-bypass=1`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ environment: environment(), probes: probes() }),
+				signal: AbortSignal.timeout(TIMEOUT_MS),
+			});
+			setUploadState(response.ok ? 'sent ✓ — the server has a copy' : `failed (status ${response.status})`);
+		} catch (error) {
+			setUploadState(`failed (${error instanceof Error ? error.message : String(error)}) — use Copy report instead`);
+		}
+	};
 
 	onMount(async () => {
 		setEnvironment(await collectEnvironment());
@@ -137,6 +155,7 @@ const DebugPage: Component = () => {
 			setProbes((prev) => [...prev, { label: probe.label, url: probe.url, img, imgBypass, fetchNoCors }]);
 		}
 		setDone(true);
+		await uploadReport();
 	});
 
 	const report = () => JSON.stringify({ environment: environment(), probes: probes() }, null, 2);
@@ -156,8 +175,9 @@ const DebugPage: Component = () => {
 		<div class="min-h-screen bg-zinc-100 p-4 text-sm text-zinc-800">
 			<div class="mx-auto max-w-2xl">
 				<h1 class="mb-1 text-xl font-semibold">FreeSpeech diagnostics</h1>
+				<p class="mb-1 text-zinc-500">{done() ? 'All probes finished.' : 'Running probes…'}</p>
 				<p class="mb-4 text-zinc-500">
-					{done() ? 'All probes finished.' : 'Running probes…'} Tap “Copy report” and send the result.
+					Report upload: <span class="font-medium text-zinc-700">{uploadState()}</span>
 				</p>
 
 				<h2 class="mb-2 font-semibold">Environment</h2>
