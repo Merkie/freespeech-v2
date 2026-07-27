@@ -1,6 +1,15 @@
 import { Show } from 'solid-js';
 import { cn } from '@/lib/cn';
+import { editingTiles, tilePositionKey } from '@/lib/state';
 import { tileImageFitClass, tileTextRowHeightClass, tileTextSizeClass, tileTextWraps } from '@/lib/tile-appearance';
+import {
+	consumeDragClick,
+	dragOverKey,
+	folderDropSide,
+	handleTilePointerDown,
+	isDraggingTiles,
+	isTileBeingDragged,
+} from '@/lib/tile-drag';
 import type { Tile as TileType } from '@/lib/types';
 
 export type TileProps = {
@@ -12,13 +21,40 @@ export type TileProps = {
 };
 
 export default function Tile(props: TileProps) {
+	const isFolder = () => !!props.tile.navigation;
+	const isDragged = () => isTileBeingDragged(props.tile);
+	const isHovered = () => isDraggingTiles() && dragOverKey() === tilePositionKey(props.tile);
+
+	// Folders offer a choice between dropping inside and trading places, so they get the split
+	// overlay instead of the plain drop ring every other tile shows.
+	const showFolderOverlay = () => isHovered() && isFolder() && !isDragged();
+	const showDropRing = () => isHovered() && !isFolder();
+
+	// A drag ends in a click on the tile it started from; without this the tile would toggle its
+	// own selection the instant the user lets go.
+	const handleClick = (event: MouseEvent) => {
+		if (consumeDragClick()) return;
+		props.onClick(event);
+	};
+
 	return (
+		// The pointer handler sits on the grid cell rather than the button inside it, so the tile's
+		// own click target stays exactly what it was. The cell is also its own drop target — the
+		// drag hit-tests through data-drop-cell rather than relying on event bubbling.
+		//
+		// select-none and the callout reset stop a press-and-hold from raising iOS's text selection
+		// menu over the tile being picked up. Scoped to tiles, since they are the thing tapped and
+		// held — ordinary text everywhere else in the app stays selectable and copyable.
 		<div
-			class="relative"
+			class={cn('relative rounded-md transition-shadow select-none [-webkit-touch-callout:none]', {
+				'ring-2 ring-blue-500': showDropRing(),
+			})}
 			style={{
 				'grid-column-start': props.tile.x + 1,
 				'grid-row-start': props.tile.y + 1,
 			}}
+			data-drop-cell={tilePositionKey(props.tile)}
+			onPointerDown={(e) => handleTilePointerDown(e, props.tile)}
 		>
 			<Show when={props.isSelected}>
 				<div class="absolute top-0 left-0 h-full w-full rounded-md ring-2 ring-blue-300"></div>
@@ -33,7 +69,7 @@ export default function Tile(props: TileProps) {
 				</Show>
 			</Show>
 			<button
-				onClick={props.onClick}
+				onClick={handleClick}
 				style={{
 					'background-color': props.tile.backgroundColor ?? 'white',
 					'border-color': props.tile.borderColor ?? 'black',
@@ -41,7 +77,8 @@ export default function Tile(props: TileProps) {
 				}}
 				class={cn(
 					'absolute top-0 left-0 flex h-full w-full cursor-pointer flex-col justify-center gap-1 rounded-md border p-2 px-1 text-black brightness-100 hover:brightness-[102%] active:brightness-[98%]',
-					{ 'opacity-40': props.isDimmed },
+					{ 'cursor-grab active:cursor-grabbing': editingTiles() },
+					{ 'opacity-40': props.isDimmed || isDragged() },
 					{ 'opacity-50': props.isSpeaking },
 				)}
 			>
@@ -81,11 +118,52 @@ export default function Tile(props: TileProps) {
 							alt={props.tile.displayText || props.tile.text}
 							loading="lazy"
 							decoding="async"
+							draggable={false}
 							class={cn('absolute inset-0 h-full w-full', tileImageFitClass())}
 						/>
 					</div>
 				</Show>
 			</button>
+
+			<Show when={showFolderOverlay()}>
+				{/* Add / Swap drop overlay for folder tiles. Extends up over the folder "nub" so it
+				    reads as one cohesive panel, and stays click-through so dragover keeps firing. */}
+				<div class="pointer-events-none absolute top-[-4px] right-0 bottom-0 left-0 z-20 flex overflow-hidden rounded-md">
+					<div
+						class={cn(
+							'flex flex-1 flex-col items-center justify-center gap-1 text-center transition-all',
+							folderDropSide() === 'add'
+								? 'bg-emerald-600 text-white ring-2 ring-inset ring-white'
+								: 'bg-zinc-900/85 text-white/50',
+						)}
+					>
+						<i
+							class={cn('bi bi-folder-plus leading-none drop-shadow transition-transform', {
+								'scale-110': folderDropSide() === 'add',
+							})}
+							style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }}
+						/>
+						<span class="text-xs font-extrabold tracking-wide uppercase drop-shadow">Add</span>
+					</div>
+					<div class="w-0 self-stretch border-l-2 border-dashed border-white" />
+					<div
+						class={cn(
+							'flex flex-1 flex-col items-center justify-center gap-1 text-center transition-all',
+							folderDropSide() === 'swap'
+								? 'bg-blue-600 text-white ring-2 ring-inset ring-white'
+								: 'bg-zinc-900/85 text-white/50',
+						)}
+					>
+						<i
+							class={cn('bi bi-arrow-left-right leading-none drop-shadow transition-transform', {
+								'scale-110': folderDropSide() === 'swap',
+							})}
+							style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }}
+						/>
+						<span class="text-xs font-extrabold tracking-wide uppercase drop-shadow">Swap</span>
+					</div>
+				</div>
+			</Show>
 		</div>
 	);
 }

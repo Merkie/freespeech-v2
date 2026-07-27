@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js';
 import { editingTilePositions, usingOnlineSearch } from '@/lib/state';
 import EditTilePanel from '../EditTilePanel';
 import OnlineImageSearchPanel from '../OnlineImageSearchPanel';
+import DragGhost from './DragGhost';
 import TileSubpages from './TileSubpages';
 
 export default function ProjectContent() {
@@ -24,8 +25,11 @@ export default function ProjectContent() {
 		<div ref={handleRef} class="relative flex-1 bg-zinc-100">
 			<Show when={containerHeight() > 0}>
 				{/* Tile grid container */}
+				{/* data-board-scroll lets a drag held near the top or bottom edge scroll this
+				    container — on touch the drag owns the gesture, so swiping is not available. */}
 				<div
 					class="thin-scrollbar absolute overflow-auto"
+					data-board-scroll
 					style={{
 						height: `${containerHeight()}px`,
 						width: showEditPanel() ? 'calc(100% - 350px)' : '100%',
@@ -33,6 +37,8 @@ export default function ProjectContent() {
 				>
 					<TileSubpages containerHeight={containerHeight} />
 				</div>
+
+				<DragGhost />
 
 				{/* Edit panel - shown when tiles are selected for editing */}
 				<Show when={showEditPanel()}>

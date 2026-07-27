@@ -1,6 +1,6 @@
 import { mutateBlob } from './blob-sync';
-import { projectBlob } from './state';
-import type { TileBlob } from './types';
+import { projectBlob, tilePositionKey } from './state';
+import type { TileBlob, TilePosition } from './types';
 
 // --- Tile operations ---
 
@@ -61,6 +61,58 @@ export function blobUpdateTilesBatch(
 				Object.assign(tile, stripped);
 			}
 		}
+	});
+}
+
+/**
+ * Repositions tiles within one page. Every move is applied in a single blob mutation so a
+ * swap lands as one change — two mutations would leave both tiles stacked on one cell in
+ * between, and position is what identifies a tile here.
+ */
+export function blobMoveTiles(pageId: string, moves: { from: TilePosition; to: TilePosition }[]): void {
+	if (moves.length === 0) return;
+
+	mutateBlob((blob) => {
+		const page = blob.pages.find((p) => p.id === pageId);
+		if (!page) return;
+
+		const destinations = new Map(moves.map((m) => [tilePositionKey(m.from), m.to]));
+		// Each tile is visited once and its key is read before it is written, so a tile moving
+		// into another tile's old cell cannot be picked up a second time.
+		for (const tile of page.tiles) {
+			const to = destinations.get(tilePositionKey(tile));
+			if (!to) continue;
+			tile.x = to.x;
+			tile.y = to.y;
+			tile.page = to.page;
+		}
+	});
+}
+
+/** Moves tiles from one page to another, repositioning them as they land. */
+export function blobMoveTilesToPage(
+	fromPageId: string,
+	toPageId: string,
+	moves: { from: TilePosition; to: TilePosition }[],
+): void {
+	if (moves.length === 0) return;
+
+	mutateBlob((blob) => {
+		const fromPage = blob.pages.find((p) => p.id === fromPageId);
+		const toPage = blob.pages.find((p) => p.id === toPageId);
+		if (!fromPage || !toPage) return;
+
+		const destinations = new Map(moves.map((m) => [tilePositionKey(m.from), m.to]));
+		const moved: TileBlob[] = [];
+
+		fromPage.tiles = fromPage.tiles.filter((tile) => {
+			const to = destinations.get(tilePositionKey(tile));
+			if (!to) return true;
+			moved.push({ ...tile, x: to.x, y: to.y, page: to.page });
+			return false;
+		});
+
+		toPage.tiles.push(...moved);
 	});
 }
 
