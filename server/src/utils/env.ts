@@ -10,6 +10,9 @@ export const R2_ACCESS_KEY = `${process.env.R2_ACCESS_KEY}`;
 export const R2_SECRET_KEY = `${process.env.R2_SECRET_KEY}`;
 export const R2_BUCKET = `${process.env.R2_BUCKET}`;
 export const ELEVEN_LABS_KEY = `${process.env.ELEVEN_LABS_KEY}`;
+export const SMTP_USER = `${process.env.SMTP_USER}`;
+export const SMTP_PASS = `${process.env.SMTP_PASS}`;
+export const SMTP_FROM = `${process.env.SMTP_FROM}`;
 
 export function init() {
 	if (PORT.length === 0) throw new Error('PORT is not set');
@@ -24,4 +27,7 @@ export function init() {
 	if (R2_SECRET_KEY.length === 0) throw new Error('R2_SECRET_KEY is not set');
 	if (R2_BUCKET.length === 0) throw new Error('R2_BUCKET is not set');
 	if (ELEVEN_LABS_KEY.length === 0) throw new Error('ELEVEN_LABS_KEY is not set');
+	if (SMTP_USER.length === 0) throw new Error('SMTP_USER is not set');
+	if (SMTP_PASS.length === 0) throw new Error('SMTP_PASS is not set');
+	if (SMTP_FROM.length === 0) throw new Error('SMTP_FROM is not set');
 }

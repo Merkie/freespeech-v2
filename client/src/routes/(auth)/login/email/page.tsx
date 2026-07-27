@@ -103,7 +103,13 @@ function Page() {
 						<span class="pointer-events-none select-none">{isSubmitting() ? 'Signing in...' : 'Continue'}</span>
 					</button>
 
-					<p class="mt-8 text-center text-sm text-gray-500">
+					<p class="mt-5 text-center text-sm">
+						<A href="/login/forgot-password" class="font-medium text-blue-600 hover:text-blue-500">
+							Forgot your password?
+						</A>
+					</p>
+
+					<p class="mt-6 text-center text-sm text-gray-500">
 						<A href="/login" class="font-medium text-blue-600 hover:text-blue-500">
 							&larr; All sign in options
 						</A>

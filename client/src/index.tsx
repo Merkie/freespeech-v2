@@ -8,8 +8,10 @@ import { registerServiceWorker } from '@/lib/sw-update';
 // --- Direct Component Imports ---
 
 import LoginEmailPage from './routes/(auth)/login/email/page.tsx';
+import ForgotPasswordPage from './routes/(auth)/login/forgot-password/page.tsx';
 // Auth Routes
 import LoginPage from './routes/(auth)/login/page.tsx';
+import ResetPasswordPage from './routes/(auth)/login/reset-password/page.tsx';
 import GoogleOauthPage from './routes/(auth)/oauth/google/page.tsx';
 import RegisterEmailPage from './routes/(auth)/register/email/page.tsx';
 import RegisterPage from './routes/(auth)/register/page.tsx';
@@ -51,6 +53,8 @@ render(
 					<Route path="/" component={HomePage} />
 					<Route path="/login" component={LoginPage} />
 					<Route path="/login/email" component={LoginEmailPage} />
+					<Route path="/login/forgot-password" component={ForgotPasswordPage} />
+					<Route path="/login/reset-password" component={ResetPasswordPage} />
 					<Route path="/register" component={RegisterPage} />
 					<Route path="/register/email" component={RegisterEmailPage} />
 					<Route path="/oauth/google" component={GoogleOauthPage} />

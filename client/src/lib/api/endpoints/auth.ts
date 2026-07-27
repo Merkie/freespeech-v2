@@ -11,6 +11,8 @@ const auth = {
 		login: processEmailLogin,
 		register: registerWithEmail,
 	},
+	forgotPassword: requestPasswordReset,
+	resetPassword,
 };
 
 export default auth;
@@ -65,6 +67,34 @@ async function registerWithEmail(body: { email: string; name: string; password: 
 	})) as {
 		token: string;
 		error: string;
+	};
+
+	return response;
+}
+
+// Always resolves to { success: true } whether or not the address has an account — the server
+// deliberately does not reveal which addresses are registered.
+async function requestPasswordReset(body: { email: string }) {
+	const response = (await fetchFromAPI({
+		path: '/auth/forgot-password',
+		method: 'POST',
+		body,
+	})) as {
+		success: boolean;
+		error?: string;
+	};
+
+	return response;
+}
+
+async function resetPassword(body: { token: string; password: string }) {
+	const response = (await fetchFromAPI({
+		path: '/auth/reset-password',
+		method: 'POST',
+		body,
+	})) as {
+		success: boolean;
+		error?: string;
 	};
 
 	return response;
