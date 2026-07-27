@@ -30,6 +30,7 @@ import AppEntryPage from './routes/app/page.tsx';
 import LegacyPageRedirect from './routes/app/project/[project_id]/[page_id].tsx';
 import AppProjectPage from './routes/app/project/[project_id]/page.tsx';
 import ThumbnailPage from './routes/app/project/[project_id]/thumbnail.tsx';
+import DebugPage from './routes/debug/page.tsx';
 // Root Layouts
 import Layout from './routes/layout.tsx';
 import NotFound from './routes/NotFound.tsx';
@@ -60,6 +61,8 @@ render(
 					<Route path="/register" component={RegisterPage} />
 					<Route path="/register/email" component={RegisterEmailPage} />
 					<Route path="/oauth/google" component={GoogleOauthPage} />
+					{/* On-device diagnostics for device-specific bugs — see routes/debug/page.tsx */}
+					<Route path="/debug" component={DebugPage} />
 					<Route path="/app" component={AppLayout}>
 						{/* Index route - handles /app entry point for PWA */}
 						<Route path="/" component={AppEntryPage} />

@@ -16,6 +16,9 @@ export default defineConfig({
 			// app posts SKIP_WAITING. An installed iOS PWA is effectively never closed, so a device
 			// that picked up a broken worker would keep it — including through a fix for that worker.
 			registerType: 'autoUpdate',
+			// lib/sw-update.ts registers the worker itself (it needs the Workbox instance for update
+			// events); without this the plugin injects a second, competing register call.
+			injectRegister: null,
 			strategies: 'injectManifest',
 			srcDir: 'src',
 			filename: 'sw.ts',

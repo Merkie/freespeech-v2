@@ -18,6 +18,20 @@
 // is worse than not caching it at all.
 export const MAX_CACHEABLE_IMAGE_BYTES = 2 * 1024 * 1024;
 
+/**
+ * A cache read that can miss but never throw. Reads need the same rule as writes: on a device
+ * whose storage is in a bad state (full disk, corrupted store — old iPads manage both),
+ * caches.match() can *reject* rather than miss, and an unguarded read would fail the request
+ * even though the network is fine.
+ */
+export async function safeCacheMatch(cacheName: string, request: Request): Promise<Response | undefined> {
+	try {
+		return await caches.match(request, { cacheName });
+	} catch {
+		return undefined;
+	}
+}
+
 /** Drops the oldest entries until at most `maxEntries` remain. */
 export async function trimCache(cache: Cache, maxEntries: number): Promise<void> {
 	const keys = await cache.keys();
@@ -82,7 +96,7 @@ export async function handleImage(
 	maxEntries: number,
 	event?: { waitUntil(promise: Promise<unknown>): void },
 ): Promise<Response> {
-	const cached = await caches.match(request, { cacheName });
+	const cached = await safeCacheMatch(cacheName, request);
 	if (cached) return cached;
 
 	const response = await fetch(request);
@@ -112,7 +126,7 @@ export async function handleApi(
 		}
 		return response;
 	} catch (error) {
-		const cached = await caches.match(request, { cacheName });
+		const cached = await safeCacheMatch(cacheName, request);
 		if (cached) return cached;
 		throw error;
 	}
