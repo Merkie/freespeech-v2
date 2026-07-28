@@ -73,7 +73,7 @@ async function removeBackground(imageUrl: string) {
 	const response = (await fetchFromAPI({
 		path: `/media/remove-background`,
 		method: 'POST',
-		body: { url: imageUrl },
+		body: { image_url: imageUrl },
 	})) as {
 		image_url: string;
 	};

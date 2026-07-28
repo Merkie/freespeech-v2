@@ -88,9 +88,11 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 
 		setRemovingBackground(true);
 		try {
+			// fetchFromAPI returns error bodies too, so guard against overwriting the image with undefined.
 			const { image_url } = await api.media.removeBackground(image);
-			const pos = tile;
-			blobUpdateTile(pageId(), { x: pos.x, y: pos.y, page: pos.page }, { image: image_url });
+			if (image_url) {
+				blobUpdateTile(pageId(), { x: tile.x, y: tile.y, page: tile.page }, { image: image_url });
+			}
 		} catch {
 			// Offline or failed — the tile image is visibly unchanged.
 		} finally {
