@@ -32,13 +32,25 @@
    Text selection is deliberately NOT disabled globally: only tiles suppress it, since they are
    the thing being tapped and held. Everything else stays selectable and copyable. */
 body {
+	background-color: #18181b;
 	touch-action: pan-x pan-y;
 	overscroll-behavior: none;
 }
 
 html {
+	background-color: #18181b;
 	-webkit-text-size-adjust: 100%;
 	text-size-adjust: 100%;
+}
+
+/* Keep the roomier safe-area treatment on phones in either orientation. Tablets and expanded
+   browser windows retain the navigation's original uniform p-2 padding. */
+@media (max-width: 639px), (max-height: 500px) and (orientation: landscape) {
+	.app-bottom-navigation {
+		padding-right: max(1.5rem, calc(0.5rem + env(safe-area-inset-right, 0px)));
+		padding-bottom: max(1.5rem, calc(0.5rem + env(safe-area-inset-bottom, 0px)));
+		padding-left: max(1.5rem, calc(0.5rem + env(safe-area-inset-left, 0px)));
+	}
 }
 
 .thin-scrollbar {

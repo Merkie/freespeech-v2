@@ -21,7 +21,10 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 		<Show when={show()} fallback={<div>One moment...</div>}>
 			<UpdateBanner />
 			<OfflineBanner />
-			<main class="fixed inset-0 flex overflow-hidden flex-col">
+			<main
+				class="fixed inset-0 flex overflow-hidden flex-col bg-zinc-900"
+				style={{ 'padding-top': 'env(safe-area-inset-top, 0px)' }}
+			>
 				<div class="relative min-h-0 flex-1 overflow-hidden">
 					<div class="absolute inset-0 flex min-h-0 w-full flex-col overflow-hidden">{props.children}</div>
 				</div>
