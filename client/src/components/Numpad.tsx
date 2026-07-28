@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js';
+import { For, onCleanup, Show } from 'solid-js';
 import { cn } from '@/lib/cn';
 
 type NumpadProps = {
@@ -10,9 +10,25 @@ type NumpadProps = {
 	/** Masked shows filled dots (a PIN); unmasked shows the digits (a maths answer). */
 	masked?: boolean;
 	disabled?: boolean;
+	/** Briefly true after a wrong entry; shakes the readout like a phone lock screen. */
+	shake?: boolean;
 };
 
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+/** Phone-style key faces: the digit plus the classic letter group underneath. */
+const KEYS: [string, string][] = [
+	['1', ''],
+	['2', 'ABC'],
+	['3', 'DEF'],
+	['4', 'GHI'],
+	['5', 'JKL'],
+	['6', 'MNO'],
+	['7', 'PQRS'],
+	['8', 'TUV'],
+	['9', 'WXYZ'],
+];
+
+const KEY_CLASS =
+	'flex h-16 select-none flex-col items-center justify-center rounded-xl bg-zinc-800 transition-all duration-100 hover:bg-zinc-700 active:scale-95 active:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-40';
 
 export default function Numpad(props: NumpadProps) {
 	const masked = () => props.masked !== false;
@@ -29,23 +45,41 @@ export default function Numpad(props: NumpadProps) {
 		props.onChange(props.value.slice(0, -1));
 	};
 
+	// Physical keyboards work too, for carers on a laptop.
+	const onKeyDown = (e: KeyboardEvent) => {
+		if (e.key >= '0' && e.key <= '9') {
+			e.preventDefault();
+			press(e.key);
+		} else if (e.key === 'Backspace') {
+			e.preventDefault();
+			backspace();
+		}
+	};
+	window.addEventListener('keydown', onKeyDown);
+	onCleanup(() => window.removeEventListener('keydown', onKeyDown));
+
 	return (
-		<div class="flex flex-col items-center gap-6">
+		<div class="flex w-full flex-col items-center gap-5">
 			<Show
 				when={masked()}
 				fallback={
-					<div class="flex h-12 min-w-[96px] items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 px-4 text-3xl font-semibold tracking-[0.3em] text-zinc-100">
-						{props.value || ' '}
+					<div
+						class={cn(
+							'flex h-14 w-full items-center justify-center rounded-xl border border-zinc-700 bg-zinc-950/50 text-3xl font-semibold tracking-[0.3em] text-zinc-100',
+							props.shake && 'animate-pin-shake',
+						)}
+					>
+						{props.value}
 					</div>
 				}
 			>
-				<div class="flex h-8 items-center gap-3">
+				<div class={cn('flex h-8 items-center gap-4', props.shake && 'animate-pin-shake')}>
 					<For each={Array.from({ length: props.maxLength })}>
 						{(_, i) => (
 							<div
 								class={cn(
-									'h-4 w-4 rounded-full transition-all',
-									i() < props.value.length ? 'scale-100 bg-zinc-100' : 'scale-90 bg-zinc-700',
+									'h-3.5 w-3.5 rounded-full border-2 transition-all duration-150',
+									i() < props.value.length ? 'scale-110 border-zinc-100 bg-zinc-100' : 'border-zinc-600 bg-transparent',
 								)}
 							/>
 						)}
@@ -53,27 +87,21 @@ export default function Numpad(props: NumpadProps) {
 				</div>
 			</Show>
 
-			<div class="grid grid-cols-3 gap-3">
+			<div class="grid w-full grid-cols-3 gap-2">
 				<For each={KEYS}>
-					{(key) => (
-						<button
-							type="button"
-							onClick={() => press(key)}
-							disabled={props.disabled}
-							class="grid h-16 w-16 place-items-center rounded-full bg-zinc-800 text-2xl font-medium text-zinc-100 transition-all hover:bg-zinc-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-						>
-							{key}
+					{([digit, letters]) => (
+						<button type="button" onClick={() => press(digit)} disabled={props.disabled} class={KEY_CLASS}>
+							<span class="text-2xl font-semibold leading-none text-zinc-100">{digit}</span>
+							<span class="mt-1 h-2.5 text-[10px] font-medium leading-none tracking-[0.2em] text-zinc-500">
+								{letters}
+							</span>
 						</button>
 					)}
 				</For>
 				<div />
-				<button
-					type="button"
-					onClick={() => press('0')}
-					disabled={props.disabled}
-					class="grid h-16 w-16 place-items-center rounded-full bg-zinc-800 text-2xl font-medium text-zinc-100 transition-all hover:bg-zinc-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-				>
-					0
+				<button type="button" onClick={() => press('0')} disabled={props.disabled} class={KEY_CLASS}>
+					<span class="text-2xl font-semibold leading-none text-zinc-100">0</span>
+					<span class="mt-1 h-2.5" />
 				</button>
 				<button
 					type="button"
@@ -81,7 +109,7 @@ export default function Numpad(props: NumpadProps) {
 					disabled={props.disabled}
 					aria-label="Delete"
 					title="Delete"
-					class="grid h-16 w-16 place-items-center rounded-full text-2xl text-zinc-300 transition-all hover:bg-zinc-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+					class="flex h-16 select-none items-center justify-center rounded-xl text-2xl text-zinc-300 transition-all duration-100 hover:bg-zinc-800 active:scale-95 active:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<i class="bi bi-backspace" />
 				</button>

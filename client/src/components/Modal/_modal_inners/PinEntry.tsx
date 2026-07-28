@@ -1,6 +1,7 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js';
 import Numpad from '@/components/Numpad';
 import { globalIsOnline } from '@/hooks/useNetworkStatus';
+import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import {
 	clearLockout,
@@ -34,6 +35,7 @@ export default function PinEntry() {
 	const [answerValue, setAnswerValue] = createSignal('');
 	const [error, setError] = createSignal('');
 	const [challenge, setChallenge] = createSignal(makeMultiplicationChallenge());
+	const [shaking, setShaking] = createSignal(false);
 	// Ticks so the lockout countdown is live rather than frozen at the moment it opened.
 	const [now, setNow] = createSignal(Date.now());
 
@@ -50,6 +52,14 @@ export default function PinEntry() {
 	const timer = setInterval(() => setNow(Date.now()), 250);
 	onCleanup(() => clearInterval(timer));
 
+	let shakeTimer: ReturnType<typeof setTimeout> | undefined;
+	const shake = () => {
+		clearTimeout(shakeTimer);
+		setShaking(true);
+		shakeTimer = setTimeout(() => setShaking(false), 400);
+	};
+	onCleanup(() => clearTimeout(shakeTimer));
+
 	// Start from a clean slate each time the modal is opened.
 	createEffect(
 		on(activeModalId, (id) => {
@@ -64,6 +74,7 @@ export default function PinEntry() {
 	);
 
 	const recordFailure = (message: string) => {
+		shake();
 		const result = registerFailedAttempt();
 		if (result.lockedOut) {
 			setNow(Date.now());
@@ -115,18 +126,25 @@ export default function PinEntry() {
 		recordFailure('Wrong answer.');
 	};
 
+	// The prompt and any error share one fixed-height slot so the keypad never jumps.
+	const statusClass = () =>
+		cn('flex min-h-10 items-center justify-center text-center text-sm', error() ? 'text-red-400' : 'text-zinc-400');
+
 	return (
-		<div class="flex flex-col items-center gap-6 py-2">
+		<div class="flex flex-col items-center gap-4 pt-1">
 			<Show when={!locked()} fallback={<LockedOut remaining={() => formatLockoutRemaining(remainingMs())} />}>
 				<Show
 					when={showingChallenge()}
 					fallback={
 						<>
-							<p class="text-center text-sm text-zinc-400">{pinPromptText()}</p>
-							<Numpad value={pinValue()} onChange={setPinValue} maxLength={PIN_LENGTH} onComplete={onPinComplete} />
-							<Show when={error()}>
-								<p class="text-center text-sm text-red-400">{error()}</p>
-							</Show>
+							<p class={statusClass()}>{error() || pinPromptText()}</p>
+							<Numpad
+								value={pinValue()}
+								onChange={setPinValue}
+								maxLength={PIN_LENGTH}
+								onComplete={onPinComplete}
+								shake={shaking()}
+							/>
 							<button
 								type="button"
 								onClick={() => {
@@ -142,17 +160,14 @@ export default function PinEntry() {
 						</>
 					}
 				>
-					<p class="text-center text-sm text-zinc-400">
-						{isMathLock() ? pinPromptText() : 'To reset your PIN, solve this problem:'}
+					<p class={statusClass()}>
+						{error() || (isMathLock() ? pinPromptText() : 'To reset your PIN, solve this problem:')}
 					</p>
-					<p class="text-4xl font-semibold text-zinc-100">
+					<p class="text-4xl font-semibold tracking-wide text-zinc-100">
 						{challenge().a} &times; {challenge().b} = ?
 					</p>
-					<Numpad value={answerValue()} onChange={setAnswerValue} maxLength={2} masked={false} />
-					<Show when={error()}>
-						<p class="text-center text-sm text-red-400">{error()}</p>
-					</Show>
-					<div class="flex w-full items-center justify-center gap-3">
+					<Numpad value={answerValue()} onChange={setAnswerValue} maxLength={2} masked={false} shake={shaking()} />
+					<div class="flex w-full gap-2">
 						<Show when={!isMathLock()}>
 							<button
 								type="button"
@@ -161,7 +176,7 @@ export default function PinEntry() {
 									setPinValue('');
 									setError('');
 								}}
-								class="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-all hover:bg-zinc-800"
+								class="h-12 flex-1 rounded-xl border border-zinc-700 text-sm text-zinc-300 transition-all hover:bg-zinc-800"
 							>
 								Back
 							</button>
@@ -170,7 +185,7 @@ export default function PinEntry() {
 							type="button"
 							onClick={checkAnswer}
 							disabled={answerValue() === ''}
-							class="rounded-md border border-blue-500 bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-500 disabled:opacity-40"
+							class="h-12 flex-1 rounded-xl bg-blue-600 text-sm font-medium text-white transition-all hover:bg-blue-500 disabled:opacity-40"
 						>
 							Submit
 						</button>

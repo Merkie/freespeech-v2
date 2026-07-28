@@ -1,10 +1,10 @@
-import { createEffect, createSignal, on, Show } from 'solid-js';
+import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js';
 import Numpad from '@/components/Numpad';
 import { globalIsOnline } from '@/hooks/useNetworkStatus';
+import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import { enablePinLock, PIN_LENGTH } from '@/lib/pin';
 import { activeModalId, setActiveModalId } from '@/lib/state';
-import { showToast } from '@/lib/toast';
 
 type Step = 'choose' | 'confirm';
 
@@ -14,6 +14,15 @@ export default function PinSetup() {
 	const [second, setSecond] = createSignal('');
 	const [error, setError] = createSignal('');
 	const [saving, setSaving] = createSignal(false);
+	const [shaking, setShaking] = createSignal(false);
+
+	let shakeTimer: ReturnType<typeof setTimeout> | undefined;
+	const shake = () => {
+		clearTimeout(shakeTimer);
+		setShaking(true);
+		shakeTimer = setTimeout(() => setShaking(false), 400);
+	};
+	onCleanup(() => clearTimeout(shakeTimer));
 
 	createEffect(
 		on(activeModalId, (id) => {
@@ -42,12 +51,14 @@ export default function PinSetup() {
 			setFirst('');
 			setSecond('');
 			setError('Those PINs did not match. Start again.');
+			shake();
 			return;
 		}
 
 		if (!globalIsOnline()) {
 			setSecond('');
 			setError('Connect to the internet to save a new passcode.');
+			shake();
 			return;
 		}
 
@@ -55,36 +66,51 @@ export default function PinSetup() {
 		try {
 			await enablePinLock(value);
 			setActiveModalId('');
-			showToast('Passcode set', 'success');
 		} catch {
 			setSecond('');
 			setError('Could not save the passcode. Check your connection and try again.');
+			shake();
 		} finally {
 			setSaving(false);
 		}
 	};
 
+	// The prompt and any error share one fixed-height slot so the keypad never jumps.
+	const statusText = () =>
+		error() || (step() === 'choose' ? 'Choose a 4-digit passcode.' : 'Enter it again to confirm.');
+
 	return (
-		<div class="flex flex-col items-center gap-6 py-2">
-			<p class="text-center text-sm text-zinc-400">
-				{step() === 'choose' ? 'Choose a 4-digit passcode.' : 'Enter it again to confirm.'}
+		<div class="flex flex-col items-center gap-4 pt-1">
+			<p
+				class={cn(
+					'flex min-h-10 items-center justify-center text-center text-sm',
+					error() ? 'text-red-400' : 'text-zinc-400',
+				)}
+			>
+				{statusText()}
 			</p>
 
 			<Show
 				when={step() === 'choose'}
-				fallback={<Numpad value={second()} onChange={setSecond} maxLength={PIN_LENGTH} onComplete={onSecondComplete} />}
+				fallback={
+					<Numpad
+						value={second()}
+						onChange={setSecond}
+						maxLength={PIN_LENGTH}
+						onComplete={onSecondComplete}
+						disabled={saving()}
+						shake={shaking()}
+					/>
+				}
 			>
-				<Numpad value={first()} onChange={setFirst} maxLength={PIN_LENGTH} onComplete={onFirstComplete} />
+				<Numpad
+					value={first()}
+					onChange={setFirst}
+					maxLength={PIN_LENGTH}
+					onComplete={onFirstComplete}
+					shake={shaking()}
+				/>
 			</Show>
-
-			<Show when={error()}>
-				<p class="text-center text-sm text-red-400">{error()}</p>
-			</Show>
-
-			<p class="max-w-xs text-center text-xs text-zinc-500">
-				This passcode is stored on your account and cached here for offline entry. Saving or resetting it requires a
-				connection.
-			</p>
 		</div>
 	);
 }

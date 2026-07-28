@@ -26,7 +26,6 @@ const AccessControlsPage: Component = () => {
 			setSaving(true);
 			try {
 				await disablePinLock();
-				showToast('Passcode turned off', 'success');
 			} catch {
 				showToast('Connect to the internet to change access controls.', 'error');
 			} finally {
@@ -45,7 +44,6 @@ const AccessControlsPage: Component = () => {
 			setSaving(true);
 			try {
 				await enableMathLock();
-				showToast('Switched to a multiplication question', 'success');
 			} catch {
 				showToast('Connect to the internet to change access controls.', 'error');
 			} finally {
