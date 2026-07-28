@@ -1,6 +1,5 @@
 import { Howl } from 'howler';
 import api from './api';
-import { OfflineError } from './api/util';
 import {
 	elevenLabsVoiceId,
 	enableThirdPartyVoiceProviders,
@@ -8,7 +7,6 @@ import {
 	setSpeakingTilePosition,
 	setVoiceEngineStatus,
 } from './state';
-import { showToast } from './toast';
 import type { TilePositionKey } from './types';
 
 // speakText accepts a position key string (e.g., "0-1-0") for tile speaking indicator
@@ -38,10 +36,8 @@ export async function speakText(text: string, tilePositionKey?: TilePositionKey)
 		sound.on('loaderror', () => {
 			speakSynth(text);
 		});
-	} catch (err) {
-		if (!(err instanceof OfflineError)) {
-			showToast('Voice failed, using offline voice', 'error');
-		}
+	} catch {
+		// Cloud voice unavailable (offline or failed) — fall back to the device voice quietly.
 		speakSynth(text);
 	}
 }

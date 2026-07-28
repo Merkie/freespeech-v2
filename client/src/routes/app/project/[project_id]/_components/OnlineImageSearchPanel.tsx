@@ -1,6 +1,5 @@
 import { type Component, createEffect, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
-import { OfflineError } from '@/lib/api/util';
 import { blobUpdateTile } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { type SkinTone, SkinTones } from '@/lib/opensymbols';
@@ -15,7 +14,6 @@ import {
 	setLocalSettings,
 	setUsingOnlineSearch,
 } from '@/lib/state';
-import { showToast } from '@/lib/toast';
 
 type SearchResult = {
 	image_url: string;
@@ -98,13 +96,9 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 					{ image: `https://media.freespeechaac.com/${key}` },
 				);
 			}
-		} catch (err) {
+		} catch {
+			// Offline or failed — the tile keeps its current image.
 			setLoading(false);
-			if (err instanceof OfflineError) {
-				showToast('This requires an internet connection', 'error');
-			} else {
-				showToast('Failed to upload image', 'error');
-			}
 		}
 	};
 
@@ -135,12 +129,9 @@ const OnlineImageSearchPanel: Component<OnlineImageSearchPanelProps> = (props) =
 			}
 
 			setImagesReady(true);
-		} catch (err) {
-			if (err instanceof OfflineError) {
-				showToast('This requires an internet connection', 'error');
-			} else {
-				showToast('Image search failed', 'error');
-			}
+		} catch {
+			// Offline or failed — fall through to the empty "no results" state.
+			setImagesReady(true);
 		} finally {
 			setSearching(false);
 		}

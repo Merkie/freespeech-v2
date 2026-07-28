@@ -7,7 +7,6 @@ import { MODAL_ID } from "@/lib/constants";
 import api from "@/lib/api";
 import { lastVisitedProjectId } from "@/lib/page-actions";
 import { localSettings, setActiveModalId, setLocalSettings, setProjectToOptimize } from "@/lib/state";
-import { showToast } from "@/lib/toast";
 import type { Project } from "@/lib/types";
 
 interface ProjectCardProps {
@@ -89,26 +88,20 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
     const confirmed = window.confirm(`Delete "${props.project.name}"? This can't be undone.`);
     if (!confirmed) return;
 
-    try {
-      const response = await api.project.delete(props.project.id);
-      if (!response.success) {
-        showToast(response.error || "Failed to delete project", "error");
-        return;
-      }
-      await deleteCachedBlob(props.project.id).catch(() => undefined);
-      const settings = localSettings();
-      if (settings.lastVisitedProjectId === props.project.id) {
-        setLocalSettings({
-          ...settings,
-          lastVisitedProjectId: "",
-          lastVisitedPageId: "",
-        });
-      }
-      props.onDelete?.(props.project.id);
-      showToast("Project deleted", "success");
-    } catch {
-      showToast("Failed to delete project", "error");
+    // A failed delete leaves the card in place; a successful one removes it.
+    const response = await api.project.delete(props.project.id).catch(() => undefined);
+    if (!response?.success) return;
+
+    await deleteCachedBlob(props.project.id).catch(() => undefined);
+    const settings = localSettings();
+    if (settings.lastVisitedProjectId === props.project.id) {
+      setLocalSettings({
+        ...settings,
+        lastVisitedProjectId: "",
+        lastVisitedPageId: "",
+      });
     }
+    props.onDelete?.(props.project.id);
   };
 
   const getTimeAgo = () => {

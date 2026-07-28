@@ -1,6 +1,5 @@
 import { type Component, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
-import { OfflineError } from '@/lib/api/util';
 import { blobDeleteTiles, blobUpdateTile, blobUpdateTilesBatch } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { uploadFile } from '@/lib/presigned-uploads';
@@ -19,7 +18,6 @@ import {
 	setUsingOnlineSearch,
 	tilePositionKey,
 } from '@/lib/state';
-import { showToast } from '@/lib/toast';
 
 const tileColors = {
 	white: {
@@ -93,12 +91,8 @@ const EditTilePanel: Component<EditTilePanelProps> = (props) => {
 			const { image_url } = await api.media.removeBackground(image);
 			const pos = tile;
 			blobUpdateTile(pageId(), { x: pos.x, y: pos.y, page: pos.page }, { image: image_url });
-		} catch (error) {
-			if (error instanceof OfflineError) {
-				showToast('This requires an internet connection', 'error');
-			} else {
-				showToast('Failed to remove background', 'error');
-			}
+		} catch {
+			// Offline or failed — the tile image is visibly unchanged.
 		} finally {
 			setRemovingBackground(false);
 		}

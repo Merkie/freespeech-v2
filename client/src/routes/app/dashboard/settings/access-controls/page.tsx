@@ -4,7 +4,6 @@ import { globalIsOnline } from '@/hooks/useNetworkStatus';
 import { MODAL_ID } from '@/lib/constants';
 import { disablePinLock, enableMathLock } from '@/lib/pin';
 import { accessControlSettings, setActiveModalId } from '@/lib/state';
-import { showToast } from '@/lib/toast';
 import type { EditPinMode } from '@/lib/types';
 import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
 import { SegmentedControl, SettingRow, Toggle } from '../_components/SettingControls';
@@ -24,13 +23,9 @@ const AccessControlsPage: Component = () => {
 		if (!globalIsOnline()) return;
 		if (!next) {
 			setSaving(true);
-			try {
-				await disablePinLock();
-			} catch {
-				showToast('Connect to the internet to change access controls.', 'error');
-			} finally {
-				setSaving(false);
-			}
+			// A failed call leaves the toggle where it was, which is feedback enough.
+			await disablePinLock().catch(() => undefined);
+			setSaving(false);
 			return;
 		}
 		// Turning it on always goes through PIN setup; the maths option is chosen afterwards.
@@ -42,13 +37,8 @@ const AccessControlsPage: Component = () => {
 		if (next === mode()) return;
 		if (next === 'math') {
 			setSaving(true);
-			try {
-				await enableMathLock();
-			} catch {
-				showToast('Connect to the internet to change access controls.', 'error');
-			} finally {
-				setSaving(false);
-			}
+			await enableMathLock().catch(() => undefined);
+			setSaving(false);
 			return;
 		}
 		setActiveModalId(MODAL_ID.PIN_SETUP);

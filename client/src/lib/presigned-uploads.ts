@@ -1,14 +1,10 @@
 import api from './api';
 import { compressImage, MAX_UPLOAD_BYTES } from './image-compress';
-import { showToast } from './toast';
 
 export async function uploadFile(file: File) {
 	const compressed = await compressImage(file);
 
-	if (compressed.blob.size > MAX_UPLOAD_BYTES) {
-		showToast('Image is too large — please try a smaller file', 'error');
-		return undefined;
-	}
+	if (compressed.blob.size > MAX_UPLOAD_BYTES) return undefined;
 
 	const presignResponse = await api.media.presignUpload(compressed.filename, compressed.blob.size);
 

@@ -3,7 +3,6 @@ import type { Component } from 'solid-js';
 import { createResource, createSignal, For, Show } from 'solid-js';
 import api from '@/lib/api';
 import type { TemplateSummary } from '@/lib/api/endpoints/project';
-import { showToast } from '@/lib/toast';
 
 const TemplatesPage: Component = () => {
 	const navigate = useNavigate();
@@ -48,19 +47,14 @@ function TemplateCard(props: { template: TemplateSummary; onImported: (projectId
 	const handleUse = async () => {
 		if (loading()) return;
 		setLoading(true);
-		try {
-			const response = await api.project.importTemplate(props.template.slug);
-			if (response.error || !response.projectId) {
-				showToast(response.error || 'Failed to import template', 'error');
-				setLoading(false);
-				return;
-			}
-			api.project.updateThumbnail(response.projectId).catch(() => undefined);
-			props.onImported(response.projectId);
-		} catch {
-			showToast('Failed to import template', 'error');
+		// On failure the button simply returns to "Use template".
+		const response = await api.project.importTemplate(props.template.slug).catch(() => undefined);
+		if (!response || response.error || !response.projectId) {
 			setLoading(false);
+			return;
 		}
+		api.project.updateThumbnail(response.projectId).catch(() => undefined);
+		props.onImported(response.projectId);
 	};
 
 	return (
