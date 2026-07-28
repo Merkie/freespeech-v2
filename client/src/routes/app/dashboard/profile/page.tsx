@@ -1,7 +1,9 @@
 import { useNavigate } from '@solidjs/router';
 import { type Component, createSignal, Show } from 'solid-js';
 import api from '@/lib/api';
+import { clearCachedAccessControlSettings } from '@/lib/cache/access-control-cache';
 import { clearCachedAuth } from '@/lib/cache/meta-cache';
+import { resetAccessControlSettings } from '@/lib/pin';
 import { setSessionStatus, setUser, user } from '@/lib/state';
 
 const ProfilePage: Component = () => {
@@ -10,8 +12,11 @@ const ProfilePage: Component = () => {
 	const [name, setName] = createSignal(user()?.name || '');
 
 	const logout = async () => {
+		const userId = user()?.id;
 		localStorage.removeItem('token');
 		await clearCachedAuth().catch(() => undefined);
+		if (userId) await clearCachedAccessControlSettings(userId).catch(() => undefined);
+		resetAccessControlSettings();
 		// The worker caches API responses keyed by URL alone, so they outlive the token unless it is
 		// told to drop them. Without this the next account on a shared iPad could be shown the
 		// previous one's project list while offline.

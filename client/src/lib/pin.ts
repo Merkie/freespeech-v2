@@ -1,21 +1,28 @@
 /**
  * Passcode gate for edit mode and the dashboard, in the spirit of iOS Guided Access.
  *
- * This is intentionally a SOFT, client-only control and is NOT enforced by the API. A 4-digit
- * PIN has a tiny keyspace, so the stored hash is not real security against someone with
- * devtools — it exists to stop an AAC user (often a child, or someone who should not be
- * rearranging their own board) from wandering into edit mode or the dashboard by accident.
+ * This is intentionally a SOFT UI control and is NOT authorization for the API. A 4-digit PIN
+ * has a tiny keyspace, so even a salted verifier cached for offline entry is not real security
+ * against someone with devtools. It exists to stop accidental editing or dashboard navigation.
  *
- * Keeping it on the device rather than on the account is deliberate: the lock has to work when
- * the device is offline, which is exactly when an AAC board matters most, and a shared iPad is
- * locked per device rather than per login.
+ * The database is authoritative for whether the account is locked, its mode, and its verifier.
+ * Each signed-in device caches those settings in IndexedDB so the existing gate works offline.
+ * Changing the setting requires a connection, avoiding conflicting offline account mutations.
  *
  * A single lockout covers both PIN entry and the multiplication reset: 3 wrong answers of
- * either kind starts a 5-minute lockout. The counter and the deadline live in localStorage, so
- * a reload cannot clear them.
+ * either kind starts a 5-minute lockout. Attempts remain device-local and are keyed by account.
  */
 
-import { localSettings, setLocalSettings } from './state';
+import api from './api';
+import { cacheAccessControlSettings, getCachedAccessControlSettings } from './cache/access-control-cache';
+import {
+	accessControlSettings,
+	DEFAULT_ACCESS_CONTROL_SETTINGS,
+	setAccessControlSettings,
+	setAccessControlSettingsLoaded,
+	user,
+} from './state';
+import type { AccessControlSettings } from './types';
 
 export const PIN_LENGTH = 4;
 export const MAX_PIN_ATTEMPTS = 3;
@@ -35,18 +42,92 @@ function randomSalt(): string {
 	return toHex(crypto.getRandomValues(new Uint8Array(16)).buffer);
 }
 
+type AccessControlRuntime = {
+	settingsUpdatedAt: string | null;
+	failureCount: number;
+	lockoutUntil: number;
+};
+
+function runtimeKey(): string | null {
+	const userId = user()?.id;
+	return userId ? `accessControlRuntime:${userId}` : null;
+}
+
+function readRuntime(): AccessControlRuntime {
+	const empty = {
+		settingsUpdatedAt: accessControlSettings().updatedAt,
+		failureCount: 0,
+		lockoutUntil: 0,
+	};
+	const key = runtimeKey();
+	if (!key) return empty;
+
+	try {
+		const value = localStorage.getItem(key);
+		if (!value) return empty;
+		const saved = JSON.parse(value) as AccessControlRuntime;
+		if (saved.settingsUpdatedAt !== accessControlSettings().updatedAt) return empty;
+		return saved;
+	} catch {
+		return empty;
+	}
+}
+
+function writeRuntime(runtime: AccessControlRuntime): void {
+	const key = runtimeKey();
+	if (key) localStorage.setItem(key, JSON.stringify(runtime));
+}
+
+function replaceSettings(settings: AccessControlSettings): void {
+	setAccessControlSettings(settings);
+}
+
+/** Prefer the account record, falling back to this account's last IndexedDB copy when offline. */
+export async function hydrateAccessControlSettings(userId: string): Promise<void> {
+	setAccessControlSettingsLoaded(false);
+	try {
+		const settings = await api.user.getAccessControls();
+		replaceSettings(settings);
+		await cacheAccessControlSettings(userId, settings).catch(() => undefined);
+	} catch {
+		const cached = await getCachedAccessControlSettings(userId);
+		replaceSettings(cached ?? DEFAULT_ACCESS_CONTROL_SETTINGS);
+	} finally {
+		setAccessControlSettingsLoaded(true);
+	}
+}
+
+export function resetAccessControlSettings(): void {
+	const key = runtimeKey();
+	if (key) localStorage.removeItem(key);
+	replaceSettings(DEFAULT_ACCESS_CONTROL_SETTINGS);
+	setAccessControlSettingsLoaded(false);
+}
+
+export function useDefaultAccessControlSettings(): void {
+	replaceSettings(DEFAULT_ACCESS_CONTROL_SETTINGS);
+	setAccessControlSettingsLoaded(true);
+}
+
+async function saveAccountSettings(settings: Omit<AccessControlSettings, 'updatedAt'>): Promise<void> {
+	const userId = user()?.id;
+	if (!userId) throw new Error('No signed-in account');
+
+	const saved = await api.user.updateAccessControls(settings);
+	replaceSettings(saved);
+	clearLockout();
+	await cacheAccessControlSettings(userId, saved).catch(() => undefined);
+}
+
 /** Turn on the gate using a 4-digit PIN. Clears any outstanding lockout. */
 export async function enablePinLock(pin: string): Promise<void> {
 	const salt = randomSalt();
 	const hash = await hashPin(pin, salt);
-	setLocalSettings({
-		...localSettings(),
-		editPinEnabled: true,
-		editPinMode: 'pin',
-		editPinHash: hash,
-		editPinSalt: salt,
-		editPinFailureCount: 0,
-		editPinLockoutUntil: 0,
+	await saveAccountSettings({
+		enabled: true,
+		mode: 'pin',
+		pinHash: hash,
+		pinSalt: salt,
 	});
 }
 
@@ -55,41 +136,35 @@ export async function enablePinLock(pin: string): Promise<void> {
  * do the arithmetic gets through, which is the point when the carer does not want to remember a
  * PIN but the person using the board cannot multiply.
  */
-export function enableMathLock(): void {
-	setLocalSettings({
-		...localSettings(),
-		editPinEnabled: true,
-		editPinMode: 'math',
-		editPinHash: '',
-		editPinSalt: '',
-		editPinFailureCount: 0,
-		editPinLockoutUntil: 0,
+export async function enableMathLock(): Promise<void> {
+	await saveAccountSettings({
+		enabled: true,
+		mode: 'math',
+		pinHash: null,
+		pinSalt: null,
 	});
 }
 
 /** Turn the gate off and forget the stored PIN. */
-export function disablePinLock(): void {
-	setLocalSettings({
-		...localSettings(),
-		editPinEnabled: false,
-		editPinMode: 'pin',
-		editPinHash: '',
-		editPinSalt: '',
-		editPinFailureCount: 0,
-		editPinLockoutUntil: 0,
+export async function disablePinLock(): Promise<void> {
+	await saveAccountSettings({
+		enabled: false,
+		mode: 'pin',
+		pinHash: null,
+		pinSalt: null,
 	});
 }
 
 export async function verifyPin(pin: string): Promise<boolean> {
-	const s = localSettings();
-	if (!s.editPinHash || !s.editPinSalt) return false;
-	const candidate = await hashPin(pin, s.editPinSalt);
-	return candidate === s.editPinHash;
+	const settings = accessControlSettings();
+	if (!settings.pinHash || !settings.pinSalt) return false;
+	const candidate = await hashPin(pin, settings.pinSalt);
+	return candidate === settings.pinHash;
 }
 
 /** Milliseconds left on the current lockout, or 0 when not locked out. */
 export function lockoutRemainingMs(): number {
-	return Math.max(0, (localSettings().editPinLockoutUntil || 0) - Date.now());
+	return Math.max(0, readRuntime().lockoutUntil - Date.now());
 }
 
 /**
@@ -97,24 +172,29 @@ export function lockoutRemainingMs(): number {
  * the counter. Returns whether we are now locked out and how many tries remain.
  */
 export function registerFailedAttempt(): { lockedOut: boolean; attemptsLeft: number } {
-	const count = (localSettings().editPinFailureCount || 0) + 1;
+	const runtime = readRuntime();
+	const count = runtime.failureCount + 1;
 
 	if (count >= MAX_PIN_ATTEMPTS) {
-		setLocalSettings({
-			...localSettings(),
-			editPinFailureCount: 0,
-			editPinLockoutUntil: Date.now() + PIN_LOCKOUT_MS,
+		writeRuntime({
+			settingsUpdatedAt: accessControlSettings().updatedAt,
+			failureCount: 0,
+			lockoutUntil: Date.now() + PIN_LOCKOUT_MS,
 		});
 		return { lockedOut: true, attemptsLeft: 0 };
 	}
 
-	setLocalSettings({ ...localSettings(), editPinFailureCount: count });
+	writeRuntime({
+		settingsUpdatedAt: accessControlSettings().updatedAt,
+		failureCount: count,
+		lockoutUntil: runtime.lockoutUntil,
+	});
 	return { lockedOut: false, attemptsLeft: MAX_PIN_ATTEMPTS - count };
 }
 
 /** Clear the failure count and lockout after a successful entry or reset. */
 export function clearLockout(): void {
-	setLocalSettings({ ...localSettings(), editPinFailureCount: 0, editPinLockoutUntil: 0 });
+	writeRuntime({ settingsUpdatedAt: accessControlSettings().updatedAt, failureCount: 0, lockoutUntil: 0 });
 }
 
 /** A multiplication challenge with both factors in [2, 9] — easy for an adult, not for a toddler. */
@@ -127,7 +207,7 @@ export function makeMultiplicationChallenge(): { a: number; b: number; answer: n
 
 /** Whether a gated action should prompt at all. */
 export function pinLockActive(): boolean {
-	return localSettings().editPinEnabled === true;
+	return accessControlSettings().enabled === true;
 }
 
 export function formatLockoutRemaining(ms: number): string {

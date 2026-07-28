@@ -1,6 +1,7 @@
 import { createEffect, createRoot, createSignal } from 'solid-js';
 import type { ModalIdType } from './constants';
 import type {
+	AccessControlSettings,
 	LocalSettings,
 	PageBlob,
 	Project,
@@ -157,6 +158,20 @@ export const [offlineVoiceUri, setOfflineVoiceUri] = createSignal<string | null>
 // Behavior settings (persisted to localStorage)
 export const [enableSentenceCopyButton, setEnableSentenceCopyButton] = createSignal(false);
 
+// Account-level access controls. The database is authoritative while this signal is hydrated
+// from a per-account IndexedDB cache when the app starts offline.
+export const DEFAULT_ACCESS_CONTROL_SETTINGS: AccessControlSettings = {
+	enabled: false,
+	mode: 'pin',
+	pinHash: null,
+	pinSalt: null,
+	updatedAt: null,
+};
+export const [accessControlSettings, setAccessControlSettings] = createSignal<AccessControlSettings>(
+	DEFAULT_ACCESS_CONTROL_SETTINGS,
+);
+export const [accessControlSettingsLoaded, setAccessControlSettingsLoaded] = createSignal(false);
+
 // Local settings (persisted to localStorage)
 export const [localSettings, setLocalSettings] = createSignal<LocalSettings>({
 	offlineVoice: '',
@@ -172,12 +187,6 @@ export const [localSettings, setLocalSettings] = createSignal<LocalSettings>({
 	skinTone: 'medium',
 	lastVisitedProjectId: '',
 	lastVisitedPageId: '',
-	editPinEnabled: false,
-	editPinMode: 'pin',
-	editPinHash: '',
-	editPinSalt: '',
-	editPinFailureCount: 0,
-	editPinLockoutUntil: 0,
 });
 
 // Passcode gate plumbing. The gated action is held here so the modal stays generic: whichever
@@ -224,7 +233,20 @@ if (typeof window !== 'undefined') {
 	// Local settings
 	const localSettingsValue = localStorage.getItem('localSettings');
 	if (localSettingsValue) {
-		setLocalSettings({ ...localSettings(), ...JSON.parse(localSettingsValue) });
+		const saved = JSON.parse(localSettingsValue) as Record<string, unknown>;
+		// Device-local PINs predate account-backed access controls. Do not let those legacy values
+		// reactivate a gate after the account defaults have deliberately reset every PIN to off.
+		for (const key of [
+			'editPinEnabled',
+			'editPinMode',
+			'editPinHash',
+			'editPinSalt',
+			'editPinFailureCount',
+			'editPinLockoutUntil',
+		]) {
+			delete saved[key];
+		}
+		setLocalSettings({ ...localSettings(), ...saved } as LocalSettings);
 	}
 
 	// Set up persistence effects inside createRoot to avoid warnings

@@ -1,11 +1,13 @@
 import { A } from '@solidjs/router';
 import type { Component } from 'solid-js';
+import OfflineSettingsNotice from './_components/OfflineSettingsNotice';
 
 const SettingsPage: Component = () => {
 	return (
 		<>
 			<div class="flex flex-col gap-8 p-8 pt-14 pb-6">
 				<p class="text-4xl text-zinc-800">Application Settings</p>
+				<OfflineSettingsNotice />
 			</div>
 
 			<div class="flex flex-col gap-8 p-8 pb-[200px]">

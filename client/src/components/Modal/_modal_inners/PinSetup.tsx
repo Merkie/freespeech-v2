@@ -1,5 +1,6 @@
 import { createEffect, createSignal, on, Show } from 'solid-js';
 import Numpad from '@/components/Numpad';
+import { globalIsOnline } from '@/hooks/useNetworkStatus';
 import { MODAL_ID } from '@/lib/constants';
 import { enablePinLock, PIN_LENGTH } from '@/lib/pin';
 import { activeModalId, setActiveModalId } from '@/lib/state';
@@ -12,6 +13,7 @@ export default function PinSetup() {
 	const [first, setFirst] = createSignal('');
 	const [second, setSecond] = createSignal('');
 	const [error, setError] = createSignal('');
+	const [saving, setSaving] = createSignal(false);
 
 	createEffect(
 		on(activeModalId, (id) => {
@@ -20,6 +22,7 @@ export default function PinSetup() {
 			setFirst('');
 			setSecond('');
 			setError('');
+			setSaving(false);
 		}),
 	);
 
@@ -31,6 +34,7 @@ export default function PinSetup() {
 	};
 
 	const onSecondComplete = async (value: string) => {
+		if (saving()) return;
 		if (value !== first()) {
 			// Send them back to the start rather than letting them retry the confirmation against a
 			// PIN they may have mistyped in the first place.
@@ -41,9 +45,23 @@ export default function PinSetup() {
 			return;
 		}
 
-		await enablePinLock(value);
-		setActiveModalId('');
-		showToast('Passcode set', 'success');
+		if (!globalIsOnline()) {
+			setSecond('');
+			setError('Connect to the internet to save a new passcode.');
+			return;
+		}
+
+		setSaving(true);
+		try {
+			await enablePinLock(value);
+			setActiveModalId('');
+			showToast('Passcode set', 'success');
+		} catch {
+			setSecond('');
+			setError('Could not save the passcode. Check your connection and try again.');
+		} finally {
+			setSaving(false);
+		}
 	};
 
 	return (
@@ -64,8 +82,8 @@ export default function PinSetup() {
 			</Show>
 
 			<p class="max-w-xs text-center text-xs text-zinc-500">
-				This passcode is stored on this device only. If it is forgotten, a multiplication question can be answered to
-				set a new one.
+				This passcode is stored on your account and cached here for offline entry. Saving or resetting it requires a
+				connection.
 			</p>
 		</div>
 	);

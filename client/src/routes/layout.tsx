@@ -1,8 +1,9 @@
 import { type RouteSectionProps, useLocation, useNavigate } from '@solidjs/router';
-import { type Component, onMount } from 'solid-js';
+import { type Component, onCleanup, onMount } from 'solid-js';
 import api from '@/lib/api';
 import { cacheAuthToken, cacheAuthUser, clearCachedAuth, getCachedAuthUser } from '@/lib/cache/meta-cache';
-import { setSessionStatus, setUser } from '@/lib/state';
+import { hydrateAccessControlSettings, resetAccessControlSettings, useDefaultAccessControlSettings } from '@/lib/pin';
+import { setSessionStatus, setUser, user } from '@/lib/state';
 
 // Check if running as installed PWA (standalone mode)
 function isStandalone(): boolean {
@@ -15,6 +16,14 @@ function isStandalone(): boolean {
 const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 	const location = useLocation();
 	const navigate = useNavigate();
+
+	const refreshAccessControls = () => {
+		const currentUser = user();
+		if (currentUser) void hydrateAccessControlSettings(currentUser.id);
+	};
+
+	window.addEventListener('online', refreshAccessControls);
+	onCleanup(() => window.removeEventListener('online', refreshAccessControls));
 
 	onMount(async () => {
 		const token = localStorage.getItem('token');
@@ -31,6 +40,7 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 		}
 
 		if (!token) {
+			resetAccessControlSettings();
 			setSessionStatus('unauthenticated');
 			return handleAppRedirect();
 		}
@@ -39,6 +49,7 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 			const data = await api.auth.me(token);
 
 			if (data.user) {
+				await hydrateAccessControlSettings(data.user.id);
 				setUser(data.user);
 				setSessionStatus('authenticated');
 				await Promise.all([cacheAuthToken(token), cacheAuthUser(data.user)]).catch(() => undefined);
@@ -47,6 +58,7 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 				// or temporary 5xx must never destroy a session that still has usable cached boards.
 				localStorage.removeItem('token');
 				await clearCachedAuth().catch(() => undefined);
+				resetAccessControlSettings();
 				setUser(null);
 				setSessionStatus('unauthenticated');
 				handleAppRedirect();
@@ -57,9 +69,14 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 			// Offline access is possession-based on this unlocked device: the saved token proves a
 			// prior login, and the cached profile only supplies shell/header display fields. Server
 			// validation resumes automatically on the next cold start with connectivity.
-			setSessionStatus('offline');
 			const cachedUser = await getCachedAuthUser();
-			if (cachedUser) setUser(cachedUser);
+			if (cachedUser) {
+				await hydrateAccessControlSettings(cachedUser.id);
+				setUser(cachedUser);
+			} else {
+				useDefaultAccessControlSettings();
+			}
+			setSessionStatus('offline');
 		}
 	});
 

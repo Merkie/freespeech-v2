@@ -16,10 +16,18 @@ export const GET = [
 		);
 		if (!user) return res.status(404).json({ error: 'User not found' });
 
-		if (user?.password) {
-			user.password = 'redacted';
-		}
+		// Access-control verifiers have their own authenticated endpoint. Keeping them out of the
+		// general profile response makes it harder to accidentally persist them in unrelated caches.
+		const {
+			editPinEnabled: _editPinEnabled,
+			editPinMode: _editPinMode,
+			editPinHash: _editPinHash,
+			editPinSalt: _editPinSalt,
+			editPinUpdatedAt: _editPinUpdatedAt,
+			...safeUser
+		} = user;
+		if (safeUser.password) safeUser.password = 'redacted';
 
-		res.json({ user });
+		res.json({ user: safeUser });
 	},
 ];

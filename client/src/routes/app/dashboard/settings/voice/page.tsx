@@ -6,6 +6,7 @@ import ElevenLabsPersonalKey from '@/routes/app/dashboard/settings/voice/_compon
 import ElevenLabsVoiceSelector from '@/routes/app/dashboard/settings/voice/_components/ElevenLabsVoiceSelector';
 import InternalVoiceSelector from '@/routes/app/dashboard/settings/voice/_components/InternalVoiceSelector';
 import TestVoice from '@/routes/app/dashboard/settings/voice/_components/TestVoice';
+import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
 
 const VoiceSettingsPage: Component = () => {
 	const [voices] = createResource(async () => {
@@ -15,6 +16,7 @@ const VoiceSettingsPage: Component = () => {
 
 	return (
 		<div class="flex flex-col gap-12 p-8 pb-[200px]">
+			<OfflineSettingsNotice />
 			<div class="flex flex-col gap-8">
 				<A href="/app/dashboard/settings" class="w-fit p-2 pl-0 text-xl text-zinc-600 hover:text-zinc-800">
 					<i class="bi bi-arrow-left-short"></i>

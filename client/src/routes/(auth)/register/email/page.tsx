@@ -2,6 +2,7 @@ import { A, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import api from '@/lib/api';
 import { cacheAuthToken, cacheAuthUser } from '@/lib/cache/meta-cache';
+import { hydrateAccessControlSettings } from '@/lib/pin';
 import { setSessionStatus, setUser } from '@/lib/state';
 
 function Page() {
@@ -44,6 +45,7 @@ function Page() {
 
 				const userData = await api.auth.me(data.token);
 				if (userData.user) {
+					await hydrateAccessControlSettings(userData.user.id);
 					setUser(userData.user);
 					setSessionStatus('authenticated');
 					cacheAuthUser(userData.user).catch(() => {});

@@ -1,15 +1,23 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js';
 import Numpad from '@/components/Numpad';
+import { globalIsOnline } from '@/hooks/useNetworkStatus';
 import { MODAL_ID } from '@/lib/constants';
 import {
 	clearLockout,
 	formatLockoutRemaining,
+	lockoutRemainingMs,
 	makeMultiplicationChallenge,
 	PIN_LENGTH,
 	registerFailedAttempt,
 	verifyPin,
 } from '@/lib/pin';
-import { activeModalId, localSettings, pinPromptText, runPinUnlockHandler, setActiveModalId } from '@/lib/state';
+import {
+	accessControlSettings,
+	activeModalId,
+	pinPromptText,
+	runPinUnlockHandler,
+	setActiveModalId,
+} from '@/lib/state';
 
 // 'entry' is the normal gate; 'reset' is the maths fallback shown after "Forgot PIN?".
 type Mode = 'entry' | 'reset';
@@ -17,7 +25,7 @@ type Mode = 'entry' | 'reset';
 /** Dynamic title so the modal header follows the step the user is on. */
 const [entryMode, setEntryMode] = createSignal<Mode>('entry');
 export function pinEntryTitle() {
-	if (localSettings().editPinMode === 'math') return 'Unlock';
+	if (accessControlSettings().mode === 'math') return 'Unlock';
 	return entryMode() === 'entry' ? 'Enter PIN' : 'Reset PIN';
 }
 
@@ -30,10 +38,13 @@ export default function PinEntry() {
 	const [now, setNow] = createSignal(Date.now());
 
 	// In math mode there is no PIN to enter, so the challenge is the gate itself.
-	const isMathLock = () => localSettings().editPinMode === 'math';
+	const isMathLock = () => accessControlSettings().mode === 'math';
 	const showingChallenge = () => isMathLock() || entryMode() === 'reset';
 
-	const remainingMs = () => Math.max(0, (localSettings().editPinLockoutUntil || 0) - now());
+	const remainingMs = () => {
+		now();
+		return lockoutRemainingMs();
+	};
 	const locked = () => remainingMs() > 0;
 
 	const timer = setInterval(() => setNow(Date.now()), 250);
@@ -86,6 +97,12 @@ export default function PinEntry() {
 			// so it hands over to the setup modal to choose a new PIN.
 			if (isMathLock()) {
 				unlock();
+				return;
+			}
+			if (!globalIsOnline()) {
+				setAnswerValue('');
+				setChallenge(makeMultiplicationChallenge());
+				setError('Connect to the internet to reset your PIN. Your current PIN still works offline.');
 				return;
 			}
 			clearLockout();

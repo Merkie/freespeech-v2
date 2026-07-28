@@ -1,10 +1,12 @@
 import { A } from '@solidjs/router';
-import { type Component, Show } from 'solid-js';
+import { type Component, createSignal, Show } from 'solid-js';
+import { globalIsOnline } from '@/hooks/useNetworkStatus';
 import { MODAL_ID } from '@/lib/constants';
 import { disablePinLock, enableMathLock } from '@/lib/pin';
-import { localSettings, setActiveModalId } from '@/lib/state';
+import { accessControlSettings, setActiveModalId } from '@/lib/state';
 import { showToast } from '@/lib/toast';
 import type { EditPinMode } from '@/lib/types';
+import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
 import { SegmentedControl, SettingRow, Toggle } from '../_components/SettingControls';
 
 const LOCK_MODE_OPTIONS: { value: EditPinMode; label: string }[] = [
@@ -13,24 +15,42 @@ const LOCK_MODE_OPTIONS: { value: EditPinMode; label: string }[] = [
 ];
 
 const AccessControlsPage: Component = () => {
-	const enabled = () => localSettings().editPinEnabled;
-	const mode = () => localSettings().editPinMode;
+	const [saving, setSaving] = createSignal(false);
+	const enabled = () => accessControlSettings().enabled;
+	const mode = () => accessControlSettings().mode;
+	const changesDisabled = () => !globalIsOnline() || saving();
 
-	const handleToggle = (next: boolean) => {
+	const handleToggle = async (next: boolean) => {
+		if (!globalIsOnline()) return;
 		if (!next) {
-			disablePinLock();
-			showToast('Passcode turned off', 'success');
+			setSaving(true);
+			try {
+				await disablePinLock();
+				showToast('Passcode turned off', 'success');
+			} catch {
+				showToast('Connect to the internet to change access controls.', 'error');
+			} finally {
+				setSaving(false);
+			}
 			return;
 		}
 		// Turning it on always goes through PIN setup; the maths option is chosen afterwards.
 		setActiveModalId(MODAL_ID.PIN_SETUP);
 	};
 
-	const handleModeChange = (next: EditPinMode) => {
+	const handleModeChange = async (next: EditPinMode) => {
+		if (!globalIsOnline()) return;
 		if (next === mode()) return;
 		if (next === 'math') {
-			enableMathLock();
-			showToast('Switched to a multiplication question', 'success');
+			setSaving(true);
+			try {
+				await enableMathLock();
+				showToast('Switched to a multiplication question', 'success');
+			} catch {
+				showToast('Connect to the internet to change access controls.', 'error');
+			} finally {
+				setSaving(false);
+			}
 			return;
 		}
 		setActiveModalId(MODAL_ID.PIN_SETUP);
@@ -38,6 +58,7 @@ const AccessControlsPage: Component = () => {
 
 	return (
 		<div class="flex flex-col gap-12 p-8 pb-[200px]">
+			<OfflineSettingsNotice />
 			<div class="flex flex-col gap-8">
 				<A href="/app/dashboard/settings" class="w-fit p-2 pl-0 text-xl text-zinc-600 hover:text-zinc-800">
 					<i class="bi bi-arrow-left-short"></i>
@@ -52,7 +73,12 @@ const AccessControlsPage: Component = () => {
 					title="Require a passcode to edit"
 					description="Asks for a passcode before entering edit mode or opening the dashboard, so a board cannot be rearranged or left by accident. Speaking tiles and moving between pages are never affected."
 				>
-					<Toggle checked={enabled()} onChange={handleToggle} label="Toggle edit passcode" />
+					<Toggle
+						checked={enabled()}
+						onChange={handleToggle}
+						label="Toggle edit passcode"
+						disabled={changesDisabled()}
+					/>
 				</SettingRow>
 
 				<Show when={enabled()}>
@@ -66,6 +92,7 @@ const AccessControlsPage: Component = () => {
 							onChange={handleModeChange}
 							label="Passcode type"
 							name="editPinMode"
+							disabled={changesDisabled()}
 						/>
 					</SettingRow>
 
@@ -77,7 +104,8 @@ const AccessControlsPage: Component = () => {
 							<button
 								type="button"
 								onClick={() => setActiveModalId(MODAL_ID.PIN_SETUP)}
-								class="rounded-lg border-2 border-zinc-300 px-5 py-3 text-xl text-zinc-600 transition-all hover:border-zinc-400 hover:bg-zinc-50"
+								disabled={changesDisabled()}
+								class="rounded-lg border-2 border-zinc-300 px-5 py-3 text-xl text-zinc-600 transition-all hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								Set a new passcode
 							</button>
@@ -86,9 +114,9 @@ const AccessControlsPage: Component = () => {
 				</Show>
 
 				<p class="max-w-3xl text-lg text-zinc-500">
-					This passcode is stored on this device only, so it keeps working with no connection and has to be set up again
-					on each device. It is a guard against accidental taps rather than account security — it does not protect the
-					data on the server.
+					Access controls are stored on your account and cached on this device so the current passcode keeps working
+					offline. A connection is required to enable, disable, change, or reset them. This remains a guard against
+					accidental taps rather than account security.
 				</p>
 			</div>
 		</div>

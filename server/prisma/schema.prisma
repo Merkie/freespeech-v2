@@ -19,6 +19,14 @@ model User {
   elevenLabsApiKey         String?
   usePersonalElevenLabsKey Boolean @default(false)
 
+  // Account-level editing guard. The verifier is returned only from the authenticated
+  // access-controls endpoint so clients can cache it for offline use.
+  editPinEnabled   Boolean  @default(false)
+  editPinMode      String   @default("pin")
+  editPinHash      String?
+  editPinSalt      String?
+  editPinUpdatedAt DateTime @default(now())
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

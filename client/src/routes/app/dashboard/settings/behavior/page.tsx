@@ -4,6 +4,7 @@ import { clearCache, getCacheStats } from '@/lib/cache';
 import { enableSentenceCopyButton, localSettings, setEnableSentenceCopyButton, setLocalSettings } from '@/lib/state';
 import { TILE_IMAGE_FIT_OPTIONS, TILE_TEXT_OVERFLOW_OPTIONS, TILE_TEXT_SIZE_OPTIONS } from '@/lib/tile-appearance';
 import type { LocalSettings } from '@/lib/types';
+import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
 import { SegmentedControl, SettingRow, Toggle } from '../_components/SettingControls';
 
 function formatBytes(bytes: number): string {
@@ -47,6 +48,7 @@ const BehaviorSettingsPage: Component = () => {
 
 	return (
 		<div class="flex flex-col gap-12 p-8 pb-[200px]">
+			<OfflineSettingsNotice />
 			<div class="flex flex-col gap-8">
 				<A href="/app/dashboard/settings" class="w-fit p-2 pl-0 text-xl text-zinc-600 hover:text-zinc-800">
 					<i class="bi bi-arrow-left-short"></i>
