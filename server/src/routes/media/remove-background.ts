@@ -13,34 +13,42 @@ const schema = z.object({
 	image_url: z.string().url(),
 });
 
+// A drained or locked fal account leaves jobs IN_QUEUE forever, so cap the wait
+// both server-side (startTimeout) and locally rather than hanging the request.
+const REMOVAL_TIMEOUT_MS = 90_000;
+
 export const POST = [
 	authenticateRequest(),
 	validateSchema(schema),
 	async (req: Request, res: Response) => {
 		const body = req.body as z.infer<typeof schema>;
 
-		// Use BiRefNet v2 for background removal
-		const result = await fal.subscribe('fal-ai/birefnet/v2', {
-			input: {
-				image_url: body.image_url,
-				model: 'General Use (Dynamic)' as any, // This isn't typed in the Fal SDK, but it works
-				output_format: 'png',
-			},
-		});
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let result: { data: { image: { url: string } | null } };
+		try {
+			result = (await Promise.race([
+				fal.subscribe('pixelcut/background-removal', {
+					input: {
+						image_url: body.image_url,
+						output_format: 'rgba',
+						// A hosted URL rather than a data: URL, so the fetch below works unchanged.
+						sync_mode: false,
+					},
+					startTimeout: 60,
+				}),
+				new Promise<never>((_, reject) => {
+					timer = setTimeout(() => reject(new Error('Background removal timed out')), REMOVAL_TIMEOUT_MS);
+				}),
+			])) as typeof result;
+		} finally {
+			clearTimeout(timer);
+		}
 
-		const data = result.data as {
-			image: {
-				url: string;
-				content_type: string;
-				file_name: string;
-				file_size: number;
-				width: number;
-				height: number;
-			};
-		};
+		const image = result.data.image;
+		if (!image?.url) throw new Error('Background removal returned no image');
 
 		// Fetch the image and trim transparent pixels
-		const imageResponse = await fetch(data.image.url);
+		const imageResponse = await fetch(image.url);
 		const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
 		const trimmedImage = await sharp(imageBuffer).trim().png().toBuffer();
