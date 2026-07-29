@@ -5,6 +5,7 @@ import { clearCachedAccessControlSettings } from '@/lib/cache/access-control-cac
 import { clearCachedAuth } from '@/lib/cache/meta-cache';
 import { resetAccessControlSettings } from '@/lib/pin';
 import { uploadFile } from '@/lib/presigned-uploads';
+import { resolveProfileImageUrl } from '@/lib/profile-image';
 import { setSessionStatus, setUser, user } from '@/lib/state';
 
 const ProfilePage: Component = () => {
@@ -29,9 +30,12 @@ const ProfilePage: Component = () => {
 				setPictureError('That image could not be uploaded. Try a different picture.');
 				return;
 			}
-			await api.user.update({ profileImgUrl: key });
+			// The presign endpoint returns a bare key; stored image paths carry a leading slash to
+			// match Project.imageUrl.
+			const path = `/${key}`;
+			await api.user.update({ profileImgUrl: path });
 			const currentUser = user();
-			if (currentUser) setUser({ ...currentUser, profileImgUrl: key });
+			if (currentUser) setUser({ ...currentUser, profileImgUrl: path });
 		} catch (_err) {
 			setPictureError('That image could not be uploaded. Check your connection and try again.');
 		} finally {
@@ -71,15 +75,7 @@ const ProfilePage: Component = () => {
 		}
 	};
 
-	const profileUrl = () => {
-		const profileImgUrl = user()?.profileImgUrl;
-		if (!profileImgUrl) return '';
-		// External URLs (e.g., Google profile pics) need to be proxied to avoid CORS issues
-		if (profileImgUrl.startsWith('http')) {
-			return `${import.meta.env.VITE_API_URL}/image-proxy?url=${encodeURIComponent(profileImgUrl)}`;
-		}
-		return `${import.meta.env.VITE_R2_URL}${profileImgUrl}`;
-	};
+	const profileUrl = () => resolveProfileImageUrl(user()?.profileImgUrl);
 
 	return (
 		<div class="flex h-full justify-center">

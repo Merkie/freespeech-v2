@@ -1,19 +1,12 @@
 import { A, useLocation } from '@solidjs/router';
 import { createMemo, Show } from 'solid-js';
+import { resolveProfileImageUrl } from '@/lib/profile-image';
 import { user } from '@/lib/state';
 
 export default function DashboardHeader() {
 	const location = useLocation();
 
-	const profileUrl = createMemo(() => {
-		const profileImgUrl = user()?.profileImgUrl;
-		if (!profileImgUrl) return '';
-		// External URLs (e.g., Google profile pics) need to be proxied to avoid CORS issues
-		if (profileImgUrl.startsWith('http')) {
-			return `${import.meta.env.VITE_API_URL}/image-proxy?url=${encodeURIComponent(profileImgUrl)}`;
-		}
-		return `${import.meta.env.VITE_R2_URL}${profileImgUrl}`;
-	});
+	const profileUrl = createMemo(() => resolveProfileImageUrl(user()?.profileImgUrl));
 
 	const getUserInitials = () => {
 		const name = user()?.name;
