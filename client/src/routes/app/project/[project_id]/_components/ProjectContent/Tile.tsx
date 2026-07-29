@@ -62,8 +62,16 @@ export default function Tile(props: TileProps) {
 		>
 			<Show when={props.isSelected}>
 				{/* A filled silhouette behind the tile produces one continuous outline. Separate
-				    rings around the tile and bump either overlap or leave a gap at their join. */}
-				<div class="pointer-events-none absolute -inset-0.5 rounded-[8px] rounded-tl-sm bg-blue-300"></div>
+				    rings around the tile and bump either overlap or leave a gap at their join.
+
+				    The tight top-left corner is only for folders: it is where the navigation bump
+				    meets the tile, and squaring it off is what lets the two read as one shape. A tile
+				    with no bump has nothing joining it there, so it keeps the uniform 8px radius. */}
+				<div
+					class={cn('pointer-events-none absolute -inset-0.5 rounded-[8px] bg-blue-300', {
+						'rounded-tl-sm': isFolder(),
+					})}
+				></div>
 				<Show when={props.tile.navigation}>
 					<div class="pointer-events-none absolute top-[-6px] left-[-2px] h-[8px] w-[calc(50%+4px)] rounded-t-[8px] bg-blue-300" />
 				</Show>
