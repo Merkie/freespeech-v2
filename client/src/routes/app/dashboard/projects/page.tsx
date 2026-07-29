@@ -6,15 +6,11 @@ import api from '@/lib/api';
 import { getCachedProjects } from '@/lib/cache/blob-cache';
 import { MODAL_ID } from '@/lib/constants';
 import { setActiveModalId } from '@/lib/state';
-import type { Project } from '@/lib/types';
 import ProjectCard from '@/routes/app/dashboard/projects/_components/ProjectCard';
-import type { SortDirection, SortOption } from '@/routes/app/dashboard/projects/_components/SearchBar';
 import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
 
 const ProjectsPage: Component = () => {
 	const [searchQuery, setSearchQuery] = createSignal('');
-	const [sortBy, setSortBy] = createSignal<SortOption>('updated');
-	const [sortDirection, setSortDirection] = createSignal<SortDirection>('desc');
 	const [showingCached, setShowingCached] = createSignal(false);
 
 	const [projects, { mutate: mutateProjects }] = createResource(
@@ -63,27 +59,7 @@ const ProjectsPage: Component = () => {
 	const sortedProjects = createMemo(() => {
 		const projectList = searchedProjects();
 		if (!projectList) return [];
-
-		const sort = sortBy();
-		const direction = sortDirection();
-		const multiplier = direction === 'asc' ? 1 : -1;
-
-		const compare = (a: Project, b: Project) => {
-			if (sort === 'name') {
-				return multiplier * a.name.localeCompare(b.name);
-			}
-			const dateA = new Date(sort === 'created' ? a.createdAt : a.updatedAt).getTime();
-			const dateB = new Date(sort === 'created' ? b.createdAt : b.updatedAt).getTime();
-			return multiplier * (dateA - dateB);
-		};
-
-		return [...projectList].sort((a, b) => {
-			const aFav = a.isFavorite;
-			const bFav = b.isFavorite;
-			if (aFav && !bFav) return -1;
-			if (!aFav && bFav) return 1;
-			return compare(a, b);
-		});
+		return [...projectList].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 	});
 
 	let promptedForFirstProject = false;
@@ -99,22 +75,15 @@ const ProjectsPage: Component = () => {
 	return (
 		<div class="min-h-full bg-zinc-100">
 			<div class="mx-auto max-w-[1500px] px-6 py-8 md:px-12 lg:px-[100px]">
-				{/* Search and Sort */}
-				<SearchBar
-					query={searchQuery}
-					setQuery={setSearchQuery}
-					sortBy={sortBy}
-					setSortBy={setSortBy}
-					sortDirection={sortDirection}
-					setSortDirection={setSortDirection}
-				>
+				{/* Search */}
+				<SearchBar query={searchQuery} setQuery={setSearchQuery}>
 					{/*
-					  This sits alongside the search field and the sort button, so it has to match their
-					  38px height. `leading-none` is what does it: a bootstrap icon is sized by its line box, not
+					  This sits alongside the search field, so it has to match its 38px height.
+					  `leading-none` is what does it: a bootstrap icon is sized by its line box, not
 					  its glyph, so a bare `text-base` would contribute 24px and push the whole bar taller — which
 					  in turn made the bar's uniform padding look bottom-heavy around the shorter controls.
 					  The blue button carries a border it doesn't show for the same reason: without it, it lands
-					  2px shorter than the bordered ones.
+					  2px shorter than the search field.
 					*/}
 					<button
 						type="button"

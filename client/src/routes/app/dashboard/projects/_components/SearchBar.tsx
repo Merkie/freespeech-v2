@@ -1,52 +1,13 @@
 import type { Accessor, Component, JSX, Setter } from 'solid-js';
-import { createSignal, Show } from 'solid-js';
-import useOutsideClick from '@/hooks/useOutsideClick';
-
-export type SortOption = 'updated' | 'created' | 'name';
-export type SortDirection = 'asc' | 'desc';
+import { Show } from 'solid-js';
 
 interface SearchBarProps {
 	query: Accessor<string>;
 	setQuery: Setter<string>;
-	sortBy: Accessor<SortOption>;
-	setSortBy: Setter<SortOption>;
-	sortDirection: Accessor<SortDirection>;
-	setSortDirection: Setter<SortDirection>;
 	children?: JSX.Element;
 }
 
 const SearchBar: Component<SearchBarProps> = (props) => {
-	const [sortMenuOpen, setSortMenuOpen] = createSignal(false);
-	const [sortMenuRef, setSortMenuRef] = createSignal<HTMLDivElement | undefined>(undefined);
-
-	const sortBy = () => props.sortBy();
-	const sortDirection = () => props.sortDirection();
-
-	useOutsideClick(sortMenuRef, () => {
-		if (sortMenuOpen()) setSortMenuOpen(false);
-	});
-
-	const handleSortChange = (newSortBy: SortOption) => {
-		props.setSortBy(newSortBy);
-		setSortMenuOpen(false);
-	};
-
-	const handleSortDirectionChange = (direction: SortDirection) => {
-		props.setSortDirection(direction);
-		setSortMenuOpen(false);
-	};
-
-	const getSortLabel = () => {
-		switch (sortBy()) {
-			case 'updated':
-				return 'Updated';
-			case 'created':
-				return 'Created';
-			case 'name':
-				return 'Name';
-		}
-	};
-
 	return (
 		<div class="mb-6 flex items-center gap-2 rounded-md border border-zinc-300 bg-white p-2">
 			{/* Search Input */}
@@ -85,116 +46,6 @@ const SearchBar: Component<SearchBarProps> = (props) => {
 						</svg>
 					</button>
 				</Show>
-			</div>
-
-			{/* Sort Dropdown */}
-			<div ref={setSortMenuRef} class="relative">
-				<button
-					onClick={() => setSortMenuOpen((prev) => !prev)}
-					class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-600 transition-all hover:border-zinc-400 hover:text-zinc-800"
-				>
-					{sortDirection() === 'asc' ? (
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-						</svg>
-					) : (
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
-						</svg>
-					)}
-					<span class="text-zinc-400">Sort:</span>
-					<span>{getSortLabel()}</span>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class={`h-4 w-4 transition-transform ${sortMenuOpen() ? 'rotate-180' : ''}`}
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-					</svg>
-				</button>
-
-				{/* Sort Menu */}
-				<div
-					style={{
-						'pointer-events': sortMenuOpen() ? 'auto' : 'none',
-						opacity: sortMenuOpen() ? 1 : 0,
-						top: sortMenuOpen() ? '100%' : 'calc(100% - 5px)',
-					}}
-					class="absolute right-0 z-20 mt-2 w-48 rounded-md border border-zinc-200 bg-white p-2 shadow-lg transition-all"
-				>
-					<p class="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-zinc-400">Sort by</p>
-					<button
-						onClick={() => handleSortChange('updated')}
-						class={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-zinc-100 ${sortBy() === 'updated' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600'}`}
-					>
-						Last Updated
-					</button>
-					<button
-						onClick={() => handleSortChange('created')}
-						class={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-zinc-100 ${sortBy() === 'created' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600'}`}
-					>
-						Date Created
-					</button>
-					<button
-						onClick={() => handleSortChange('name')}
-						class={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-zinc-100 ${sortBy() === 'name' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600'}`}
-					>
-						Name
-					</button>
-
-					<div class="my-2 border-t border-zinc-200" />
-
-					<p class="mb-2 px-2 text-xs font-medium uppercase tracking-wider text-zinc-400">Direction</p>
-					<button
-						onClick={() => handleSortDirectionChange('desc')}
-						class={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-zinc-100 ${sortDirection() === 'desc' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600'}`}
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
-						</svg>
-						{sortBy() === 'name' ? 'Z to A' : 'Newest First'}
-					</button>
-					<button
-						onClick={() => handleSortDirectionChange('asc')}
-						class={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-zinc-100 ${sortDirection() === 'asc' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-600'}`}
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-						</svg>
-						{sortBy() === 'name' ? 'A to Z' : 'Oldest First'}
-					</button>
-				</div>
 			</div>
 
 			{/* Create button slot */}
