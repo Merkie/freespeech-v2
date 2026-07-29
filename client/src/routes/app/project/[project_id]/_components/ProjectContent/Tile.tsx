@@ -58,18 +58,33 @@ export default function Tile(props: TileProps) {
 			}}
 			data-drop-cell={tilePositionKey(props.tile)}
 			onPointerDown={(e) => handleTilePointerDown(e, props.tile)}
+			onClick={handleClick}
 		>
 			<Show when={props.isSelected}>
 				{/* A filled silhouette behind the tile produces one continuous outline. Separate
 				    rings around the tile and bump either overlap or leave a gap at their join. */}
 				<div class="pointer-events-none absolute -inset-0.5 rounded-[8px] bg-blue-300"></div>
 				<Show when={props.tile.navigation}>
-					<div class="pointer-events-none absolute top-[-6px] left-[-3px] h-[8px] w-[calc(50%+4px)] rounded-t-[8px] bg-blue-300" />
+					<div class="pointer-events-none absolute top-[-6px] left-[-2px] h-[8px] w-[calc(50%+4px)] rounded-t-[8px] bg-blue-300" />
 				</Show>
 			</Show>
+
+			{/* Keep the bump in the cell's coordinate space. The button paints over the portion
+			    inside the tile, leaving only the true outer edge with no border seam. */}
+			<Show when={props.tile.navigation}>
+				<div
+					style={{
+						'background-color': props.tile.backgroundColor ?? 'white',
+						'border-color': props.tile.borderColor ?? 'black',
+					}}
+					class={cn('absolute top-[-4px] left-0 h-[10px] w-[50%] rounded-t-md border border-b-0', {
+						'cursor-grab active:cursor-grabbing': editingTiles(),
+					})}
+				/>
+			</Show>
+
 			<button
 				type="button"
-				onClick={handleClick}
 				style={{
 					'background-color': props.tile.backgroundColor ?? 'white',
 					'border-color': props.tile.borderColor ?? 'black',
@@ -86,24 +101,6 @@ export default function Tile(props: TileProps) {
 					{ 'opacity-50': props.isSpeaking },
 				)}
 			>
-				{/* Navigation bump */}
-				<Show when={props.tile.navigation}>
-					<div
-						style={{
-							'background-color': 'inherit',
-							'border-color': 'inherit',
-						}}
-						class="absolute top-[-4px] left-0 h-[10px] w-[50%] -translate-x-px rounded-t-md border border-b-0"
-					>
-						{/* The bump overlaps the tile to cover the tile's top border. Mask the part of
-						    its right border inside the tile so the two shapes read as one outline. */}
-						<div
-							style={{ 'background-color': 'inherit' }}
-							class="absolute top-[5px] -right-px bottom-0 w-[2px]"
-						/>
-					</div>
-				</Show>
-
 				{/* Truncating keeps the label on one centred line of fixed height. Wrapping has to let
 				    the row grow instead, or extra lines would be clipped by the fixed strip. */}
 				<div
