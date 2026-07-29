@@ -69,20 +69,6 @@ export default function Tile(props: TileProps) {
 				</Show>
 			</Show>
 
-			{/* Keep the bump in the cell's coordinate space. The button paints over the portion
-			    inside the tile, leaving only the true outer edge with no border seam. */}
-			<Show when={props.tile.navigation}>
-				<div
-					style={{
-						'background-color': props.tile.backgroundColor ?? 'white',
-						'border-color': props.tile.borderColor ?? 'black',
-					}}
-					class={cn('absolute top-[-4px] left-0 h-[10px] w-[50%] rounded-t-md border border-b-0', {
-						'cursor-grab active:cursor-grabbing': editingTiles(),
-					})}
-				/>
-			</Show>
-
 			<button
 				type="button"
 				style={{
@@ -132,6 +118,23 @@ export default function Tile(props: TileProps) {
 					/>
 				</Show>
 			</button>
+
+			{/* Paint the bump above the button so it covers the button's rounded top-left corner.
+			    It overlaps by one pixel only, enough to close the join without drawing a seam. */}
+			<Show when={props.tile.navigation}>
+				<div
+					style={{
+						'background-color': props.tile.backgroundColor ?? 'white',
+						'border-color': props.tile.borderColor ?? 'black',
+						transition: 'opacity 0.15s ease-in-out',
+					}}
+					class={cn('absolute top-[-4px] left-0 z-10 h-[5px] w-[50%] rounded-t-md border border-b-0', {
+						'cursor-grab active:cursor-grabbing': editingTiles(),
+						'opacity-40': props.isDimmed || isDragged(),
+						'opacity-50': props.isSpeaking,
+					})}
+				/>
+			</Show>
 
 			<Show when={showFolderOverlay()}>
 				{/* Add / Swap drop overlay for folder tiles. Extends up over the folder "nub" so it
