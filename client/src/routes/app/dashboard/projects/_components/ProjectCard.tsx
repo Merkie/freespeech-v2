@@ -132,8 +132,14 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 						</Show>
 						<p class="truncate whitespace-nowrap">{props.project.name}</p>
 						<Show when={cached()}>
+							{/*
+							  An optical nudge, not a fix for a broken box. items-center already lands the glyph
+							  within 0.1px of the centre of the label's full ascender-to-baseline ink, but a
+							  mostly-lowercase name carries its visual weight in the x-height band, ~1.75px lower,
+							  so a truly centred icon reads high. 1px splits the difference between the two.
+							*/}
 							<i
-								class="bi bi-cloud-check-fill shrink-0 text-sm leading-none text-zinc-600/40"
+								class="bi bi-cloud-check-fill relative top-px shrink-0 text-sm leading-none text-zinc-600/40"
 								title="Saved on this device for offline use"
 							/>
 						</Show>
