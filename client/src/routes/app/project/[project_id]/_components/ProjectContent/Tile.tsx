@@ -60,16 +60,11 @@ export default function Tile(props: TileProps) {
 			onPointerDown={(e) => handleTilePointerDown(e, props.tile)}
 		>
 			<Show when={props.isSelected}>
-				<div class="pointer-events-none absolute top-0 left-0 h-full w-full rounded-md ring-2 ring-blue-300"></div>
+				{/* A filled silhouette behind the tile produces one continuous outline. Separate
+				    rings around the tile and bump either overlap or leave a gap at their join. */}
+				<div class="pointer-events-none absolute -inset-0.5 rounded-[8px] bg-blue-300"></div>
 				<Show when={props.tile.navigation}>
-					<div
-						style={{
-							// Only the four pixels above the tile belong to the bump's outer edge. Letting
-							// its ring continue below that join creates a blue seam through the tile.
-							'clip-path': 'inset(-3px -3px 5px -3px)',
-						}}
-						class="pointer-events-none absolute top-[-4px] left-0 h-[10px] w-[50%] -translate-x-px rounded-t-md ring-2 ring-blue-300"
-					/>
+					<div class="pointer-events-none absolute top-[-6px] left-[-3px] h-[8px] w-[calc(50%+4px)] rounded-t-[8px] bg-blue-300" />
 				</Show>
 			</Show>
 			<button
