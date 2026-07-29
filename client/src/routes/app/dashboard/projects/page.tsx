@@ -109,24 +109,13 @@ const ProjectsPage: Component = () => {
 					setSortDirection={setSortDirection}
 				>
 					{/*
-					  These two sit alongside the search field and the sort button, so they have to match their
+					  This sits alongside the search field and the sort button, so it has to match their
 					  38px height. `leading-none` is what does it: a bootstrap icon is sized by its line box, not
 					  its glyph, so a bare `text-base` would contribute 24px and push the whole bar taller — which
 					  in turn made the bar's uniform padding look bottom-heavy around the shorter controls.
 					  The blue button carries a border it doesn't show for the same reason: without it, it lands
 					  2px shorter than the bordered ones.
 					*/}
-					<button
-						type="button"
-						onClick={() => setActiveModalId(MODAL_ID.IMPORT_BOARD)}
-						disabled={showingCached()}
-						title="Import a .obf or .obz board from another AAC app"
-						class="flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-700 transition-all hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
-					>
-						<i class="bi bi-file-earmark-arrow-up text-base leading-none" />
-						<span class="text-sm font-semibold uppercase tracking-wider">Import</span>
-					</button>
-
 					<button
 						type="button"
 						onClick={() => setActiveModalId(MODAL_ID.CREATE_PROJECT)}

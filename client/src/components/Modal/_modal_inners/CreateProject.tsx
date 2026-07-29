@@ -1,10 +1,81 @@
 import { useNavigate } from '@solidjs/router';
-import { createSignal, Show } from 'solid-js';
+import { createResource, createSignal, For, Match, Show, Switch } from 'solid-js';
 import api from '@/lib/api';
+import type { TemplateSummary } from '@/lib/api/endpoints/project';
 import { cn } from '@/lib/cn';
 import { setActiveModalId } from '@/lib/state';
+import ImportBoard from './ImportBoard';
+
+type Step = 'type' | 'blank' | 'template' | 'import';
 
 export default function CreateProject() {
+	const [step, setStep] = createSignal<Step>('type');
+
+	return (
+		<div class="flex flex-col gap-4">
+			<Show when={step() !== 'type'}>
+				<button
+					type="button"
+					onClick={() => setStep('type')}
+					class="flex w-fit items-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-white"
+				>
+					<i class="bi bi-arrow-left" />
+					<span>Back</span>
+				</button>
+			</Show>
+
+			<Switch>
+				<Match when={step() === 'type'}>
+					<div class="grid grid-rows-3 gap-3">
+						<TypeButton
+							icon="plus-square-dotted"
+							title="Blank Project"
+							description="Start from scratch with an empty project"
+							onClick={() => setStep('blank')}
+						/>
+						<TypeButton
+							icon="file-earmark-code"
+							title="Use Template"
+							description="Choose from pre-made project templates"
+							onClick={() => setStep('template')}
+						/>
+						<TypeButton
+							icon="file-earmark-arrow-up"
+							title="Import File"
+							description="Import an existing project from a file"
+							onClick={() => setStep('import')}
+						/>
+					</div>
+				</Match>
+				<Match when={step() === 'blank'}>
+					<BlankProjectForm />
+				</Match>
+				<Match when={step() === 'template'}>
+					<TemplateStep />
+				</Match>
+				<Match when={step() === 'import'}>
+					<ImportBoard />
+				</Match>
+			</Switch>
+		</div>
+	);
+}
+
+function TypeButton(props: { icon: string; title: string; description: string; onClick: () => void }) {
+	return (
+		<button
+			type="button"
+			onClick={props.onClick}
+			class="flex w-full flex-col items-center rounded-lg border border-zinc-700 bg-zinc-800 p-5 text-center transition-all hover:border-zinc-500 hover:bg-zinc-700/60 active:brightness-90"
+		>
+			<i class={`bi bi-${props.icon} mb-2 text-4xl text-zinc-200`} />
+			<p class="text-lg font-bold text-white">{props.title}</p>
+			<p class="text-sm text-zinc-400">{props.description}</p>
+		</button>
+	);
+}
+
+function BlankProjectForm() {
 	const navigate = useNavigate();
 	const [name, setName] = createSignal('');
 	const [columns, setColumns] = createSignal(6);
@@ -121,5 +192,98 @@ export default function CreateProject() {
 				</button>
 			</div>
 		</form>
+	);
+}
+
+// Importing a template runs the full server-side board import, so a click is not instant.
+function TemplateStep() {
+	const navigate = useNavigate();
+	const [templates] = createResource<TemplateSummary[]>(async () => {
+		const response = await api.project.listTemplates();
+		return response.templates;
+	});
+	const [busySlug, setBusySlug] = createSignal('');
+	const [error, setError] = createSignal('');
+
+	const useTemplate = async (template: TemplateSummary) => {
+		if (busySlug()) return;
+		setBusySlug(template.slug);
+		setError('');
+
+		try {
+			const response = await api.project.importTemplate(template.slug);
+			if (response.error || !response.projectId) {
+				setError(response.error || 'That template could not be imported.');
+				return;
+			}
+			api.project.updateThumbnail(response.projectId).catch(() => {});
+			setActiveModalId('');
+			navigate(`/app/project/${response.projectId}`);
+		} catch (_err) {
+			setError('That template could not be imported.');
+		} finally {
+			setBusySlug('');
+		}
+	};
+
+	return (
+		<div class="flex flex-col gap-3">
+			<p class="text-sm text-zinc-300">Pick a pre-built vocabulary set. You can edit everything afterwards.</p>
+
+			<Show
+				when={!templates.loading}
+				fallback={
+					<div class="flex items-center justify-center gap-3 py-8 text-zinc-400">
+						<div class="h-5 w-5 animate-spin rounded-full border-2 border-zinc-500 border-t-transparent" />
+						<span class="text-sm">Loading templates...</span>
+					</div>
+				}
+			>
+				<Show
+					when={!templates.error && (templates()?.length ?? 0) > 0}
+					fallback={<p class="py-4 text-center text-sm text-zinc-400">Templates could not be loaded right now.</p>}
+				>
+					<div class="flex max-h-[50vh] flex-col gap-2 overflow-y-auto pr-1">
+						<For each={templates()}>
+							{(template) => (
+								<button
+									type="button"
+									onClick={() => useTemplate(template)}
+									disabled={!!busySlug()}
+									class={cn(
+										'flex w-full items-center gap-3 rounded-lg border border-zinc-700 bg-zinc-800 p-3 text-left transition-all',
+										busySlug() ? 'cursor-wait opacity-60' : 'hover:border-zinc-500 hover:bg-zinc-700/60',
+										busySlug() === template.slug && 'border-blue-500 opacity-100',
+									)}
+								>
+									<div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-1">
+										<img src={template.thumbnailUrl} alt="" class="max-h-full max-w-full object-contain" />
+									</div>
+									<div class="min-w-0 flex-1">
+										<p class="truncate font-semibold text-white">{template.name}</p>
+										<p class="truncate text-xs italic text-zinc-500">By {template.creatorName}</p>
+										<p class="line-clamp-2 text-xs text-zinc-400">{template.description}</p>
+									</div>
+									<Show
+										when={busySlug() === template.slug}
+										fallback={<i class="bi bi-chevron-right shrink-0 text-zinc-500" />}
+									>
+										<i class="bi bi-arrow-repeat shrink-0 animate-spin text-zinc-300" />
+									</Show>
+								</button>
+							)}
+						</For>
+					</div>
+				</Show>
+			</Show>
+
+			<Show when={busySlug()}>
+				<p class="text-center text-xs text-zinc-500">Creating your project — this can take a minute...</p>
+			</Show>
+
+			<Show when={error()}>
+				<div class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400">{error()}</div>
+			</Show>
+		</div>
 	);
 }
