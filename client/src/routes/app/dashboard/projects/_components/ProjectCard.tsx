@@ -163,7 +163,7 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 				type="button"
 				onClick={handleMenuClick}
 				aria-label={`Options for ${props.project.name}`}
-				class="absolute right-8 top-8 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-600 shadow-md transition-all hover:bg-zinc-100 hover:text-zinc-900"
+				class="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-600 shadow-md transition-all hover:bg-zinc-100 hover:text-zinc-900"
 			>
 				<i class="bi bi-three-dots text-base leading-none" />
 			</button>
@@ -174,9 +174,10 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 					'pointer-events': menuOpen() ? 'auto' : 'none',
 					opacity: menuOpen() ? 1 : 0,
 					'user-select': 'none',
-					top: menuOpen() ? '72px' : '66px',
+					// Clears the trigger, which ends at 48px: top-4 (16px) plus its own h-8 (32px).
+					top: menuOpen() ? '56px' : '50px',
 				}}
-				class="absolute right-8 z-10 flex w-fit flex-col whitespace-nowrap rounded-md border border-zinc-200 bg-white p-2 text-sm shadow-lg transition-all"
+				class="absolute right-4 z-10 flex w-fit flex-col whitespace-nowrap rounded-md border border-zinc-200 bg-white p-2 text-sm shadow-lg transition-all"
 			>
 				<button
 					onClick={handleToggleFavorite}
