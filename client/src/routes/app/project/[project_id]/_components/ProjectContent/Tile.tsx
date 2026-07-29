@@ -63,7 +63,7 @@ export default function Tile(props: TileProps) {
 			<Show when={props.isSelected}>
 				{/* A filled silhouette behind the tile produces one continuous outline. Separate
 				    rings around the tile and bump either overlap or leave a gap at their join. */}
-				<div class="pointer-events-none absolute -inset-0.5 rounded-[8px] bg-blue-300"></div>
+				<div class="pointer-events-none absolute -inset-0.5 rounded-[8px] rounded-tr-sm bg-blue-300"></div>
 				<Show when={props.tile.navigation}>
 					<div class="pointer-events-none absolute top-[-6px] left-[-2px] h-[8px] w-[calc(50%+4px)] rounded-t-[8px] bg-blue-300" />
 				</Show>
