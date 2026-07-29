@@ -60,14 +60,15 @@ export default function Tile(props: TileProps) {
 			onPointerDown={(e) => handleTilePointerDown(e, props.tile)}
 		>
 			<Show when={props.isSelected}>
-				<div class="absolute top-0 left-0 h-full w-full rounded-md ring-2 ring-blue-300"></div>
+				<div class="pointer-events-none absolute top-0 left-0 h-full w-full rounded-md ring-2 ring-blue-300"></div>
 				<Show when={props.tile.navigation}>
 					<div
 						style={{
-							'background-color': 'inherit',
-							'border-color': 'inherit',
+							// Only the four pixels above the tile belong to the bump's outer edge. Letting
+							// its ring continue below that join creates a blue seam through the tile.
+							'clip-path': 'inset(-3px -3px 5px -3px)',
 						}}
-						class="absolute top-[-4px] left-0 h-[10px] w-[50%] -translate-x-px rounded-t-md border border-b-0 ring-2 ring-blue-300"
+						class="pointer-events-none absolute top-[-4px] left-0 h-[10px] w-[50%] -translate-x-px rounded-t-md ring-2 ring-blue-300"
 					/>
 				</Show>
 			</Show>
@@ -98,7 +99,14 @@ export default function Tile(props: TileProps) {
 							'border-color': 'inherit',
 						}}
 						class="absolute top-[-4px] left-0 h-[10px] w-[50%] -translate-x-px rounded-t-md border border-b-0"
-					/>
+					>
+						{/* The bump overlaps the tile to cover the tile's top border. Mask the part of
+						    its right border inside the tile so the two shapes read as one outline. */}
+						<div
+							style={{ 'background-color': 'inherit' }}
+							class="absolute top-[5px] -right-px bottom-0 w-[2px]"
+						/>
+					</div>
 				</Show>
 
 				{/* Truncating keeps the label on one centred line of fixed height. Wrapping has to let
