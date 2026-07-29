@@ -119,8 +119,8 @@ export default function Tile(props: TileProps) {
 				</Show>
 			</button>
 
-			{/* Paint the bump above the button so it covers the button's rounded top-left corner.
-			    It overlaps by one pixel only, enough to close the join without drawing a seam. */}
+			{/* Paint the bump above the button so it covers the button's rounded top-left corner
+			    and visibly extends below the tile's top edge. */}
 			<Show when={props.tile.navigation}>
 				<div
 					style={{
@@ -128,7 +128,7 @@ export default function Tile(props: TileProps) {
 						'border-color': props.tile.borderColor ?? 'black',
 						transition: 'opacity 0.15s ease-in-out',
 					}}
-					class={cn('absolute top-[-4px] left-0 z-10 h-[5px] w-[50%] rounded-t-md border border-b-0', {
+					class={cn('absolute top-[-4px] left-0 z-10 h-[10px] w-[50%] rounded-t-md border border-b-0', {
 						'cursor-grab active:cursor-grabbing': editingTiles(),
 						'opacity-40': props.isDimmed || isDragged(),
 						'opacity-50': props.isSpeaking,
