@@ -69,72 +69,75 @@ export default function Tile(props: TileProps) {
 				</Show>
 			</Show>
 
-			<button
-				type="button"
-				style={{
-					'background-color': props.tile.backgroundColor ?? 'white',
-					'border-color': props.tile.borderColor ?? 'black',
-					transition: 'opacity 0.15s ease-in-out',
-				}}
-				class={cn(
-					'absolute top-0 left-0 grid h-full w-full cursor-pointer rounded-md border p-2 px-1 text-black',
-					{
-						'grid-rows-[auto_minmax(0,1fr)] gap-1': !!props.tile.image,
-						'place-items-center': !props.tile.image,
-					},
-					{ 'cursor-grab active:cursor-grabbing': editingTiles() },
-					{ 'opacity-40': props.isDimmed || isDragged() },
-					{ 'opacity-50': props.isSpeaking },
-				)}
+			{/* Dim the opaque tile and bump as one composited shape. Dimming them separately
+			    makes their overlap show through at the top edge. */}
+			<div
+				class={cn('absolute inset-0 transition-opacity', {
+					'opacity-40': props.isDimmed || isDragged(),
+					'opacity-50': props.isSpeaking,
+				})}
 			>
-				{/* Truncating keeps the label on one centred line of fixed height. Wrapping has to let
-				    the row grow instead, or extra lines would be clipped by the fixed strip. */}
-				<div
-					class={cn('relative w-full shrink-0', tileTextSizeClass(), {
-						[tileTextRowHeightClass()]: !tileTextWraps(),
-						truncate: !tileTextWraps(),
-					})}
-				>
-					<p
-						class={cn('w-full text-center', {
-							'absolute top-1/2 left-0 -translate-y-1/2 truncate': !tileTextWraps(),
-							'leading-tight break-words': tileTextWraps(),
-						})}
-					>
-						{(props.tile.displayText || props.tile.text).trim()}
-					</p>
-				</div>
-
-				<Show when={props.tile.image}>
-					{/* Keep the image in normal grid flow. The old absolute image lived inside a
-					    shrinking flex item on a filtered button; WebKit could fetch and decode every
-					    image yet fail to paint that composited layer on an iPad. This mirrors the
-					    production Svelte renderer, which is known to work on the same device. */}
-					<img
-						src={props.tile.image}
-						alt={props.tile.displayText || props.tile.text}
-						draggable={false}
-						class={cn('block h-full min-h-0 w-full min-w-0', tileImageFitClass())}
-					/>
-				</Show>
-			</button>
-
-			{/* Paint the bump above the button so it covers the button's rounded top-left corner
-			    and visibly extends below the tile's top edge. */}
-			<Show when={props.tile.navigation}>
-				<div
+				<button
+					type="button"
 					style={{
 						'background-color': props.tile.backgroundColor ?? 'white',
 						'border-color': props.tile.borderColor ?? 'black',
-						transition: 'opacity 0.15s ease-in-out',
 					}}
-					class={cn('absolute top-[-4px] left-0 z-10 h-[10px] w-[50%] rounded-t-md border border-b-0', {
-						'cursor-grab active:cursor-grabbing': editingTiles(),
-						'opacity-40': props.isDimmed || isDragged(),
-						'opacity-50': props.isSpeaking,
-					})}
-				/>
-			</Show>
+					class={cn(
+						'absolute top-0 left-0 grid h-full w-full cursor-pointer rounded-md border p-2 px-1 text-black',
+						{
+							'grid-rows-[auto_minmax(0,1fr)] gap-1': !!props.tile.image,
+							'place-items-center': !props.tile.image,
+						},
+						{ 'cursor-grab active:cursor-grabbing': editingTiles() },
+					)}
+				>
+					{/* Truncating keeps the label on one centred line of fixed height. Wrapping has to let
+				    the row grow instead, or extra lines would be clipped by the fixed strip. */}
+					<div
+						class={cn('relative w-full shrink-0', tileTextSizeClass(), {
+							[tileTextRowHeightClass()]: !tileTextWraps(),
+							truncate: !tileTextWraps(),
+						})}
+					>
+						<p
+							class={cn('w-full text-center', {
+								'absolute top-1/2 left-0 -translate-y-1/2 truncate': !tileTextWraps(),
+								'leading-tight break-words': tileTextWraps(),
+							})}
+						>
+							{(props.tile.displayText || props.tile.text).trim()}
+						</p>
+					</div>
+
+					<Show when={props.tile.image}>
+						{/* Keep the image in normal grid flow. The old absolute image lived inside a
+					    shrinking flex item on a filtered button; WebKit could fetch and decode every
+					    image yet fail to paint that composited layer on an iPad. This mirrors the
+					    production Svelte renderer, which is known to work on the same device. */}
+						<img
+							src={props.tile.image}
+							alt={props.tile.displayText || props.tile.text}
+							draggable={false}
+							class={cn('block h-full min-h-0 w-full min-w-0', tileImageFitClass())}
+						/>
+					</Show>
+				</button>
+
+				{/* Paint the bump above the button so it covers the button's rounded top-left corner
+				    and visibly extends below the tile's top edge. */}
+				<Show when={props.tile.navigation}>
+					<div
+						style={{
+							'background-color': props.tile.backgroundColor ?? 'white',
+							'border-color': props.tile.borderColor ?? 'black',
+						}}
+						class={cn('absolute top-[-4px] left-0 z-10 h-[10px] w-[50%] rounded-t-md border border-b-0', {
+							'cursor-grab active:cursor-grabbing': editingTiles(),
+						})}
+					/>
+				</Show>
+			</div>
 
 			<Show when={showFolderOverlay()}>
 				{/* Add / Swap drop overlay for folder tiles. Extends up over the folder "nub" so it
