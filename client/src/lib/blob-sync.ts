@@ -1,8 +1,16 @@
 import { createSignal } from 'solid-js';
 import api from './api';
-import { cacheBlob, getCachedBlob, getDirtyBlobIds, markBlobClean } from './cache/blob-cache';
+import { cacheBlob, getCachedBlobEntry, getDirtyBlobIds, reconcileCachedBlobAfterSync } from './cache/blob-cache';
 import { MODAL_ID } from './constants';
-import { conflictServerBlob, projectBlob, setActiveModalId, setConflictServerBlob, setProjectBlob, setSyncStatus } from './state';
+import {
+	conflictServerBlob,
+	projectBlob,
+	setActiveModalId,
+	setConflictServerBlob,
+	setProjectBlob,
+	setSyncStatus,
+	syncStatus,
+} from './state';
 import type { ProjectBlob } from './types';
 
 // --- Background Sync registration ---
@@ -34,18 +42,18 @@ export function enterEditMode(): void {
 	setEditModeHasChanges(false);
 }
 
-export function saveEditMode(): void {
-	editModeActive = false;
-	editModeSnapshot = null;
-	setEditModeHasChanges(false);
-
+export async function saveEditMode(): Promise<void> {
 	const blob = projectBlob();
 	if (!blob) return;
 
-	// Persist to IndexedDB and sync to server
-	cacheBlob(blob, true).catch((err) => console.error('Failed to cache blob:', err));
+	// IndexedDB is the durability boundary. Wait for it before callers navigate or reload; the
+	// server sync can continue in the background after the edit-mode UI closes.
+	await cacheBlob(blob, true);
+	editModeActive = false;
+	editModeSnapshot = null;
+	setEditModeHasChanges(false);
 	setSyncStatus('dirty');
-	forceSyncNow().catch((err) => console.error('Sync failed:', err));
+	void forceSyncNow().catch((err) => console.error('Sync failed:', err));
 }
 
 export function discardEditMode(): void {
@@ -58,13 +66,39 @@ export function discardEditMode(): void {
 	editModeSnapshot = null;
 }
 
+export function hasUnsavedEditChanges(): boolean {
+	return editModeActive && editModeHasChanges();
+}
+
+/** Makes the current board durable before an in-app update reloads the page. */
+export async function prepareForAppReload(): Promise<boolean> {
+	if (hasUnsavedEditChanges()) return false;
+
+	const blob = projectBlob();
+	if (blob && syncStatus() !== 'synced') {
+		// A fresh revision prevents an older in-flight response from marking this snapshot clean.
+		await cacheBlob(blob, true);
+	}
+
+	return true;
+}
+
 // --- Load project blob ---
 // Returns true if loaded successfully (from cache or server)
 export async function loadProjectBlob(projectId: string): Promise<boolean> {
 	// 1. Try IndexedDB cache first for instant render
-	const cached = await getCachedBlob(projectId);
+	const cachedEntry = await getCachedBlobEntry(projectId);
+	const cached = cachedEntry?.blob ?? null;
 	if (cached) {
 		setProjectBlob(cached);
+	}
+
+	// A dirty local blob is the newest copy we know about. Never replace it with a server GET on
+	// cold start; sync it first so the normal conflict flow can decide if another device also edited.
+	if (cachedEntry?.dirty) {
+		setSyncStatus(navigator.onLine ? 'dirty' : 'offline');
+		if (navigator.onLine) void syncBlobToServer().catch((err) => console.error('Sync failed:', err));
+		return true;
 	}
 
 	// 2. Fetch from server
@@ -108,7 +142,9 @@ export function mutateBlob(mutator: (blob: ProjectBlob) => void): void {
 
 	// Persist to IndexedDB (dirty)
 	cacheBlob(clone, true)
-		.then(() => requestBackgroundSync())
+		.then(() => {
+			if (!navigator.onLine) return requestBackgroundSync();
+		})
 		.catch((err) => console.error('Failed to cache blob:', err));
 
 	// Update sync status
@@ -122,9 +158,21 @@ export function mutateBlob(mutator: (blob: ProjectBlob) => void): void {
 }
 
 // --- Push local blob to server ---
-export async function syncBlobToServer(): Promise<boolean> {
+let syncRequested = false;
+let syncLoopPromise: Promise<boolean> | null = null;
+
+async function syncLatestBlobOnce(): Promise<boolean> {
 	const blob = projectBlob();
 	if (!blob) return false;
+
+	// Persist exactly what this request is about and remember its revision. If another edit lands
+	// while the request is in flight, reconciliation keeps that newer revision dirty.
+	const revision = await cacheBlob(blob, true);
+	if (projectBlob() !== blob) {
+		syncRequested = true;
+		setSyncStatus('dirty');
+		return true;
+	}
 
 	setSyncStatus('syncing');
 
@@ -144,16 +192,33 @@ export async function syncBlobToServer(): Promise<boolean> {
 			return false;
 		}
 
-		// Success — update lastEditedAt and mark clean
-		if (result.lastEditedAt) {
-			const updated = { ...blob, lastEditedAt: result.lastEditedAt };
-			setProjectBlob(updated);
-			await cacheBlob(updated, false);
-		} else {
-			await markBlobClean(blob.id);
+		if (!result.lastEditedAt) {
+			setSyncStatus('error');
+			return false;
 		}
 
-		setSyncStatus('synced');
+		const reconciliation = await reconcileCachedBlobAfterSync(blob.id, revision, result.lastEditedAt);
+		const current = projectBlob();
+
+		if (current?.id === blob.id && current !== blob) {
+			// The request saved blob A while the user created blob B. Rebase B onto A's server timestamp,
+			// persist it as dirty, and immediately drain one more sync instead of rolling the UI back.
+			const rebased = { ...current, lastEditedAt: result.lastEditedAt };
+			setProjectBlob(rebased);
+			await cacheBlob(rebased, true);
+			setSyncStatus('dirty');
+			syncRequested = true;
+		} else if (current === blob && reconciliation?.needsAnotherSync) {
+			// A newer IndexedDB revision landed while this request was in flight. Adopt it rather than
+			// overwriting it with the request's older snapshot.
+			setProjectBlob(reconciliation.entry.blob);
+			setSyncStatus('dirty');
+			syncRequested = true;
+		} else if (current === blob) {
+			setProjectBlob({ ...blob, lastEditedAt: result.lastEditedAt });
+			setSyncStatus('synced');
+		}
+
 		return true;
 	} catch {
 		// Network error — register for background sync retry
@@ -163,16 +228,40 @@ export async function syncBlobToServer(): Promise<boolean> {
 	}
 }
 
+async function drainRequestedSyncs(): Promise<boolean> {
+	let result = true;
+	do {
+		syncRequested = false;
+		result = await syncLatestBlobOnce();
+	} while (result && syncRequested);
+	return result;
+}
+
+export function syncBlobToServer(): Promise<boolean> {
+	syncRequested = true;
+	if (!syncLoopPromise) {
+		syncLoopPromise = drainRequestedSyncs();
+		void syncLoopPromise
+			.finally(() => {
+				syncLoopPromise = null;
+			})
+			.catch(() => undefined);
+	}
+	return syncLoopPromise;
+}
+
 // --- Background revalidation ---
 export async function checkAndRevalidate(projectId: string): Promise<void> {
 	try {
+		if ((await getCachedBlobEntry(projectId))?.dirty) return;
+		const beforeRequest = projectBlob();
 		const { lastEditedAt } = await api.project.syncCheck(projectId);
 		const current = projectBlob();
 
-		if (current && lastEditedAt && lastEditedAt > current.lastEditedAt) {
+		if (current === beforeRequest && current && lastEditedAt && lastEditedAt > current.lastEditedAt) {
 			// Server has newer data — re-download blob
 			const { blob } = await api.project.fetchBlob(projectId);
-			if (blob) {
+			if (blob && projectBlob() === current && !(await getCachedBlobEntry(projectId))?.dirty) {
 				setProjectBlob(blob);
 				await cacheBlob(blob, false);
 			}
@@ -186,23 +275,20 @@ export async function checkAndRevalidate(projectId: string): Promise<void> {
 export async function flushDirtyBlobs(): Promise<void> {
 	const dirtyIds = await getDirtyBlobIds();
 	for (const id of dirtyIds) {
-		const cached = await getCachedBlob(id);
-		if (!cached) continue;
+		if (projectBlob()?.id === id) {
+			await syncBlobToServer();
+			continue;
+		}
+
+		const cachedEntry = await getCachedBlobEntry(id);
+		if (!cachedEntry) continue;
 
 		try {
-			const result = await api.project.syncBlob(id, cached, cached.lastEditedAt, true);
+			// Reconnect is not permission to overwrite another device. A 409 stays dirty until the
+			// project is opened and the existing conflict modal can ask the user what to keep.
+			const result = await api.project.syncBlob(id, cachedEntry.blob, cachedEntry.blob.lastEditedAt);
 			if (result.success && result.lastEditedAt) {
-				const updated = { ...cached, lastEditedAt: result.lastEditedAt };
-				await cacheBlob(updated, false);
-
-				// If this is the currently loaded project, update in-memory
-				const current = projectBlob();
-				if (current?.id === id) {
-					setProjectBlob(updated);
-					setSyncStatus('synced');
-				}
-			} else {
-				await markBlobClean(id);
+				await reconcileCachedBlobAfterSync(id, cachedEntry.revision ?? 0, result.lastEditedAt);
 			}
 		} catch {
 			// Still offline — leave dirty
@@ -229,13 +315,24 @@ export async function resolveConflictKeepLocal(): Promise<void> {
 	setSyncStatus('syncing');
 
 	try {
+		const revision = await cacheBlob(blob, true);
 		const result = await api.project.syncBlob(blob.id, blob, blob.lastEditedAt, true);
 		if (result.lastEditedAt) {
-			const updated = { ...blob, lastEditedAt: result.lastEditedAt };
-			setProjectBlob(updated);
-			await cacheBlob(updated, false);
+			const reconciliation = await reconcileCachedBlobAfterSync(blob.id, revision, result.lastEditedAt);
+			const current = projectBlob();
+			if (current === blob && !reconciliation?.needsAnotherSync) {
+				setProjectBlob({ ...blob, lastEditedAt: result.lastEditedAt });
+				setSyncStatus('synced');
+			} else if (current?.id === blob.id) {
+				const rebased = { ...current, lastEditedAt: result.lastEditedAt };
+				setProjectBlob(rebased);
+				await cacheBlob(rebased, true);
+				setSyncStatus('dirty');
+				void syncBlobToServer().catch((err) => console.error('Sync failed:', err));
+			}
+		} else {
+			setSyncStatus('error');
 		}
-		setSyncStatus('synced');
 	} catch {
 		setSyncStatus('error');
 	}

@@ -123,4 +123,7 @@ export type CachedProjectBlob = {
 	blob: ProjectBlob;
 	cachedAt: number;
 	dirty: boolean;
+	// Added without an IndexedDB version bump: existing records normalize to revision 0 on read.
+	// Every local write increments it so stale network responses cannot mark newer edits clean.
+	revision?: number;
 };

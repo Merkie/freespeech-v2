@@ -13,6 +13,7 @@ import {
 	setProjectHomePageId,
 	setProjectLoading,
 } from './state';
+import { consumeSwReloadState } from './sw-update';
 import type { Project } from './types';
 
 // Helper to update last visited project/page in localStorage
@@ -111,7 +112,9 @@ export async function loadProject(projectId: string, options?: { setHomePage?: b
 		trackVisit(projectId);
 
 		if (options?.setHomePage) {
-			navigateToPageInProject(homePageId);
+			// A deliberate PWA update reload should return to the exact communication context rather
+			// than dumping the user at Home with an empty sentence builder.
+			navigateToPageInProject(consumeSwReloadState(projectId, blob) ?? homePageId);
 		}
 
 		return true;

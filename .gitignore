@@ -8,6 +8,7 @@ node_modules
 
 # Build output
 dist
+.release-version
 
 # OS files
 .DS_Store

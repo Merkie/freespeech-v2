@@ -40,7 +40,8 @@ export default function OfflineBanner() {
 	return (
 		<Show when={showBanner() && !dismissed()}>
 			<div
-				class={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2 text-sm font-medium ${
+				aria-live="polite"
+				class={`flex w-full items-center justify-between px-4 py-2 text-sm font-medium ${
 					globalIsOnline() ? 'bg-green-600 text-white' : 'bg-amber-500 text-black'
 				}`}
 			>
@@ -58,7 +59,7 @@ export default function OfflineBanner() {
 						<span>Back online</span>
 					</Show>
 				</div>
-				<button onClick={handleDismiss} class="rounded p-1 hover:bg-black/10" aria-label="Dismiss">
+				<button type="button" onClick={handleDismiss} class="rounded p-1 hover:bg-black/10" aria-label="Dismiss">
 					<i class="bi bi-x-lg" />
 				</button>
 			</div>

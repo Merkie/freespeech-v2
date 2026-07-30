@@ -3,6 +3,7 @@
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { handleApi, handleImage } from '@/lib/sw-cache';
+import { reconcileSuccessfulSync } from '@/lib/sync-reconcile';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -97,86 +98,100 @@ self.addEventListener('message', (event) => {
 
 // --- Background Sync: sync dirty blobs when connectivity returns ---
 const DB_NAME = 'freespeech-cache';
-const DB_VERSION = 4;
 
 function openIDB(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const req = indexedDB.open(DB_NAME, DB_VERSION);
+		// Do not carry a second schema version in the worker. The window owns migrations; opening the
+		// current version avoids a worker winning an upgrade race without creating the new stores.
+		const req = indexedDB.open(DB_NAME);
 		req.onsuccess = () => resolve(req.result);
 		req.onerror = () => reject(req.error);
 	});
 }
 
 async function syncDirtyBlobs() {
+	// The page's reconnect path owns syncing while any app window exists. This prevents the worker
+	// and page from posting the same stale blob concurrently; Background Sync is the closed-app
+	// enhancement, not a second writer racing the primary one.
+	const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+	if (windowClients.length > 0) return;
+
 	const db = await openIDB();
 
-	// Read auth token from meta store
-	const token: string | null = await new Promise((resolve) => {
-		const tx = db.transaction('meta', 'readonly');
-		const req = tx.objectStore('meta').get('authToken');
-		req.onsuccess = () => resolve(req.result?.value ?? null);
-		req.onerror = () => resolve(null);
-	});
-
-	if (!token) {
-		db.close();
-		return;
-	}
-
-	// Get all dirty blobs
-	const dirtyBlobs: Array<{ id: string; blob: any; lastEditedAt: string }> = await new Promise((resolve) => {
-		const tx = db.transaction('projectBlobs', 'readonly');
-		const store = tx.objectStore('projectBlobs');
-		const req = store.getAll();
-		req.onsuccess = () => {
-			const all = req.result || [];
-			resolve(
-				all
-					.filter((e: any) => e.dirty)
-					.map((e: any) => ({ id: e.id, blob: e.blob, lastEditedAt: e.blob.lastEditedAt })),
-			);
-		};
-		req.onerror = () => resolve([]);
-	});
-
-	for (const entry of dirtyBlobs) {
-		const res = await fetch(`${API_BASE_URL}/project/${entry.id}/sync`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`,
-			},
-			body: JSON.stringify({ blob: entry.blob, lastEditedAt: entry.lastEditedAt, force: true }),
+	try {
+		// Read auth token from meta store
+		const token: string | null = await new Promise((resolve) => {
+			const tx = db.transaction('meta', 'readonly');
+			const req = tx.objectStore('meta').get('authToken');
+			req.onsuccess = () => resolve(req.result?.value ?? null);
+			req.onerror = () => resolve(null);
 		});
 
-		if (res.ok) {
-			const data = await res.json();
-			// Mark blob as clean in IndexedDB
-			await new Promise<void>((resolve, reject) => {
-				const tx = db.transaction('projectBlobs', 'readwrite');
-				const store = tx.objectStore('projectBlobs');
-				const getReq = store.get(entry.id);
-				getReq.onsuccess = () => {
-					const record = getReq.result;
-					if (record) {
-						record.dirty = false;
-						if (data.lastEditedAt) {
-							record.blob.lastEditedAt = data.lastEditedAt;
-						}
-						store.put(record);
-					}
-					tx.oncomplete = () => resolve();
-					tx.onerror = () => reject(tx.error);
-				};
-				getReq.onerror = () => reject(getReq.error);
-			});
-		} else {
-			// Non-OK response — throw so sync manager can retry
-			throw new Error(`Sync failed for ${entry.id}: ${res.status}`);
-		}
-	}
+		if (!token) return;
 
-	db.close();
+		const dirtyIds: string[] = await new Promise((resolve) => {
+			const tx = db.transaction('projectBlobs', 'readonly');
+			const req = tx.objectStore('projectBlobs').getAll();
+			req.onsuccess = () => resolve((req.result || []).filter((entry) => entry.dirty).map((entry) => entry.id));
+			req.onerror = () => resolve([]);
+		});
+
+		for (const id of dirtyIds) {
+			// Normally one pass is enough. Looping handles the unlikely case where another context wrote
+			// a newer revision just before it disappeared and this closed-app sync began.
+			for (let attempt = 0; attempt < 10; attempt++) {
+				const entry: any = await new Promise((resolve, reject) => {
+					const tx = db.transaction('projectBlobs', 'readonly');
+					const req = tx.objectStore('projectBlobs').get(id);
+					req.onsuccess = () => resolve(req.result);
+					req.onerror = () => reject(req.error);
+				});
+
+				if (!entry?.dirty) break;
+				const sentRevision = entry.revision ?? 0;
+				const res = await fetch(`${API_BASE_URL}/project/${id}/sync`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${token}`,
+					},
+					body: JSON.stringify({
+						blob: entry.blob,
+						lastEditedAt: entry.blob.lastEditedAt,
+					}),
+				});
+
+				// Conflicts and invalid credentials need the foreground UI, not an endless background retry.
+				if ([400, 401, 403, 404, 409].includes(res.status)) break;
+				if (!res.ok) throw new Error(`Sync failed for ${id}: ${res.status}`);
+
+				const data = await res.json();
+				if (!data.lastEditedAt) throw new Error(`Sync response for ${id} had no timestamp`);
+
+				const needsAnotherSync = await new Promise<boolean>((resolve, reject) => {
+					const tx = db.transaction('projectBlobs', 'readwrite');
+					const store = tx.objectStore('projectBlobs');
+					const getReq = store.get(id);
+					getReq.onsuccess = () => {
+						const current = getReq.result;
+						if (!current) {
+							resolve(false);
+							return;
+						}
+						const reconciliation = reconcileSuccessfulSync(current, sentRevision, data.lastEditedAt);
+						store.put(reconciliation.entry);
+						tx.oncomplete = () => resolve(reconciliation.needsAnotherSync);
+						tx.onerror = () => reject(tx.error);
+					};
+					getReq.onerror = () => reject(getReq.error);
+				});
+
+				if (!needsAnotherSync) break;
+			}
+		}
+	} finally {
+		db.close();
+	}
 }
 
 self.addEventListener('sync', (event: any) => {

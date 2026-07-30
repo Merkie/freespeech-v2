@@ -27,15 +27,23 @@ const AppProjectPage: Component = () => {
 	const handleOffline = () => {
 		setSyncStatus('offline');
 	};
+	const handleVisibilityChange = () => {
+		// A registered Background Sync may have fired while this installed PWA was suspended and
+		// deliberately deferred to its still-open window. Drain those edits as soon as the board is
+		// usable again, even if WebKit does not replay an `online` event on resume.
+		if (document.visibilityState === 'visible' && navigator.onLine) handleOnline();
+	};
 
 	onMount(() => {
 		window.addEventListener('online', handleOnline);
 		window.addEventListener('offline', handleOffline);
+		document.addEventListener('visibilitychange', handleVisibilityChange);
 	});
 
 	onCleanup(() => {
 		window.removeEventListener('online', handleOnline);
 		window.removeEventListener('offline', handleOffline);
+		document.removeEventListener('visibilitychange', handleVisibilityChange);
 	});
 
 	// React to route param changes

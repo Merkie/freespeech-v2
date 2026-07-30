@@ -38,6 +38,7 @@ BRANCH="main"
 PORT=5106
 DIR="/opt/freespeech-v2"
 BUN="/root/.bun/bin/bun"
+RELEASE_FILE="$DIR/.release-version"
 
 echo ""
 echo -e "${BOLD}========================================${NC}"
@@ -52,6 +53,7 @@ echo ""
 echo -e "${YELLOW}[1/6] Pulling latest changes from origin/${BRANCH}...${NC}"
 cd "$DIR"
 git pull origin "$BRANCH"
+RELEASE_ID="$(git rev-parse --short=12 HEAD)"
 echo ""
 
 # Step 2: Install dependencies (bun workspaces cover server + client)
@@ -68,7 +70,13 @@ echo ""
 # Step 4: Build client
 echo -e "${YELLOW}[4/6] Building client (Vite + PWA)...${NC}"
 cd "$DIR/client"
-$BUN run build
+APP_VERSION="$RELEASE_ID" $BUN run build
+
+# Publish the same non-secret release identifier to the API. The middleware reads this file at
+# process start, so the client bundle and x-app-version header describe one deployment without
+# putting a changing value in systemd or the secret-bearing server/.env.
+printf '%s\n' "$RELEASE_ID" > "$RELEASE_FILE.tmp"
+mv "$RELEASE_FILE.tmp" "$RELEASE_FILE"
 echo ""
 
 # Step 5: Restart service
@@ -101,6 +109,14 @@ if curl -sf "http://127.0.0.1:${PORT}/health" > /dev/null; then
 else
     echo -e "  ${RED}Health check FAILED on port ${PORT}${NC}"
     journalctl -u "$SERVICE" -n 30 --no-pager
+    exit 1
+fi
+
+RUNNING_RELEASE="$(curl -sfD - "http://127.0.0.1:${PORT}/health" -o /dev/null | awk 'tolower($1) == "x-app-version:" { print $2 }' | tr -d '\r')"
+if [ "$RUNNING_RELEASE" = "$RELEASE_ID" ]; then
+    echo -e "  ${GREEN}Client/API release IDs match (${RELEASE_ID})${NC}"
+else
+    echo -e "  ${RED}Release ID mismatch: expected ${RELEASE_ID}, API reported ${RUNNING_RELEASE:-missing}${NC}"
     exit 1
 fi
 

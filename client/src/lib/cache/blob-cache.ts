@@ -1,9 +1,15 @@
+import { reconcileSuccessfulSync, type SyncReconciliation } from '../sync-reconcile';
 import type { Project, ProjectBlob } from '../types';
 import { getDB } from './db';
 
-export async function getCachedBlob(projectId: string): Promise<ProjectBlob | null> {
+export async function getCachedBlobEntry(projectId: string) {
 	const db = await getDB();
 	const entry = await db.get('projectBlobs', projectId);
+	return entry ? { ...entry, revision: entry.revision ?? 0 } : null;
+}
+
+export async function getCachedBlob(projectId: string): Promise<ProjectBlob | null> {
+	const entry = await getCachedBlobEntry(projectId);
 	return entry?.blob ?? null;
 }
 
@@ -33,32 +39,42 @@ export async function getCachedProjects(): Promise<Project[]> {
 	}));
 }
 
-export async function cacheBlob(blob: ProjectBlob, dirty = false): Promise<void> {
+export async function cacheBlob(blob: ProjectBlob, dirty = false): Promise<number> {
 	const db = await getDB();
-	await db.put('projectBlobs', {
+	const tx = db.transaction('projectBlobs', 'readwrite');
+	const existing = await tx.store.get(blob.id);
+	const revision = dirty ? (existing?.revision ?? 0) + 1 : (existing?.revision ?? 0);
+
+	await tx.store.put({
 		id: blob.id,
 		blob,
 		cachedAt: Date.now(),
 		dirty,
+		revision,
 	});
+	await tx.done;
+	return revision;
 }
 
-export async function markBlobDirty(projectId: string): Promise<void> {
+export async function reconcileCachedBlobAfterSync(
+	projectId: string,
+	sentRevision: number,
+	serverLastEditedAt: string,
+): Promise<SyncReconciliation | null> {
 	const db = await getDB();
-	const entry = await db.get('projectBlobs', projectId);
-	if (entry) {
-		entry.dirty = true;
-		await db.put('projectBlobs', entry);
-	}
-}
+	const tx = db.transaction('projectBlobs', 'readwrite');
+	const current = await tx.store.get(projectId);
 
-export async function markBlobClean(projectId: string): Promise<void> {
-	const db = await getDB();
-	const entry = await db.get('projectBlobs', projectId);
-	if (entry) {
-		entry.dirty = false;
-		await db.put('projectBlobs', entry);
+	if (!current) {
+		await tx.done;
+		return null;
 	}
+
+	const reconciliation = reconcileSuccessfulSync(current, sentRevision, serverLastEditedAt);
+	reconciliation.entry.cachedAt = Date.now();
+	await tx.store.put(reconciliation.entry);
+	await tx.done;
+	return reconciliation;
 }
 
 export async function getDirtyBlobIds(): Promise<string[]> {

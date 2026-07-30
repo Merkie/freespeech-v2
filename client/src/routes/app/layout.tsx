@@ -26,8 +26,13 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 				</div>
 			}
 		>
-			<UpdateBanner />
-			<OfflineBanner />
+			<div
+				class="fixed top-0 left-0 right-0 z-50 flex flex-col"
+				style={{ 'padding-top': 'env(safe-area-inset-top, 0px)' }}
+			>
+				<UpdateBanner />
+				<OfflineBanner />
+			</div>
 			<main
 				class="fixed inset-0 flex overflow-hidden flex-col bg-zinc-900"
 				style={{ 'padding-top': 'env(safe-area-inset-top, 0px)' }}

@@ -10,6 +10,13 @@ function getAppVersion(): string {
 	if (process.env.APP_VERSION) return process.env.APP_VERSION;
 
 	try {
+		const releaseVersion = readFileSync(path.resolve(__dirname, '..', '..', '..', '.release-version'), 'utf-8').trim();
+		if (releaseVersion) return releaseVersion;
+	} catch {
+		// Local development and a checkout that has not been deployed use the package fallback.
+	}
+
+	try {
 		const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', '..', 'package.json'), 'utf-8'));
 		return pkg.version || '1.0.0';
 	} catch {

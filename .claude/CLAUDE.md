@@ -42,9 +42,10 @@ GET /project/:id/blob → IndexedDB → projectBlob signal
   ↓ mutateBlob() — structuredClone → mutate → setProjectBlob
 IndexedDB (dirty: true) → debounce 2s → POST /project/:id/sync
   ↓ server validates lastEditedAt → 200 OK or 409 conflict
-IndexedDB (dirty: false)
+IndexedDB revision check → dirty: false only if the response matches the revision that was sent
+  ↓ if a newer local edit landed in flight: rebase it on the server timestamp and sync again
   ↓ on 409: conflict modal → keep local (force sync) or use server version
-  ↓ on offline: Background Sync API registers retry (Chrome)
+  ↓ on offline: Background Sync API registers a closed-app retry; open windows use foreground sync
 ```
 
 ## Data Model
@@ -202,6 +203,8 @@ Pre-built vocabulary sets (CommuniKate, Quick Core, Vocal Flair, Sequoia, Projec
 
 Cold offline launches keep a stored session unless `/auth/me` returns a definitive 401/403/404; transport failures never delete the token. A safe subset of the last authenticated user is cached in IndexedDB so the app shell can render without the API. The projects dashboard falls back to summaries built from `projectBlobs`, so it shows only boards that can actually open offline rather than a stale full server list or an indefinite loading state.
 
+A dirty IndexedDB board always wins on cold start, including when connectivity has returned. It is synced through the normal timestamp/conflict path before any server GET may replace it. Cache records carry a local revision number so an older foreground or Background Sync response can never mark a newer edit clean.
+
 ### File-based routing (server)
 
 ```typescript
@@ -229,5 +232,5 @@ export const GET = [
 | Tile identity | Position `(x,y,page)` | No IDs needed, saves wire size |
 | Templates | `isTemplate` flag on pages in blob | No separate tables, all through blob sync |
 | Path alias | `@/*` → `src/*` | Both client and server |
-| PWA | Prompt-mode SW + Background Sync API | User controls updates; offline edits survive tab close |
-| API versioning | `x-app-version` header + client check | Detects stale clients, shows update banner |
+| PWA | Auto-discovered SW + ready banner + Background Sync | Updates are found on resume/online/interval; the user chooses the safe reload moment |
+| API versioning | Shared release SHA in client + `x-app-version` | API mismatch immediately asks the registered worker to check for the matching client build |
