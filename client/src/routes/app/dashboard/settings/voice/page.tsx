@@ -1,12 +1,13 @@
-import { A } from '@solidjs/router';
 import { type Component, createResource, Show } from 'solid-js';
 import api from '@/lib/api';
+import { cn } from '@/lib/cn';
 import { enableThirdPartyVoiceProviders, setEnableThirdPartyVoiceProviders, user } from '@/lib/state';
 import ElevenLabsPersonalKey from '@/routes/app/dashboard/settings/voice/_components/ElevenLabsPersonalKey';
 import ElevenLabsVoiceSelector from '@/routes/app/dashboard/settings/voice/_components/ElevenLabsVoiceSelector';
 import InternalVoiceSelector from '@/routes/app/dashboard/settings/voice/_components/InternalVoiceSelector';
 import TestVoice from '@/routes/app/dashboard/settings/voice/_components/TestVoice';
 import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
+import { SettingCard, SettingsPageHeader, Toggle } from '../_components/SettingControls';
 
 const VoiceSettingsPage: Component = () => {
 	const [voices] = createResource(async () => {
@@ -15,68 +16,65 @@ const VoiceSettingsPage: Component = () => {
 	});
 
 	return (
-		<div class="flex flex-col gap-12 p-8 pb-[200px]">
+		<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 pb-[200px] sm:p-6 lg:p-8">
 			<OfflineSettingsNotice />
-			<div class="flex flex-col gap-8">
-				<A href="/app/dashboard/settings" class="w-fit p-2 pl-0 text-xl text-zinc-600 hover:text-zinc-800">
-					<i class="bi bi-arrow-left-short"></i>
-					<span>Back</span>
-				</A>
 
-				<p class="border-b border-zinc-300 pb-8 text-4xl text-zinc-600">Voice Settings</p>
-			</div>
+			<SettingsPageHeader
+				title="Voice"
+				description="How FreeSpeech speaks out loud"
+				icon="bi bi-volume-up-fill"
+				iconClass="bg-blue-100 text-blue-500"
+			/>
 
-			<div class="flex flex-col">
-				<div class="flex items-center gap-4">
-					<p class="text-3xl text-zinc-800">Enable third-party voice providers:</p>
-					<button
-						aria-label={`Turn ${enableThirdPartyVoiceProviders() ? 'off' : 'on'} third-party voice providers`}
-						onClick={() => setEnableThirdPartyVoiceProviders(!enableThirdPartyVoiceProviders())}
-						class={`relative w-[48px] scale-[120%] rounded-full p-1 shadow-sm transition-all ${
-							enableThirdPartyVoiceProviders() ? 'bg-green-500' : 'bg-zinc-300'
-						}`}
-					>
-						<div
-							style={{
-								transform: `translateX(${!enableThirdPartyVoiceProviders() ? '0' : '100%'})`,
-							}}
-							class="h-[20px] w-[20px] rounded-full bg-white shadow-sm transition-all"
-						></div>
-					</button>
+			<SettingCard>
+				<div class="flex flex-col gap-1 p-5 sm:p-6">
+					<div class="flex items-center justify-between gap-6">
+						<h2 class="text-2xl font-semibold text-zinc-900">Use online voices</h2>
+						<Toggle
+							checked={enableThirdPartyVoiceProviders()}
+							onChange={setEnableThirdPartyVoiceProviders}
+							label="Use online voices"
+						/>
+					</div>
+					<p class="max-w-prose text-lg text-zinc-500">
+						Online voices from ElevenLabs sound more natural and need an internet connection. If one can't be played,
+						the device voice below is used instead.
+					</p>
 				</div>
-				<p class="mt-2 max-w-[750px] text-zinc-800">
-					When enabled, the selected third-party voice will be the primary voice used by the app. The internal voice
-					will still be used if the third-party voice fails. Third-party voices require a good internet connection for
-					best results.
-				</p>
-			</div>
+				<Show when={enableThirdPartyVoiceProviders()}>
+					<div class="border-t border-zinc-100" />
+					<ElevenLabsPersonalKey
+						apiKey={user()?.elevenLabsApiKey || ''}
+						usePersonalElevenLabsKey={user()?.usePersonalElevenLabsKey || false}
+					/>
+				</Show>
+			</SettingCard>
 
-			<Show when={enableThirdPartyVoiceProviders()}>
-				<ElevenLabsPersonalKey
-					apiKey={user()?.elevenLabsApiKey || ''}
-					usePersonalElevenLabsKey={user()?.usePersonalElevenLabsKey || false}
-				/>
-			</Show>
-
-			<div class="flex flex-col gap-4">
-				<p class="text-3xl text-zinc-800">Select voice:</p>
-				<div
-					class={`grid gap-8 transition-all ${
-						enableThirdPartyVoiceProviders()
-							? 'grid-cols-1 grid-rows-2 lg:grid-cols-2 lg:grid-rows-1'
-							: 'grid-cols-1 grid-rows-1'
-					}`}
-				>
-					<Show when={enableThirdPartyVoiceProviders()}>
-						<Show when={!voices.loading} fallback={<div>Loading voices...</div>}>
-							<ElevenLabsVoiceSelector voices={voices() || []} />
+			<SettingCard>
+				<div class="flex flex-col gap-5 p-5 sm:p-6">
+					<div class="flex flex-col gap-1">
+						<h2 class="text-2xl font-semibold text-zinc-900">Choose a voice</h2>
+						<p class="max-w-prose text-lg text-zinc-500">
+							<Show
+								when={enableThirdPartyVoiceProviders()}
+								fallback="Online voices are turned off, so the device voice is always used."
+							>
+								The online voice speaks whenever you're connected. The device voice works everywhere, even offline.
+							</Show>
+						</p>
+					</div>
+					<div class={cn('grid grid-cols-1 gap-6', enableThirdPartyVoiceProviders() && 'lg:grid-cols-2')}>
+						<Show when={enableThirdPartyVoiceProviders()}>
+							<ElevenLabsVoiceSelector voices={voices() || []} loading={voices.loading} />
 						</Show>
-					</Show>
-					<InternalVoiceSelector />
+						<InternalVoiceSelector />
+					</div>
 				</div>
-			</div>
+			</SettingCard>
 
-			<TestVoice />
+			<SettingCard>
+				<TestVoice />
+			</SettingCard>
 		</div>
 	);
 };

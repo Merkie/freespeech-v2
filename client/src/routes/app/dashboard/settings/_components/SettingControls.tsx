@@ -1,8 +1,40 @@
+import { A } from '@solidjs/router';
 import { For, type JSX } from 'solid-js';
 import { cn } from '@/lib/cn';
 
 // Shared controls for the settings screens. The dashboard is used on tablets by carers as often
 // as by communicators, so hit targets stay large and every control is labelled for screen readers.
+
+// Back button + icon badge + title. The badge repeats the icon and colour of the card that was
+// tapped on the settings index, so landing on a subpage confirms where the tap went.
+export function SettingsPageHeader(props: { title: string; description?: string; icon: string; iconClass?: string }) {
+	return (
+		<div class="flex items-center gap-4">
+			<A
+				href="/app/dashboard/settings"
+				aria-label="Back to settings"
+				class="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-2xl text-zinc-600 shadow-sm transition-all hover:text-zinc-900 active:scale-95"
+			>
+				<i class="bi bi-arrow-left" />
+			</A>
+			<div class={cn('grid h-12 w-12 shrink-0 place-items-center rounded-xl text-2xl', props.iconClass)}>
+				<i class={props.icon} />
+			</div>
+			<div class="min-w-0">
+				<h1 class="text-3xl font-semibold text-zinc-900">{props.title}</h1>
+				{props.description ? <p class="text-lg text-zinc-500">{props.description}</p> : null}
+			</div>
+		</div>
+	);
+}
+
+export function SettingCard(props: { children: JSX.Element; class?: string }) {
+	return (
+		<section class={cn('overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm', props.class)}>
+			{props.children}
+		</section>
+	);
+}
 
 export function SettingRow(props: { title: string; description?: string; children: JSX.Element }) {
 	return (
@@ -31,13 +63,17 @@ export function Toggle(props: {
 			onClick={() => props.onChange(!props.checked)}
 			disabled={props.disabled}
 			class={cn(
-				'relative w-[48px] shrink-0 scale-[120%] rounded-full p-1 shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50',
+				'relative h-8 w-14 shrink-0 rounded-full transition-colors',
+				'focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2',
+				'disabled:cursor-not-allowed disabled:opacity-50',
 				props.checked ? 'bg-green-500' : 'bg-zinc-300',
 			)}
 		>
-			<div
-				style={{ transform: `translateX(${props.checked ? '100%' : '0'})` }}
-				class="h-[20px] w-[20px] rounded-full bg-white shadow-sm transition-all"
+			<span
+				class={cn(
+					'absolute top-1 left-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform',
+					props.checked && 'translate-x-6',
+				)}
 			/>
 		</button>
 	);
