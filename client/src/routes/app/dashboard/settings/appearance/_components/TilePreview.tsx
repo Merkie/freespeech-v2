@@ -1,6 +1,13 @@
 import { type Component, For, Show } from 'solid-js';
 import { cn } from '@/lib/cn';
-import { tileImageFitClass, tileTextRowHeightClass, tileTextSizeClass, tileTextWraps } from '@/lib/tile-appearance';
+import {
+	boardGridGapClass,
+	tileCornerClass,
+	tileImageFitClass,
+	tileTextRowHeightClass,
+	tileTextSizeClass,
+	tileTextWraps,
+} from '@/lib/tile-appearance';
 
 // A one-row slice of a real board: same container (bg-zinc-100, p-2, gap-2), same tile markup
 // and appearance helpers as ProjectContent's Tile. The tiles are lifted verbatim — text,
@@ -43,15 +50,18 @@ const SAMPLE_TILES = [
 const TilePreview: Component = () => {
 	return (
 		<div class="overflow-hidden rounded-xl border border-zinc-200">
-			<div class="grid grid-cols-4 gap-2 bg-zinc-100 p-2">
+			<div class={cn('grid grid-cols-4 bg-zinc-100', boardGridGapClass())}>
 				<For each={SAMPLE_TILES}>
 					{(tile) => (
 						// Same cell + tile structure as the board's Tile component, with a fixed height
 						// standing in for the board grid's row sizing. Not a button: nothing to tap.
-						<div class="relative h-24 rounded-md sm:h-32">
+						<div class={cn('relative h-24 sm:h-32', tileCornerClass())}>
 							<div
 								style={{ 'background-color': tile.backgroundColor, 'border-color': tile.borderColor }}
-								class="absolute top-0 left-0 grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-1 rounded-md border p-2 px-1 text-black"
+								class={cn(
+									'absolute top-0 left-0 grid h-full w-full grid-rows-[auto_minmax(0,1fr)] gap-1 border p-2 px-1 text-black',
+									tileCornerClass(),
+								)}
 							>
 								<div
 									class={cn('relative w-full shrink-0', tileTextSizeClass(), {

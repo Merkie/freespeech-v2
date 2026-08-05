@@ -1,7 +1,14 @@
 import { Show } from 'solid-js';
 import { cn } from '@/lib/cn';
 import { editingTiles, tilePositionKey } from '@/lib/state';
-import { tileImageFitClass, tileTextRowHeightClass, tileTextSizeClass, tileTextWraps } from '@/lib/tile-appearance';
+import {
+	tileCornerClass,
+	tileGridIsGapless,
+	tileImageFitClass,
+	tileTextRowHeightClass,
+	tileTextSizeClass,
+	tileTextWraps,
+} from '@/lib/tile-appearance';
 import {
 	consumeDragClick,
 	dragOverKey,
@@ -49,7 +56,7 @@ export default function Tile(props: TileProps) {
 		// menu over the tile being picked up. Scoped to tiles, since they are the thing tapped and
 		// held — ordinary text everywhere else in the app stays selectable and copyable.
 		<div
-			class={cn('relative rounded-md transition-shadow select-none [-webkit-touch-callout:none]', {
+			class={cn('relative transition-shadow select-none [-webkit-touch-callout:none]', tileCornerClass(), {
 				'ring-2 ring-blue-500': showDropRing(),
 			})}
 			style={{
@@ -68,12 +75,19 @@ export default function Tile(props: TileProps) {
 				    meets the tile, and squaring it off is what lets the two read as one shape. A tile
 				    with no bump has nothing joining it there, so it keeps the uniform 8px radius. */}
 				<div
-					class={cn('pointer-events-none absolute -inset-0.5 rounded-[8px] bg-blue-300', {
-						'rounded-tl-sm': isFolder(),
-					})}
+					class={cn(
+						'pointer-events-none absolute -inset-0.5 bg-blue-300',
+						tileGridIsGapless() ? 'rounded-none' : 'rounded-[8px]',
+						{ 'rounded-tl-sm': isFolder() && !tileGridIsGapless() },
+					)}
 				></div>
 				<Show when={props.tile.navigation}>
-					<div class="pointer-events-none absolute top-[-6px] left-[-2px] h-[8px] w-[calc(50%+4px)] rounded-t-[8px] bg-blue-300" />
+					<div
+						class={cn(
+							'pointer-events-none absolute top-[-6px] left-[-2px] h-[8px] w-[calc(50%+4px)] bg-blue-300',
+							!tileGridIsGapless() && 'rounded-t-[8px]',
+						)}
+					/>
 				</Show>
 			</Show>
 
@@ -92,7 +106,8 @@ export default function Tile(props: TileProps) {
 						'border-color': props.tile.borderColor ?? 'black',
 					}}
 					class={cn(
-						'absolute top-0 left-0 grid h-full w-full cursor-pointer rounded-md border p-2 px-1 text-black',
+						'absolute top-0 left-0 grid h-full w-full cursor-pointer border p-2 px-1 text-black',
+						tileCornerClass(),
 						{
 							'grid-rows-[auto_minmax(0,1fr)] gap-1': !!props.tile.image,
 							'place-items-center': !props.tile.image,
@@ -150,7 +165,12 @@ export default function Tile(props: TileProps) {
 			<Show when={showFolderOverlay()}>
 				{/* Add / Swap drop overlay for folder tiles. Extends up over the folder "nub" so it
 				    reads as one cohesive panel, and stays click-through so dragover keeps firing. */}
-				<div class="pointer-events-none absolute top-[-4px] right-0 bottom-0 left-0 z-20 flex overflow-hidden rounded-md">
+				<div
+					class={cn(
+						'pointer-events-none absolute top-[-4px] right-0 bottom-0 left-0 z-20 flex overflow-hidden',
+						tileCornerClass(),
+					)}
+				>
 					<div
 						class={cn(
 							'flex flex-1 flex-col items-center justify-center gap-1 text-center transition-all',

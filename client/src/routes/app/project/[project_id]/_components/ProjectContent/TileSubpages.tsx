@@ -15,6 +15,7 @@ import {
 	tilePositionKey,
 	voiceEngineStatus,
 } from '@/lib/state';
+import { boardGridGapClass } from '@/lib/tile-appearance';
 import type { Tile as TileType } from '@/lib/types';
 import AddTileButton from './AddTileButton';
 import Tile from './Tile';
@@ -179,7 +180,7 @@ const TileSubpageContainer: ParentComponent<{
 				'grid-template-columns': `repeat(${project().columns}, 1fr)`,
 				'grid-template-rows': `repeat(${project().rows}, 1fr)`,
 			}}
-			class={cn('absolute right-0 left-0 grid gap-2 bg-zinc-100 p-2', {
+			class={cn('absolute right-0 left-0 grid bg-zinc-100', boardGridGapClass(), {
 				'bg-zinc-200': pageIndex() % 2 === 1,
 			})}
 		>

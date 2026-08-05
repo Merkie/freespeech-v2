@@ -3,7 +3,7 @@ import { localSettings, setLocalSettings } from '@/lib/state';
 import { TILE_IMAGE_FIT_OPTIONS, TILE_TEXT_OVERFLOW_OPTIONS, TILE_TEXT_SIZE_OPTIONS } from '@/lib/tile-appearance';
 import type { LocalSettings } from '@/lib/types';
 import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
-import { SegmentedControl, SettingCard, SettingRow, SettingsPageHeader } from '../_components/SettingControls';
+import { SegmentedControl, SettingCard, SettingRow, SettingsPageHeader, Toggle } from '../_components/SettingControls';
 import TilePreview from './_components/TilePreview';
 
 const AppearanceSettingsPage: Component = () => {
@@ -59,6 +59,17 @@ const AppearanceSettingsPage: Component = () => {
 							onChange={(next) => update('tileImageFit', next)}
 							label="Tile image fit"
 							name="tileImageFit"
+						/>
+					</SettingRow>
+
+					<SettingRow
+						title="Gapless grid"
+						description="Removes the space between tiles so the board runs edge to edge as one solid surface. Tiles get a little bigger, and there is no dead space to tap between them."
+					>
+						<Toggle
+							checked={localSettings().gaplessTileGrid}
+							onChange={(next) => update('gaplessTileGrid', next)}
+							label="Toggle gapless grid"
 						/>
 					</SettingRow>
 				</div>
