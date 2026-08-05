@@ -3,48 +3,40 @@ import { cn } from '@/lib/cn';
 import { tileImageFitClass, tileTextRowHeightClass, tileTextSizeClass, tileTextWraps } from '@/lib/tile-appearance';
 
 // A one-row slice of a real board: same container (bg-zinc-100, p-2, gap-2), same tile markup
-// and appearance helpers as ProjectContent's Tile, colours from the edit panel's palette, and a
-// folder tile complete with its navigation bump. Images are inline SVGs (no network, works
-// offline), square so Contain pillarboxes and Cover visibly crops in the wider-than-tall image
-// area. One long label shows the difference between truncating and wrapping.
-const svg = (body: string) =>
-	`data:image/svg+xml,${encodeURIComponent(
-		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">${body}</svg>`,
-	)}`;
-
+// and appearance helpers as ProjectContent's Tile. The tiles are lifted verbatim — text,
+// colours, and images — from the CommuniKate 20 starter template's Home page, referencing the
+// same shared template-assets URLs an imported board uses, so the preview shows exactly what
+// real tiles look like. "I want to talk to you" shows truncate vs wrap; Food is a folder with
+// its navigation bump.
 const SAMPLE_TILES = [
 	{
 		text: 'I',
-		backgroundColor: '#fef9c3',
-		borderColor: '#eab308',
-		image: svg(
-			'<circle cx="60" cy="32" r="18" fill="#3f3f46"/><path d="M60 56c-22 0-32 15-32 36v16h64V92c0-21-10-36-32-36z" fill="#3f3f46"/>',
-		),
+		backgroundColor: 'rgb(191, 140, 30)',
+		borderColor: 'rgb(68, 68, 68)',
+		image:
+			'https://media.freespeechaac.com/template-assets/6a43848e56b3004292fe651b4d175bcbc9d67c25126cbbe5cc26c079135aedfc.webp',
 	},
 	{
 		text: 'want',
-		backgroundColor: '#dcfce7',
-		borderColor: '#22c55e',
-		image: svg(
-			'<rect x="40" y="24" width="10" height="44" rx="5" fill="#3f3f46"/><rect x="54" y="16" width="10" height="52" rx="5" fill="#3f3f46"/><rect x="68" y="22" width="10" height="46" rx="5" fill="#3f3f46"/><rect x="82" y="32" width="9" height="36" rx="4.5" fill="#3f3f46"/><path d="M36 62h56v20c0 14-12 24-28 24S36 96 36 82z" fill="#3f3f46"/><rect x="22" y="56" width="22" height="11" rx="5.5" fill="#3f3f46" transform="rotate(28 22 56)"/>',
-		),
+		backgroundColor: 'rgb(255, 50, 255)',
+		borderColor: 'rgb(68, 68, 68)',
+		image:
+			'https://media.freespeechaac.com/template-assets/21e933166c53b869343e1427a2930ae7ce877a42552c3b379ac11731153fecea.webp',
 	},
 	{
-		text: 'more crackers please',
-		backgroundColor: '#ffedd5',
-		borderColor: '#f97316',
-		image: svg(
-			'<rect width="120" height="120" fill="#fde68a"/><rect x="14" y="14" width="92" height="92" rx="14" fill="#fbbf24" stroke="#d97706" stroke-width="4"/><circle cx="42" cy="42" r="5" fill="#b45309"/><circle cx="78" cy="42" r="5" fill="#b45309"/><circle cx="42" cy="78" r="5" fill="#b45309"/><circle cx="78" cy="78" r="5" fill="#b45309"/><circle cx="60" cy="60" r="5" fill="#b45309"/>',
-		),
+		text: 'I want to talk to you',
+		backgroundColor: 'rgb(192, 192, 192)',
+		borderColor: 'rgb(68, 68, 68)',
+		image:
+			'https://media.freespeechaac.com/template-assets/a9596d95ee8d076e769f30b5f63a00d9d754ea1991243a9c92e628b5800b6646.webp',
 	},
 	{
-		text: 'food',
-		backgroundColor: '#dbeafe',
-		borderColor: '#3b82f6',
+		text: 'Food',
+		backgroundColor: 'rgb(255, 255, 50)',
+		borderColor: 'rgb(68, 68, 68)',
 		isFolder: true,
-		image: svg(
-			'<circle cx="46" cy="70" r="32" fill="#ef4444"/><circle cx="74" cy="70" r="32" fill="#ef4444"/><rect x="56" y="22" width="7" height="20" rx="3.5" fill="#92400e"/><ellipse cx="76" cy="28" rx="14" ry="8" fill="#22c55e" transform="rotate(-25 76 28)"/>',
-		),
+		image:
+			'https://media.freespeechaac.com/template-assets/c1c86b3512082c6415c2083f7a25112a52d64c38e15694feb376c68d6140c356.svg',
 	},
 ];
 
