@@ -1,10 +1,15 @@
-import { type Component, createMemo, createSignal } from 'solid-js';
+import { type Component, createMemo, createSignal, Show } from 'solid-js';
 import { cn } from '@/lib/cn';
 import { speakText } from '@/lib/speak';
-import { voiceEngineStatus } from '@/lib/state';
+import { elevenLabsVoiceId, enableThirdPartyVoiceProviders, voiceEngineStatus } from '@/lib/state';
 
 const TestVoice: Component = () => {
 	const [voiceTestText, setVoiceTestText] = createSignal('Hey there! So, how do I sound?');
+	const [previewDeviceVoice, setPreviewDeviceVoice] = createSignal(false);
+
+	// Only meaningful while an online voice would normally speak; otherwise the device voice
+	// is what plays anyway and the checkbox would be noise.
+	const onlineVoiceActive = createMemo(() => enableThirdPartyVoiceProviders() && !!elevenLabsVoiceId());
 
 	const buttonText = createMemo(() => {
 		const status = voiceEngineStatus();
@@ -50,7 +55,11 @@ const TestVoice: Component = () => {
 
 				<button
 					type="button"
-					onClick={() => speakText(voiceTestText())}
+					onClick={() =>
+						speakText(voiceTestText(), undefined, {
+							forceDeviceVoice: onlineVoiceActive() && previewDeviceVoice(),
+						})
+					}
 					disabled={isDisabled()}
 					class={cn(
 						'flex w-fit min-w-44 items-center justify-center gap-3 rounded-full px-7 py-4 text-xl font-semibold text-white shadow-sm',
@@ -67,6 +76,27 @@ const TestVoice: Component = () => {
 					<span>{buttonText()}</span>
 				</button>
 			</div>
+
+			<Show when={onlineVoiceActive()}>
+				<label class="group flex w-fit cursor-pointer items-center gap-3 select-none">
+					<input
+						type="checkbox"
+						checked={previewDeviceVoice()}
+						onChange={(e) => setPreviewDeviceVoice(e.currentTarget.checked)}
+						class="sr-only"
+					/>
+					<span
+						class={cn(
+							'grid h-7 w-7 shrink-0 place-items-center rounded-lg border-2 transition-all',
+							'group-focus-within:ring-2 group-focus-within:ring-blue-400',
+							previewDeviceVoice() ? 'border-blue-600 bg-blue-600 text-white' : 'border-zinc-300 bg-white text-transparent',
+						)}
+					>
+						<i class="bi bi-check-lg text-base" />
+					</span>
+					<span class="text-lg text-zinc-700">Preview the device voice instead</span>
+				</label>
+			</Show>
 		</div>
 	);
 };

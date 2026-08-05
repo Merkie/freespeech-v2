@@ -9,12 +9,17 @@ import {
 } from './state';
 import type { TilePositionKey } from './types';
 
-// speakText accepts a position key string (e.g., "0-1-0") for tile speaking indicator
-export async function speakText(text: string, tilePositionKey?: TilePositionKey) {
+// speakText accepts a position key string (e.g., "0-1-0") for tile speaking indicator.
+// forceDeviceVoice skips the online voice so settings can preview the device fallback.
+export async function speakText(
+	text: string,
+	tilePositionKey?: TilePositionKey,
+	options?: { forceDeviceVoice?: boolean },
+) {
 	setVoiceEngineStatus('synthesizing');
 	if (tilePositionKey) setSpeakingTilePosition(tilePositionKey);
 
-	if (!enableThirdPartyVoiceProviders() || !elevenLabsVoiceId()) return speakSynth(text);
+	if (options?.forceDeviceVoice || !enableThirdPartyVoiceProviders() || !elevenLabsVoiceId()) return speakSynth(text);
 
 	try {
 		const data = await api.tts.speak.elevenlabs(joinWordsInSentence(text));
