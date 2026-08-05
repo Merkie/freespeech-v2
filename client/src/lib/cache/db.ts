@@ -53,10 +53,7 @@ export function getDB(): Promise<IDBPDatabase<FreeSpeechDB>> {
 export async function clearCache(): Promise<void> {
 	const db = await getDB();
 	const tx = db.transaction(['projectBlobs'], 'readwrite');
-	await Promise.all([
-		tx.objectStore('projectBlobs').clear(),
-		tx.done,
-	]);
+	await Promise.all([tx.objectStore('projectBlobs').clear(), tx.done]);
 }
 
 // Estimate size of a cached entry in bytes
@@ -99,9 +96,7 @@ export async function evictLRUIfNeeded(): Promise<{ evictedBlobs: number }> {
 	}
 
 	// Sort by cachedAt (oldest first), never evict dirty blobs
-	const evictable = blobEntries
-		.filter((b) => !b.dirty)
-		.sort((a, b) => a.cachedAt - b.cachedAt);
+	const evictable = blobEntries.filter((b) => !b.dirty).sort((a, b) => a.cachedAt - b.cachedAt);
 
 	let bytesToFree = totalSize - MAX_CACHE_SIZE_BYTES;
 	let evictedBlobs = 0;

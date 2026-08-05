@@ -74,18 +74,20 @@ const VoiceList: Component<{
 									<label
 										data-voice-selected={selected() ? '' : undefined}
 										class={cn(
-											'flex min-h-14 cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition-colors',
-											'focus-within:ring-2 focus-within:ring-blue-400',
+											'relative flex min-h-14 cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition-colors',
+											'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-400',
 											selected() ? 'bg-blue-50' : 'hover:bg-zinc-100',
 										)}
 									>
+										{/* Covers the row rather than sr-only: focusing a clipped input scrolls
+										    overflow-hidden ancestors and blanks the app shell. */}
 										<input
 											type="radio"
 											name={props.name}
 											value={option.id}
 											checked={selected()}
 											onChange={() => props.onSelect(option.id)}
-											class="sr-only"
+											class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
 										/>
 										<span
 											class={cn(

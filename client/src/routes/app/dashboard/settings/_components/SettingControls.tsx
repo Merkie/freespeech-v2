@@ -96,8 +96,8 @@ export function SegmentedControl<T extends string>(props: {
 				{(option) => (
 					<label
 						class={cn(
-							'cursor-pointer rounded-lg border-2 px-5 py-3 text-xl transition-all',
-							'focus-within:ring-2 focus-within:ring-pink-400 focus-within:ring-offset-2',
+							'relative cursor-pointer rounded-lg border-2 px-5 py-3 text-xl transition-all',
+							'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-pink-400 has-[:focus-visible]:ring-offset-2',
 							props.disabled && 'cursor-not-allowed opacity-50',
 							props.value === option.value
 								? 'border-pink-400 bg-pink-50 text-pink-700'
@@ -111,7 +111,7 @@ export function SegmentedControl<T extends string>(props: {
 							checked={props.value === option.value}
 							onChange={() => props.onChange(option.value)}
 							disabled={props.disabled}
-							class="sr-only"
+							class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
 						/>
 						{option.label}
 					</label>

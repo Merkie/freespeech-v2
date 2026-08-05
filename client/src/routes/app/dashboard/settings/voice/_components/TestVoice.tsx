@@ -78,18 +78,23 @@ const TestVoice: Component = () => {
 			</div>
 
 			<Show when={onlineVoiceActive()}>
-				<label class="group flex w-fit cursor-pointer items-center gap-3 select-none">
+				<label class="group relative flex w-fit cursor-pointer items-center gap-3 select-none">
+					{/* The input covers the whole label instead of being sr-only clipped to a point:
+					    focusing a clipped input makes the browser scroll overflow-hidden ancestors to
+					    "reveal" it, which shoved the entire app shell off screen. */}
 					<input
 						type="checkbox"
 						checked={previewDeviceVoice()}
 						onChange={(e) => setPreviewDeviceVoice(e.currentTarget.checked)}
-						class="sr-only"
+						class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
 					/>
 					<span
 						class={cn(
 							'grid h-7 w-7 shrink-0 place-items-center rounded-lg border-2 transition-all',
-							'group-focus-within:ring-2 group-focus-within:ring-blue-400',
-							previewDeviceVoice() ? 'border-blue-600 bg-blue-600 text-white' : 'border-zinc-300 bg-white text-transparent',
+							'group-has-[:focus-visible]:ring-2 group-has-[:focus-visible]:ring-blue-400',
+							previewDeviceVoice()
+								? 'border-blue-600 bg-blue-600 text-white'
+								: 'border-zinc-300 bg-white text-transparent',
 						)}
 					>
 						<i class="bi bi-check-lg text-base" />
