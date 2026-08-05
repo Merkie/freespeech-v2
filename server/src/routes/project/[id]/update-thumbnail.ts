@@ -33,10 +33,10 @@ export const POST = [
 				userId: req.userId!,
 			},
 			include: {
-				user: true,
+				user: { select: { id: true, name: true } },
 			},
 		});
-		if (!project) return;
+		if (!project) return res.status(404).json({ error: 'Project not found' });
 
 		const homePageId = project.homePageId;
 		if (!homePageId) return res.status(404).json({ error: 'Home page not found' });
@@ -73,11 +73,12 @@ export const POST = [
 
 		// Skip deletion for shared template thumbnails — they're referenced by every user who imported that template.
 		if (project.imageUrl && !project.imageUrl.startsWith('/template-')) {
-			const deleteCommand = new DeleteObjectCommand({
-				Bucket: R2_BUCKET,
-				Key: project.imageUrl.split('/').filter(Boolean).join('/'),
-			});
-			await s3.send(deleteCommand);
+			const key = project.imageUrl.split('/').filter(Boolean).join('/');
+			try {
+				await s3.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
+			} catch (err) {
+				console.warn(`Failed to delete thumbnail ${key}:`, err);
+			}
 		}
 
 		const newThumbnailKey = `${slugify(project.user.name)}-${project.user.id}/${fileName}`;

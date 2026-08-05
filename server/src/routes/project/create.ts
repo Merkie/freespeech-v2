@@ -3,7 +3,6 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 
 const schema = z.object({
@@ -55,8 +54,6 @@ export const POST = [
 				blob,
 			},
 		});
-
-		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({ success: true, projectId: createdProject.id });
 	},

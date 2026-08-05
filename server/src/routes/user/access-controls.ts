@@ -2,7 +2,6 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 
 const PIN_HASH_PATTERN = /^[0-9a-f]{64}$/;
@@ -77,7 +76,6 @@ export const POST = [
 			select,
 		});
 
-		invalidateCache(`user:${req.userId}`);
 		return res.json({ settings: serialize(user) });
 	},
 ];

@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
 import { TEMPLATES, templateBlobKey } from '@/data/templates';
-import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
@@ -61,8 +60,6 @@ export const POST = [
 				lastEditedAt: now,
 			},
 		});
-
-		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({ success: true, projectId: createdProject.id });
 	},

@@ -3,7 +3,6 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 import { SITE_SECRET } from '@/utils/env';
 
@@ -38,8 +37,6 @@ export const POST = [
 			},
 			data: body,
 		});
-
-		invalidateCache(`user:${req.userId}`);
 
 		return res.json({ success: true });
 	},

@@ -1,7 +1,6 @@
 import express, { type Request, type Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { userImportAssetStore } from '@/resources/asset-store';
-import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 import { buildProjectFromOpenBoard, OpenBoardParseError, parseOpenBoardSource } from '@/utils/open-board-import';
 
@@ -64,8 +63,6 @@ export const POST = [
 				lastEditedAt: new Date(),
 			},
 		});
-
-		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({
 			success: true,

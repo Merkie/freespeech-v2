@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
-import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 
 export const POST = [
@@ -20,8 +19,6 @@ export const POST = [
 			data: { isFavorite: !project.isFavorite },
 			select: { isFavorite: true },
 		});
-
-		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({ isFavorite: updated.isFavorite });
 	},

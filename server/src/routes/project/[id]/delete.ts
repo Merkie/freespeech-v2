@@ -1,7 +1,6 @@
 import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
-import { invalidateCache } from '@/resources/cache';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
@@ -13,6 +12,7 @@ export const POST = [
 
 		const project = await prisma.project.findFirst({
 			where: { id: projectId, userId: req.userId },
+			select: { imageUrl: true },
 		});
 
 		if (!project) {
@@ -30,7 +30,6 @@ export const POST = [
 		}
 
 		await prisma.project.delete({ where: { id: projectId } });
-		invalidateCache(`projects:${req.userId}`);
 
 		return res.json({ success: true });
 	},

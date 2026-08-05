@@ -11,7 +11,7 @@
  * Usage: npx tsx src/scripts/backfill-full-blob.ts
  */
 
-import { PrismaClient } from '@prisma/client';
+import { type Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -48,7 +48,7 @@ async function main() {
 			columns: project.columns,
 			rows: project.rows,
 			homePageId: project.homePageId ?? null,
-			pages: (blob?.pages as unknown[]) ?? [],
+			pages: (blob?.pages as Prisma.InputJsonValue[]) ?? [],
 		};
 
 		await prisma.project.update({
