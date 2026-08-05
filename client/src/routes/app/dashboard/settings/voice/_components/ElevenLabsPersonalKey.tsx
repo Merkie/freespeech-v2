@@ -99,7 +99,7 @@ const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => 
 										elevenLabsApiKey() ? 'text-zinc-500' : 'text-zinc-400',
 									)}
 								>
-									{elevenLabsApiKey() ? '•'.repeat(Math.min(elevenLabsApiKey().length, 40)) : 'Tap to add your key'}
+									{elevenLabsApiKey() ? '•'.repeat(Math.min(elevenLabsApiKey().length, 40)) : 'Add your key here'}
 								</button>
 							}
 						>
