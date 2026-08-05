@@ -76,9 +76,9 @@ const SettingsPage: Component = () => {
 						<i class="bi bi-arrow-right-short text-6xl text-zinc-500 transition-all group-hover:text-amber-500"></i>
 					</A>
 
-					<a
-						href="/app/dashboard/settings/"
-						class="group pointer-events-none flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 opacity-50 grayscale transition-all select-none hover:border-purple-200 hover:bg-purple-50"
+					<A
+						href="/app/dashboard/settings/appearance"
+						class="group flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 transition-all select-none hover:border-purple-200 hover:bg-purple-50"
 					>
 						<div class="grid h-[70px] w-[70px] place-items-center rounded-lg bg-purple-100">
 							<i class="bi bi-palette-fill text-[40px] text-purple-500"></i>
@@ -86,7 +86,7 @@ const SettingsPage: Component = () => {
 						<span class="text-3xl text-zinc-800 transition-all group-hover:text-purple-500">Appearance</span>
 						<div class="flex-1"></div>
 						<i class="bi bi-arrow-right-short text-6xl text-zinc-500 transition-all group-hover:text-purple-500"></i>
-					</a>
+					</A>
 				</div>
 			</div>
 		</>

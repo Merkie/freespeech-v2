@@ -1,4 +1,3 @@
-import { A } from '@solidjs/router';
 import { type Component, createSignal, Show } from 'solid-js';
 import { globalIsOnline } from '@/hooks/useNetworkStatus';
 import { MODAL_ID } from '@/lib/constants';
@@ -6,7 +5,14 @@ import { disablePinLock, enableMathLock } from '@/lib/pin';
 import { accessControlSettings, setActiveModalId } from '@/lib/state';
 import type { EditPinMode } from '@/lib/types';
 import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
-import { SegmentedControl, SettingRow, Toggle } from '../_components/SettingControls';
+import {
+	SegmentedControl,
+	SettingButton,
+	SettingCard,
+	SettingRow,
+	SettingsPageHeader,
+	Toggle,
+} from '../_components/SettingControls';
 
 const LOCK_MODE_OPTIONS: { value: EditPinMode; label: string }[] = [
 	{ value: 'pin', label: '4-digit passcode' },
@@ -45,68 +51,68 @@ const AccessControlsPage: Component = () => {
 	};
 
 	return (
-		<div class="flex flex-col gap-12 p-8 pb-[200px]">
+		<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 pb-[200px] sm:p-6 lg:p-8">
 			<OfflineSettingsNotice />
-			<div class="flex flex-col gap-8">
-				<A href="/app/dashboard/settings" class="w-fit p-2 pl-0 text-xl text-zinc-600 hover:text-zinc-800">
-					<i class="bi bi-arrow-left-short"></i>
-					<span>Back</span>
-				</A>
 
-				<p class="border-b border-zinc-300 pb-8 text-4xl text-zinc-600">Access Controls</p>
-			</div>
+			<SettingsPageHeader
+				title="Access Controls"
+				description="Stop boards being edited by accident"
+				icon="bi bi-lock-fill"
+				iconClass="bg-amber-100 text-amber-500"
+			/>
 
-			<div class="flex flex-col gap-8">
-				<SettingRow
-					title="Require a passcode to edit"
-					description="Asks for a passcode before entering edit mode or opening the dashboard, so a board cannot be rearranged or left by accident. Speaking tiles and moving between pages are never affected."
-				>
-					<Toggle
-						checked={enabled()}
-						onChange={handleToggle}
-						label="Toggle edit passcode"
-						disabled={changesDisabled()}
-					/>
-				</SettingRow>
-
-				<Show when={enabled()}>
+			<SettingCard>
+				<div class="divide-y divide-zinc-100">
 					<SettingRow
-						title="Passcode type"
-						description="A 4-digit passcode is entered on a keypad. A multiplication question stores no secret at all — anyone who can do the arithmetic gets through, which is often enough to stop accidental taps."
+						title="Require a passcode to edit"
+						description="Asks for a passcode before entering edit mode or opening the dashboard, so a board cannot be rearranged or left by accident. Speaking tiles and moving between pages are never affected."
 					>
-						<SegmentedControl
-							value={mode()}
-							options={LOCK_MODE_OPTIONS}
-							onChange={handleModeChange}
-							label="Passcode type"
-							name="editPinMode"
+						<Toggle
+							checked={enabled()}
+							onChange={handleToggle}
+							label="Toggle edit passcode"
 							disabled={changesDisabled()}
 						/>
 					</SettingRow>
 
-					<Show when={mode() === 'pin'}>
+					<Show when={enabled()}>
 						<SettingRow
-							title="Change passcode"
-							description="Forgotten passcodes can also be reset from the prompt itself by answering a multiplication question."
+							layout="stacked"
+							title="Passcode type"
+							description="A 4-digit passcode is entered on a keypad. A multiplication question stores no secret at all — anyone who can do the arithmetic gets through, which is often enough to stop accidental taps."
 						>
-							<button
-								type="button"
-								onClick={() => setActiveModalId(MODAL_ID.PIN_SETUP)}
+							<SegmentedControl
+								value={mode()}
+								options={LOCK_MODE_OPTIONS}
+								onChange={handleModeChange}
+								label="Passcode type"
+								name="editPinMode"
 								disabled={changesDisabled()}
-								class="rounded-lg border-2 border-zinc-300 px-5 py-3 text-xl text-zinc-600 transition-all hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-							>
-								Set a new passcode
-							</button>
+							/>
 						</SettingRow>
-					</Show>
-				</Show>
 
-				<p class="max-w-3xl text-lg text-zinc-500">
-					Access controls are stored on your account and cached on this device so the current passcode keeps working
-					offline. A connection is required to enable, disable, change, or reset them. This remains a guard against
-					accidental taps rather than account security.
-				</p>
-			</div>
+						<Show when={mode() === 'pin'}>
+							<SettingRow
+								title="Change passcode"
+								description="Forgotten passcodes can also be reset from the prompt itself by answering a multiplication question."
+							>
+								<SettingButton onClick={() => setActiveModalId(MODAL_ID.PIN_SETUP)} disabled={changesDisabled()}>
+									Set a new passcode
+								</SettingButton>
+							</SettingRow>
+						</Show>
+					</Show>
+				</div>
+
+				<div class="flex items-start gap-3 border-t border-zinc-100 bg-zinc-50 p-5 sm:px-6">
+					<i class="bi bi-info-circle mt-0.5 text-lg text-zinc-400" />
+					<p class="max-w-prose text-base text-zinc-500">
+						Access controls are stored on your account and cached on this device so the current passcode keeps working
+						offline. A connection is required to enable, disable, change, or reset them. This remains a guard against
+						accidental taps rather than account security.
+					</p>
+				</div>
+			</SettingCard>
 		</div>
 	);
 };

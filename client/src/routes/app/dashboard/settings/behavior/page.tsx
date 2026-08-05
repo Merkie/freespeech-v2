@@ -1,11 +1,10 @@
-import { A } from '@solidjs/router';
 import { type Component, createSignal, onMount, Show } from 'solid-js';
 import { clearCache, getCacheStats } from '@/lib/cache';
+import { cn } from '@/lib/cn';
 import { enableSentenceCopyButton, localSettings, setEnableSentenceCopyButton, setLocalSettings } from '@/lib/state';
-import { TILE_IMAGE_FIT_OPTIONS, TILE_TEXT_OVERFLOW_OPTIONS, TILE_TEXT_SIZE_OPTIONS } from '@/lib/tile-appearance';
 import type { LocalSettings } from '@/lib/types';
 import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
-import { SegmentedControl, SettingRow, Toggle } from '../_components/SettingControls';
+import { SettingButton, SettingCard, SettingRow, SettingsPageHeader, Toggle } from '../_components/SettingControls';
 
 function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
@@ -47,54 +46,57 @@ const BehaviorSettingsPage: Component = () => {
 	};
 
 	return (
-		<div class="flex flex-col gap-12 p-8 pb-[200px]">
+		<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 pb-[200px] sm:p-6 lg:p-8">
 			<OfflineSettingsNotice />
-			<div class="flex flex-col gap-8">
-				<A href="/app/dashboard/settings" class="w-fit p-2 pl-0 text-xl text-zinc-600 hover:text-zinc-800">
-					<i class="bi bi-arrow-left-short"></i>
-					<span>Back</span>
-				</A>
 
-				<p class="border-b border-zinc-300 pb-8 text-4xl text-zinc-600">Behavior Settings</p>
-			</div>
+			<SettingsPageHeader
+				title="Behavior"
+				description="What happens when tiles are tapped"
+				icon="bi bi-gear-wide-connected"
+				iconClass="bg-pink-100 text-pink-500"
+			/>
 
-			<div class="flex flex-col gap-8">
-				<SettingRow
-					title="Sentence builder"
-					description="When off, tapping a tile speaks it straight away and nothing is queued. The sentence bar and its buttons are hidden, leaving more room for tiles."
-				>
-					<Toggle
-						checked={localSettings().sentenceBuilder}
-						onChange={(next) => update('sentenceBuilder', next)}
-						label="Toggle sentence builder"
-					/>
-				</SettingRow>
-
-				{/* The copy button lives inside the sentence bar, so it is meaningless without it. */}
-				<Show when={localSettings().sentenceBuilder}>
+			<SettingCard>
+				<div class="divide-y divide-zinc-100">
 					<SettingRow
-						title={'Display "Copy Sentence" button'}
-						description="Adds a button to the sentence bar that copies the current sentence to the clipboard."
+						title="Sentence builder"
+						description="When off, tapping a tile speaks it straight away and nothing is queued. The sentence bar and its buttons are hidden, leaving more room for tiles."
 					>
 						<Toggle
-							checked={enableSentenceCopyButton()}
-							onChange={setEnableSentenceCopyButton}
-							label="Toggle copy sentence button"
+							checked={localSettings().sentenceBuilder}
+							onChange={(next) => update('sentenceBuilder', next)}
+							label="Toggle sentence builder"
 						/>
 					</SettingRow>
-				</Show>
 
-				<SettingRow
-					title="Speak on tap"
-					description="Speak each tile as it is tapped, in addition to adding it to the sentence."
-				>
-					<Toggle
-						checked={localSettings().speakOnTap}
-						onChange={(next) => update('speakOnTap', next)}
-						label="Toggle speak on tap"
-					/>
-				</SettingRow>
+					{/* The copy button lives inside the sentence bar, so it is meaningless without it. */}
+					<Show when={localSettings().sentenceBuilder}>
+						<SettingRow
+							title={'Display "Copy Sentence" button'}
+							description="Adds a button to the sentence bar that copies the current sentence to the clipboard."
+						>
+							<Toggle
+								checked={enableSentenceCopyButton()}
+								onChange={setEnableSentenceCopyButton}
+								label="Toggle copy sentence button"
+							/>
+						</SettingRow>
+					</Show>
 
+					<SettingRow
+						title="Speak on tap"
+						description="Speak each tile as it is tapped, in addition to adding it to the sentence."
+					>
+						<Toggle
+							checked={localSettings().speakOnTap}
+							onChange={(next) => update('speakOnTap', next)}
+							label="Toggle speak on tap"
+						/>
+					</SettingRow>
+				</div>
+			</SettingCard>
+
+			<SettingCard>
 				<SettingRow
 					title="Search for images online"
 					description="When off, tile images can only come from this device. Nothing is sent to an image search provider."
@@ -105,75 +107,40 @@ const BehaviorSettingsPage: Component = () => {
 						label="Toggle online image search"
 					/>
 				</SettingRow>
+			</SettingCard>
 
-				<SettingRow title="Tile text size" description="How large the label on each tile is drawn.">
-					<SegmentedControl
-						value={localSettings().tileTextSize}
-						options={TILE_TEXT_SIZE_OPTIONS}
-						onChange={(next) => update('tileTextSize', next)}
-						label="Tile text size"
-						name="tileTextSize"
-					/>
-				</SettingRow>
-
-				<SettingRow
-					title="Long tile text"
-					description="Truncate cuts a long label off with an ellipsis. Word wrap lets it run onto more lines, which leaves less room for the tile's image — especially at larger text sizes."
-				>
-					<SegmentedControl
-						value={localSettings().tileTextOverflow}
-						options={TILE_TEXT_OVERFLOW_OPTIONS}
-						onChange={(next) => update('tileTextOverflow', next)}
-						label="Long tile text"
-						name="tileTextOverflow"
-					/>
-				</SettingRow>
-
-				<SettingRow
-					title="Tile image fit"
-					description="Contain shows the whole image, which suits symbol sets. Cover fills the tile and crops the edges, which usually suits photographs."
-				>
-					<SegmentedControl
-						value={localSettings().tileImageFit}
-						options={TILE_IMAGE_FIT_OPTIONS}
-						onChange={(next) => update('tileImageFit', next)}
-						label="Tile image fit"
-						name="tileImageFit"
-					/>
-				</SettingRow>
-			</div>
-
-			<div class="flex flex-col gap-6">
-				<p class="text-3xl text-zinc-800">Offline Cache</p>
-				<p class="text-xl text-zinc-500">Project data is cached on your device for offline use and faster loading.</p>
-
-				<div class="flex flex-col gap-3">
-					<div class="flex items-baseline justify-between">
-						<p class="text-lg text-zinc-600">
-							{formatBytes(cacheUsed())} of {formatBytes(cacheMax())} used
-						</p>
-						<p class="text-lg text-zinc-500">
-							{cacheEntries()} {cacheEntries() === 1 ? 'project' : 'projects'} cached
+			<SettingCard>
+				<div class="flex flex-col gap-5 p-5 sm:p-6">
+					<div class="flex flex-col gap-1">
+						<h2 class="text-2xl font-semibold text-zinc-900">Offline cache</h2>
+						<p class="max-w-prose text-lg text-zinc-500">
+							Project data is cached on this device for offline use and faster loading.
 						</p>
 					</div>
 
-					<div class="h-3 w-full overflow-hidden rounded-full bg-zinc-200">
-						<div
-							class={`h-full rounded-full transition-all ${usagePercent() > 80 ? 'bg-red-400' : 'bg-pink-400'}`}
-							style={{ width: `${usagePercent()}%` }}
-						></div>
+					<div class="flex flex-col gap-3">
+						<div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+							<p class="text-lg text-zinc-600">
+								{formatBytes(cacheUsed())} of {formatBytes(cacheMax())} used
+							</p>
+							<p class="text-lg text-zinc-500">
+								{cacheEntries()} {cacheEntries() === 1 ? 'project' : 'projects'} cached
+							</p>
+						</div>
+
+						<div class="h-3 w-full overflow-hidden rounded-full bg-zinc-200">
+							<div
+								class={cn('h-full rounded-full transition-all', usagePercent() > 80 ? 'bg-red-400' : 'bg-blue-500')}
+								style={{ width: `${usagePercent()}%` }}
+							></div>
+						</div>
 					</div>
+
+					<SettingButton variant="danger" onClick={handleClearCache} disabled={clearing() || cacheEntries() === 0}>
+						{clearing() ? 'Clearing…' : 'Clear cache'}
+					</SettingButton>
 				</div>
-
-				<button
-					type="button"
-					onClick={handleClearCache}
-					disabled={clearing() || cacheEntries() === 0}
-					class="w-fit rounded-lg border-2 border-red-200 bg-red-50 px-5 py-3 text-xl text-red-600 transition-all hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					{clearing() ? 'Clearing...' : 'Clear Cache'}
-				</button>
-			</div>
+			</SettingCard>
 		</div>
 	);
 };

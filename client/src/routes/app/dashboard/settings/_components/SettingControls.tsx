@@ -1,5 +1,5 @@
 import { A } from '@solidjs/router';
-import { For, type JSX } from 'solid-js';
+import { For, type JSX, Show } from 'solid-js';
 import { cn } from '@/lib/cn';
 
 // Shared controls for the settings screens. The dashboard is used on tablets by carers as often
@@ -36,15 +36,54 @@ export function SettingCard(props: { children: JSX.Element; class?: string }) {
 	);
 }
 
-export function SettingRow(props: { title: string; description?: string; children: JSX.Element }) {
+// One setting inside a SettingCard. Rows are separated by the card's divide-y rather than their
+// own borders. 'inline' seats the control beside the title (toggles, small buttons); 'stacked'
+// seats it under the description for controls too wide to share the title row (segmented rows).
+export function SettingRow(props: {
+	title: string;
+	description?: string;
+	layout?: 'inline' | 'stacked';
+	children: JSX.Element;
+}) {
 	return (
-		<div class="flex flex-col gap-3 border-b border-zinc-200 pb-8 last:border-b-0">
-			<div class="flex flex-wrap items-center justify-between gap-4">
-				<p class="text-3xl text-zinc-800">{props.title}</p>
-				{props.children}
+		<div class="flex flex-col gap-1 p-5 sm:p-6">
+			<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+				<h2 class="text-2xl font-semibold text-zinc-900">{props.title}</h2>
+				<Show when={props.layout !== 'stacked'}>{props.children}</Show>
 			</div>
-			{props.description ? <p class="max-w-3xl text-xl text-zinc-500">{props.description}</p> : null}
+			<Show when={props.description}>
+				<p class="max-w-prose text-lg text-zinc-500">{props.description}</p>
+			</Show>
+			<Show when={props.layout === 'stacked'}>
+				<div class="pt-3">{props.children}</div>
+			</Show>
 		</div>
+	);
+}
+
+// Pill button matching the voice page's Speak button, for the occasional action inside a card.
+export function SettingButton(props: {
+	onClick: () => void;
+	disabled?: boolean;
+	variant?: 'neutral' | 'danger';
+	children: JSX.Element;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={() => props.onClick()}
+			disabled={props.disabled}
+			class={cn(
+				'w-fit rounded-full border px-6 py-3 text-lg font-semibold shadow-sm transition-all',
+				'focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.98]',
+				'disabled:cursor-not-allowed disabled:opacity-50',
+				props.variant === 'danger'
+					? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100 focus-visible:ring-red-400'
+					: 'border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50 focus-visible:ring-blue-400',
+			)}
+		>
+			{props.children}
+		</button>
 	);
 }
 
@@ -97,10 +136,10 @@ export function SegmentedControl<T extends string>(props: {
 					<label
 						class={cn(
 							'relative cursor-pointer rounded-lg border-2 px-5 py-3 text-xl transition-all',
-							'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-pink-400 has-[:focus-visible]:ring-offset-2',
+							'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-400 has-[:focus-visible]:ring-offset-2',
 							props.disabled && 'cursor-not-allowed opacity-50',
 							props.value === option.value
-								? 'border-pink-400 bg-pink-50 text-pink-700'
+								? 'border-blue-500 bg-blue-50 text-blue-700'
 								: 'border-zinc-300 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50',
 						)}
 					>
