@@ -61,7 +61,8 @@ export function SettingRow(props: {
 	);
 }
 
-// Pill button matching the voice page's Speak button, for the occasional action inside a card.
+// Action button in the app's usual bordered style — the same shape as the segmented options,
+// so cards don't introduce a second button language.
 export function SettingButton(props: {
 	onClick: () => void;
 	disabled?: boolean;
@@ -74,12 +75,12 @@ export function SettingButton(props: {
 			onClick={() => props.onClick()}
 			disabled={props.disabled}
 			class={cn(
-				'w-fit rounded-full border px-6 py-3 text-lg font-semibold shadow-sm transition-all',
-				'focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-[0.98]',
+				'w-fit rounded-lg border-2 px-5 py-3 text-xl transition-all',
+				'focus-visible:ring-2 focus-visible:ring-offset-2',
 				'disabled:cursor-not-allowed disabled:opacity-50',
 				props.variant === 'danger'
 					? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100 focus-visible:ring-red-400'
-					: 'border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50 focus-visible:ring-blue-400',
+					: 'border-zinc-300 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50 focus-visible:ring-blue-400',
 			)}
 		>
 			{props.children}

@@ -93,6 +93,7 @@ const AccessControlsPage: Component = () => {
 
 						<Show when={mode() === 'pin'}>
 							<SettingRow
+								layout="stacked"
 								title="Change passcode"
 								description="Forgotten passcodes can also be reset from the prompt itself by answering a multiplication question."
 							>
