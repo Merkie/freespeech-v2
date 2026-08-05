@@ -1,4 +1,4 @@
-import { type Component, createMemo, Show } from 'solid-js';
+import { type Component, createMemo } from 'solid-js';
 import { emojis } from '@/lib/eleven-labs-emojis';
 import { elevenLabsVoiceId, setElevenLabsVoiceId } from '@/lib/state';
 import VoiceList, { type VoiceOption } from './VoiceList';
@@ -52,12 +52,7 @@ const ElevenLabsVoiceSelector: Component<ElevenLabsVoiceSelectorProps> = (props)
 		<div class="flex min-w-0 flex-col gap-3">
 			<div class="flex items-center gap-2">
 				<i class="bi bi-cloud-fill text-lg text-blue-500" />
-				<h3 class="text-xl font-semibold text-zinc-800">Online voices</h3>
-				<Show when={!props.loading}>
-					<span class="rounded-full bg-zinc-100 px-2.5 py-0.5 text-sm font-medium text-zinc-500">
-						{options().length}
-					</span>
-				</Show>
+				<h3 class="text-xl font-semibold text-zinc-800">Online voice</h3>
 			</div>
 			<VoiceList
 				name="elevenlabs-voice"
@@ -66,6 +61,7 @@ const ElevenLabsVoiceSelector: Component<ElevenLabsVoiceSelectorProps> = (props)
 				selectedId={elevenLabsVoiceId()}
 				onSelect={setElevenLabsVoiceId}
 				loading={props.loading}
+				chipPlacement="below"
 				emptyText="Online voices couldn't be loaded. Check your connection and try again."
 			/>
 		</div>

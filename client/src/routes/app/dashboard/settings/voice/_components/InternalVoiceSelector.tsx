@@ -23,7 +23,7 @@ const InternalVoiceSelector: Component = () => {
 		<div class="flex min-w-0 flex-col gap-3">
 			<div class="flex items-center gap-2">
 				<i class="bi bi-tablet-fill text-lg text-zinc-500" />
-				<h3 class="text-xl font-semibold text-zinc-800">Device voices</h3>
+				<h3 class="text-xl font-semibold text-zinc-800">Device voice</h3>
 				<span class="rounded-full bg-green-100 px-2.5 py-0.5 text-sm font-medium text-green-700">Works offline</span>
 			</div>
 			<VoiceList
@@ -32,6 +32,7 @@ const InternalVoiceSelector: Component = () => {
 				options={options()}
 				selectedId={offlineVoiceUri()}
 				onSelect={setOfflineVoiceUri}
+				chipVariant="code"
 				emptyText="No voices found on this device."
 			/>
 		</div>

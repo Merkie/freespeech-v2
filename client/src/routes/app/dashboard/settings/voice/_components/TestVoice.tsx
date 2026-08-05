@@ -4,9 +4,7 @@ import { speakText } from '@/lib/speak';
 import { voiceEngineStatus } from '@/lib/state';
 
 const TestVoice: Component = () => {
-	const [voiceTestText, setVoiceTestText] = createSignal(
-		'This is what your voice will sound like inside the application.',
-	);
+	const [voiceTestText, setVoiceTestText] = createSignal('Hey there! So, how do I sound?');
 
 	const buttonText = createMemo(() => {
 		const status = voiceEngineStatus();
@@ -31,14 +29,11 @@ const TestVoice: Component = () => {
 				<p class="max-w-prose text-lg text-zinc-500">Type anything and hear how the selected voice says it.</p>
 			</div>
 
-			<div class="flex flex-col gap-4">
-				{/* The test sentence sits in a speech bubble whose tail points at the Speak button below. */}
+			<div class="flex flex-wrap items-center gap-4">
 				<div
 					class={cn(
-						'relative max-w-2xl rounded-2xl border border-zinc-200 bg-white shadow-sm',
+						'min-w-64 flex-1 rounded-xl border border-zinc-200 bg-white shadow-sm',
 						'transition-all focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-200',
-						'after:absolute after:-bottom-[7px] after:left-9 after:h-3.5 after:w-3.5 after:rotate-45',
-						'after:border-r after:border-b after:border-zinc-200 after:bg-white',
 					)}
 				>
 					<label class="sr-only" for="voice-test-sentence">
@@ -49,7 +44,7 @@ const TestVoice: Component = () => {
 						value={voiceTestText()}
 						onInput={(e) => setVoiceTestText(e.currentTarget.value)}
 						type="text"
-						class="w-full rounded-2xl bg-transparent p-4 text-lg text-zinc-800 outline-none"
+						class="w-full rounded-xl bg-transparent p-4 text-lg text-zinc-800 outline-none"
 					/>
 				</div>
 
@@ -58,7 +53,7 @@ const TestVoice: Component = () => {
 					onClick={() => speakText(voiceTestText())}
 					disabled={isDisabled()}
 					class={cn(
-						'flex w-fit min-w-48 items-center justify-center gap-3 rounded-full px-8 py-4 text-xl font-semibold text-white shadow-sm',
+						'flex w-fit min-w-44 items-center justify-center gap-3 rounded-full px-7 py-4 text-xl font-semibold text-white shadow-sm',
 						'transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
 						voiceEngineStatus() === 'failed' ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700',
 					)}

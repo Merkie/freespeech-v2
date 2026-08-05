@@ -1,6 +1,5 @@
 import { type Component, createResource, Show } from 'solid-js';
 import api from '@/lib/api';
-import { cn } from '@/lib/cn';
 import { enableThirdPartyVoiceProviders, setEnableThirdPartyVoiceProviders, user } from '@/lib/state';
 import ElevenLabsPersonalKey from '@/routes/app/dashboard/settings/voice/_components/ElevenLabsPersonalKey';
 import ElevenLabsVoiceSelector from '@/routes/app/dashboard/settings/voice/_components/ElevenLabsVoiceSelector';
@@ -63,7 +62,7 @@ const VoiceSettingsPage: Component = () => {
 							</Show>
 						</p>
 					</div>
-					<div class={cn('grid grid-cols-1 gap-6', enableThirdPartyVoiceProviders() && 'lg:grid-cols-2')}>
+					<div class="flex flex-col gap-6">
 						<Show when={enableThirdPartyVoiceProviders()}>
 							<ElevenLabsVoiceSelector voices={voices() || []} loading={voices.loading} />
 						</Show>

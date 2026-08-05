@@ -18,6 +18,10 @@ const VoiceList: Component<{
 	onSelect: (id: string) => void;
 	loading?: boolean;
 	emptyText: string;
+	/** 'below' puts chips on their own line under the voice name; default is inline after it. */
+	chipPlacement?: 'inline' | 'below';
+	/** 'code' renders chips as small mono tags (for language codes); default is rounded pills. */
+	chipVariant?: 'pill' | 'code';
 }> = (props) => {
 	let containerRef: HTMLDivElement | undefined;
 
@@ -93,19 +97,37 @@ const VoiceList: Component<{
 										>
 											<i class="bi bi-check-lg text-base" />
 										</span>
-										<span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+										<span
+											class={cn(
+												'flex min-w-0 flex-1',
+												props.chipPlacement === 'below'
+													? 'flex-col items-start gap-1'
+													: 'flex-wrap items-center gap-x-2 gap-y-1',
+											)}
+										>
 											<span
 												class={cn('text-lg leading-snug font-medium', selected() ? 'text-blue-900' : 'text-zinc-800')}
 											>
 												{option.name}
 											</span>
-											<For each={option.chips}>
-												{(chip) => (
-													<span class="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-sm whitespace-nowrap text-zinc-600">
-														{chip}
-													</span>
-												)}
-											</For>
+											<Show when={option.chips?.length}>
+												<span class="flex flex-wrap items-center gap-1.5">
+													<For each={option.chips}>
+														{(chip) => (
+															<span
+																class={cn(
+																	'whitespace-nowrap',
+																	props.chipVariant === 'code'
+																		? 'rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-500'
+																		: 'rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-600',
+																)}
+															>
+																{chip}
+															</span>
+														)}
+													</For>
+												</span>
+											</Show>
 										</span>
 									</label>
 								);
