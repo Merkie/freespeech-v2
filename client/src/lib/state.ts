@@ -35,6 +35,8 @@ export function findTileByPositionKey(tiles: Tile[], key: TilePositionKey): Tile
 export const [project, setProject] = createSignal<Project>(null as unknown as Project);
 export const [projectHomePageId, setProjectHomePageId] = createSignal('');
 export const [currentPageId, setCurrentPageId] = createSignal('');
+// Trail of previously visited page ids in the current project, most recent last
+export const [pageHistory, setPageHistory] = createSignal<string[]>([]);
 
 // --- this is stuff claude code mostly generated ---
 
@@ -136,6 +138,7 @@ export function resetProjectState() {
 	setAddingPage(false);
 	setProjectBlob(null);
 	setSyncStatus('synced');
+	setPageHistory([]);
 }
 
 export const [voiceEngineStatus, setVoiceEngineStatus] = createSignal<'ready' | 'speaking' | 'synthesizing' | 'failed'>(

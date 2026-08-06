@@ -4,11 +4,14 @@ import { loadProjectBlob } from './blob-sync';
 import { getCachedProjects } from './cache/blob-cache';
 import { pickDefaultProject } from './project-order';
 import {
+	currentPageId,
 	localSettings,
+	pageHistory,
 	projectBlob,
 	resetProjectState,
 	setCurrentPageId,
 	setLocalSettings,
+	setPageHistory,
 	setProject,
 	setProjectHomePageId,
 	setProjectLoading,
@@ -142,12 +145,40 @@ export function navigateToPageInProject(pageId: string): boolean {
 		return false;
 	}
 
+	// Remember the page being left so the header's back button can retrace the trail.
+	// Empty means initial load; capped so a long session can't grow the stack forever.
+	const from = currentPageId();
+	if (from && from !== pageId) {
+		setPageHistory([...pageHistory(), from].slice(-50));
+	}
+
 	setCurrentPageId(pageId);
 
 	// Track this page visit
 	trackVisit(blob.id, pageId);
 
 	return true;
+}
+
+// Step back to the most recently visited page, skipping any that were deleted since.
+// Does not push onto the history, so repeated presses walk further back.
+export function navigateBackInProject(): boolean {
+	const blob = projectBlob();
+	if (!blob) return false;
+
+	const history = [...pageHistory()];
+	while (history.length > 0) {
+		const target = history.pop();
+		if (target && target !== currentPageId() && blob.pages.some((p) => p.id === target)) {
+			setPageHistory(history);
+			setCurrentPageId(target);
+			trackVisit(blob.id, target);
+			return true;
+		}
+	}
+
+	setPageHistory(history);
+	return false;
 }
 
 // Get home page ID from blob

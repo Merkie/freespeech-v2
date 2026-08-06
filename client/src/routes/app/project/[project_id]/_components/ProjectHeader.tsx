@@ -3,11 +3,13 @@ import useOutsideClick from '@/hooks/useOutsideClick';
 import { editModeHasChanges } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
+import { navigateBackInProject } from '@/lib/page-actions';
 import {
 	currentPageId,
 	editingTiles,
 	getPageFromBlob,
 	multiSelectMode,
+	pageHistory,
 	setActiveModalId,
 	setMultiSelectMode,
 	syncStatus,
@@ -97,8 +99,20 @@ export default function ProjectHeader() {
 				</Show>
 			</div>
 
-			{/* Center - Page name */}
-			<p class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-light">{pageName()}</p>
+			{/* Center - Page name; outside edit mode it becomes a back button once there is a trail */}
+			<Show
+				when={!editingTiles() && pageHistory().length > 0}
+				fallback={<p class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-light">{pageName()}</p>}
+			>
+				<button
+					onClick={() => navigateBackInProject()}
+					aria-label="Go back to previous page"
+					class="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-md px-3 py-1.5 font-light transition-colors hover:bg-zinc-800 active:bg-zinc-700"
+				>
+					<i class="bi bi-chevron-left text-sm text-zinc-400" />
+					<span>{pageName()}</span>
+				</button>
+			</Show>
 
 			{/* Right side - Sync status + Unsaved badge + Multi-select toggle */}
 			<div class="flex flex-1 items-center justify-end gap-2">
