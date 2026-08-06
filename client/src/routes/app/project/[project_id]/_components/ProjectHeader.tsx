@@ -64,10 +64,9 @@ export default function ProjectHeader() {
 					<button
 						onClick={() => navigateBackInProject()}
 						aria-label="Go back to previous page"
-						class="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-700"
+						class="flex items-center rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-700"
 					>
-						<i class="bi bi-chevron-left text-zinc-400" />
-						<span>{previousPage()?.name}</span>
+						<i class="bi bi-chevron-left" />
 					</button>
 				</Show>
 				<Show when={editingTiles()}>
