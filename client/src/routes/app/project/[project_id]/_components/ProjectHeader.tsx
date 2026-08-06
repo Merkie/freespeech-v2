@@ -27,7 +27,16 @@ export default function ProjectHeader() {
 		return page?.name || 'Loading...';
 	};
 
-	const canGoBack = () => pageHistory().length > 0;
+	// The page a back press would land on: the newest history entry that still exists
+	const previousPage = () => {
+		const history = pageHistory();
+		for (let i = history.length - 1; i >= 0; i--) {
+			if (history[i] === currentPageId()) continue;
+			const page = getPageFromBlob(history[i]);
+			if (page) return page;
+		}
+		return undefined;
+	};
 
 	const handleEditPage = () => {
 		const page = getPageFromBlob(currentPageId());
@@ -49,22 +58,16 @@ export default function ProjectHeader() {
 
 	return (
 		<div class="relative flex h-14 shrink-0 touch-none items-center bg-zinc-900 px-3 text-zinc-100">
-			{/* Left side - back button with page name (view mode) or Page Actions (edit mode) */}
+			{/* Left side - back button (view mode) or Page Actions (edit mode) */}
 			<div class="flex flex-1 gap-2">
-				<Show when={!editingTiles()}>
+				<Show when={!editingTiles() && previousPage()}>
 					<button
 						onClick={() => navigateBackInProject()}
-						disabled={!canGoBack()}
 						aria-label="Go back to previous page"
-						class={cn(
-							'flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors',
-							canGoBack() ? 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700' : 'cursor-default border-transparent',
-						)}
+						class="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-700"
 					>
-						<Show when={canGoBack()}>
-							<i class="bi bi-chevron-left text-zinc-400" />
-						</Show>
-						<span>{pageName()}</span>
+						<i class="bi bi-chevron-left text-zinc-400" />
+						<span>{previousPage()?.name}</span>
 					</button>
 				</Show>
 				<Show when={editingTiles()}>
@@ -117,10 +120,8 @@ export default function ProjectHeader() {
 				</Show>
 			</div>
 
-			{/* Center - Page name (edit mode only; in view mode the name lives in the left back button) */}
-			<Show when={editingTiles()}>
-				<p class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-light">{pageName()}</p>
-			</Show>
+			{/* Center - Page name */}
+			<p class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-light">{pageName()}</p>
 
 			{/* Right side - Sync status + Unsaved badge + Multi-select toggle */}
 			<div class="flex flex-1 items-center justify-end gap-2">
