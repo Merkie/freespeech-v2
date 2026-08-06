@@ -28,7 +28,6 @@ export type LocalSettings = {
 	tileTextSize: TileTextSize;
 	tileTextOverflow: TileTextOverflow;
 	tileImageFit: TileImageFit;
-	gaplessTileGrid: boolean;
 	skinTone: SkinTone;
 	lastVisitedProjectId: string;
 	lastVisitedPageId: string;

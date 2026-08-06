@@ -57,18 +57,3 @@ export function tileTextWraps(): boolean {
 export function tileImageFitClass(): string {
 	return IMAGE_FIT_CLASS[localSettings().tileImageFit] ?? IMAGE_FIT_CLASS.contain;
 }
-
-// Gapless mode packs tiles edge to edge: no grid gap, no board padding, and square tile corners
-// so adjacent tiles form one continuous surface — bigger targets with no dead space between them.
-
-export function boardGridGapClass(): string {
-	return localSettings().gaplessTileGrid ? '' : 'gap-2 p-2';
-}
-
-export function tileCornerClass(): string {
-	return localSettings().gaplessTileGrid ? '' : 'rounded-md';
-}
-
-export function tileGridIsGapless(): boolean {
-	return localSettings().gaplessTileGrid;
-}

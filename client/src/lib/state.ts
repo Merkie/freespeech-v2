@@ -184,7 +184,6 @@ export const [localSettings, setLocalSettings] = createSignal<LocalSettings>({
 	tileTextSize: 'medium',
 	tileTextOverflow: 'truncate',
 	tileImageFit: 'contain',
-	gaplessTileGrid: false,
 	skinTone: 'medium',
 	lastVisitedProjectId: '',
 	lastVisitedPageId: '',
