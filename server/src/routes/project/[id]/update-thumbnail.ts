@@ -67,12 +67,33 @@ export const POST = [
 		await page.close();
 
 		const fileName = `${Date.now()}-thumbnail.png`;
-		const file = new File([Buffer.from(screenshotBuffer)], fileName, {
-			type: 'image/png',
-		});
+		const newThumbnailKey = `${slugify(project.user.name)}-${project.user.id}/${fileName}`;
 
-		// Skip deletion for shared template thumbnails — they're referenced by every user who imported that template.
-		if (project.imageUrl && !project.imageUrl.startsWith('/template-')) {
+		await s3.send(
+			new PutObjectCommand({
+				Bucket: R2_BUCKET,
+				Key: newThumbnailKey,
+				Body: Buffer.from(screenshotBuffer),
+				ContentType: 'image/png',
+			}),
+		);
+
+		const newImageUrl = `/${newThumbnailKey}`;
+
+		// jsonb_set instead of rewriting the whole blob: a sync can land while the
+		// screenshot renders, and a read-modify-write here would revert its page edits.
+		await prisma.$executeRaw`
+			UPDATE "Project"
+			SET "imageUrl" = ${newImageUrl},
+			    "blob" = jsonb_set("blob", '{imageUrl}', to_jsonb(${newImageUrl}::text)),
+			    "updatedAt" = now()
+			WHERE "id" = ${project.id}
+		`;
+
+		// Delete the old thumbnail only after the new URL is committed, so a failure
+		// anywhere above leaves the record pointing at an object that still exists.
+		// Skip shared template thumbnails — they're referenced by every user who imported that template.
+		if (project.imageUrl && project.imageUrl !== newImageUrl && !project.imageUrl.startsWith('/template-')) {
 			const key = project.imageUrl.split('/').filter(Boolean).join('/');
 			try {
 				await s3.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }));
@@ -80,32 +101,6 @@ export const POST = [
 				console.warn(`Failed to delete thumbnail ${key}:`, err);
 			}
 		}
-
-		const newThumbnailKey = `${slugify(project.user.name)}-${project.user.id}/${fileName}`;
-
-		const fileArrayBuffer = await file.arrayBuffer();
-		const fileBuffer = Buffer.from(fileArrayBuffer);
-
-		const uploadCommand = new PutObjectCommand({
-			Bucket: R2_BUCKET,
-			Key: newThumbnailKey,
-			Body: fileBuffer,
-			ContentType: 'image/png',
-		});
-		await s3.send(uploadCommand);
-
-		const newImageUrl = `/${newThumbnailKey}`;
-		const currentBlob = project.blob as unknown as Record<string, unknown>;
-
-		await prisma.project.update({
-			where: {
-				id: project.id,
-			},
-			data: {
-				imageUrl: newImageUrl,
-				blob: { ...currentBlob, imageUrl: newImageUrl },
-			},
-		});
 
 		res.json({ success: true });
 	},

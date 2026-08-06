@@ -34,12 +34,15 @@ export type ProjectBlob = {
 };
 
 // --- Sync data helper (columns synced from blob for fast listing queries) ---
+// imageUrl is deliberately absent: it is server-owned, written only by
+// update-thumbnail. The client's copy is whatever it last pulled, so accepting
+// it on sync would revert newer thumbnails to URLs whose R2 objects the
+// thumbnail route has already deleted.
 
 export function getRecordSyncData(blob: ProjectBlob) {
 	return {
 		name: blob.name,
 		description: blob.description,
-		imageUrl: blob.imageUrl,
 		columns: blob.columns,
 		rows: blob.rows,
 		homePageId: blob.homePageId,
@@ -112,7 +115,7 @@ export async function applyProjectBlob(
 ): Promise<{ success: boolean; conflict?: boolean; serverBlob?: ProjectBlob; newLastEditedAt?: string }> {
 	const project = await prisma.project.findFirst({
 		where: { id: projectId, userId },
-		select: { id: true, lastEditedAt: true },
+		select: { id: true, lastEditedAt: true, imageUrl: true },
 	});
 
 	if (!project) {
@@ -127,11 +130,13 @@ export async function applyProjectBlob(
 
 	const now = new Date();
 
-	// Store full blob (minus transient id/lastEditedAt) and sync columns
+	// Store full blob (minus transient id/lastEditedAt) and sync columns.
+	// The stored blob keeps the server's imageUrl (not the client's) so pulled
+	// and offline-cached blobs always carry the current thumbnail URL.
 	const blobData = {
 		name: blob.name,
 		description: blob.description,
-		imageUrl: blob.imageUrl,
+		imageUrl: project.imageUrl,
 		columns: blob.columns,
 		rows: blob.rows,
 		homePageId: blob.homePageId,
