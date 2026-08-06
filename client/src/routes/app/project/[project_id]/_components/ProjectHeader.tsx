@@ -27,6 +27,8 @@ export default function ProjectHeader() {
 		return page?.name || 'Loading...';
 	};
 
+	const canGoBack = () => pageHistory().length > 0;
+
 	const handleEditPage = () => {
 		const page = getPageFromBlob(currentPageId());
 		if (page) {
@@ -47,8 +49,24 @@ export default function ProjectHeader() {
 
 	return (
 		<div class="relative flex h-14 shrink-0 touch-none items-center bg-zinc-900 px-3 text-zinc-100">
-			{/* Left side - Page Actions (only in edit mode) */}
+			{/* Left side - back button with page name (view mode) or Page Actions (edit mode) */}
 			<div class="flex flex-1 gap-2">
+				<Show when={!editingTiles()}>
+					<button
+						onClick={() => navigateBackInProject()}
+						disabled={!canGoBack()}
+						aria-label="Go back to previous page"
+						class={cn(
+							'flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors',
+							canGoBack() ? 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700' : 'cursor-default border-transparent',
+						)}
+					>
+						<Show when={canGoBack()}>
+							<i class="bi bi-chevron-left text-zinc-400" />
+						</Show>
+						<span>{pageName()}</span>
+					</button>
+				</Show>
 				<Show when={editingTiles()}>
 					{/* Page Actions dropdown */}
 					<div class="relative" ref={setPageDropdownRef}>
@@ -99,19 +117,9 @@ export default function ProjectHeader() {
 				</Show>
 			</div>
 
-			{/* Center - Page name; outside edit mode it becomes a back button once there is a trail */}
-			<Show
-				when={!editingTiles() && pageHistory().length > 0}
-				fallback={<p class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-light">{pageName()}</p>}
-			>
-				<button
-					onClick={() => navigateBackInProject()}
-					aria-label="Go back to previous page"
-					class="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-md px-3 py-1.5 font-light transition-colors hover:bg-zinc-800 active:bg-zinc-700"
-				>
-					<i class="bi bi-chevron-left text-sm text-zinc-400" />
-					<span>{pageName()}</span>
-				</button>
+			{/* Center - Page name (edit mode only; in view mode the name lives in the left back button) */}
+			<Show when={editingTiles()}>
+				<p class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-light">{pageName()}</p>
 			</Show>
 
 			{/* Right side - Sync status + Unsaved badge + Multi-select toggle */}
