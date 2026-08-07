@@ -5,11 +5,20 @@ import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
 import { DecryptElevenLabsKey } from '@/utils/decrypt-key';
 import { ELEVEN_LABS_KEY } from '@/utils/env';
+import { prepareSpeechText } from '@/utils/prepare-speech-text';
 
 const schema = z.object({
 	voiceId: z.string().min(1),
-	text: z.string().min(1).max(1500),
+	text: z.string().trim().min(1).max(1500),
 });
+
+const AAC_VOICE_SETTINGS = {
+	stability: 0.7,
+	similarity_boost: 0.75,
+	style: 0,
+	use_speaker_boost: true,
+	speed: 1,
+} as const;
 
 export const POST = [
 	authenticateRequest(),
@@ -33,21 +42,20 @@ export const POST = [
 
 		const _startTime = Date.now();
 
-		const response = await fetch(
-			`https://api.elevenlabs.io/v1/text-to-speech/${body.voiceId}?optimize_streaming_latency=1`,
-			{
-				method: 'POST',
-				headers: {
-					Accept: 'audio/mpeg',
-					'Content-Type': 'application/json',
-					'xi-api-key': userKey || ELEVEN_LABS_KEY,
-				},
-				body: JSON.stringify({
-					text: body.text,
-					model_id: 'eleven_flash_v2_5',
-				}),
+		const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${body.voiceId}`, {
+			method: 'POST',
+			headers: {
+				Accept: 'audio/mpeg',
+				'Content-Type': 'application/json',
+				'xi-api-key': userKey || ELEVEN_LABS_KEY,
 			},
-		);
+			body: JSON.stringify({
+				text: prepareSpeechText(body.text),
+				model_id: 'eleven_flash_v2_5',
+				language_code: 'en',
+				voice_settings: AAC_VOICE_SETTINGS,
+			}),
+		});
 
 		const audio = await response.arrayBuffer();
 
