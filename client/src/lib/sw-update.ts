@@ -2,14 +2,28 @@ import { createSignal } from 'solid-js';
 import { Workbox } from 'workbox-window';
 import { currentPageId, projectBlob, sentence, setSentence } from '@/lib/state';
 import type { ProjectBlob, Tile } from '@/lib/types';
+import { apiVersionMismatch } from '@/lib/version-check';
 
 export const [swNeedsUpdate, setSwNeedsUpdate] = createSignal(false);
 export const [swUpdateChecking, setSwUpdateChecking] = createSignal(false);
+// Set when a client that knows it is stale keeps completing update checks without a new worker
+// taking control. The banner degrades from "Check Again" to a plain reload at that point — a
+// stale page under an already-updated worker can never progress any other way, and for every
+// other stuck state the reload re-runs registration, which is the next-best recovery.
+export const [swUpdateStalled, setSwUpdateStalled] = createSignal(false);
 
 let workbox: Workbox | null = null;
 let registrationPromise: Promise<ServiceWorkerRegistration | undefined> | null = null;
 let updateCheckPromise: Promise<void> | null = null;
 let checkRequestedBeforeRegistration = false;
+let futileUpdateChecks = 0;
+
+// One empty check proves little (it may race a deploy or an install still in flight), so two
+// must complete before the banner stops promising automatic progress.
+const STALL_AFTER_FUTILE_CHECKS = 2;
+// update() resolves when the sw.js fetch completes, not when a found worker has installed and
+// taken control — judging a check futile waits this long for a real takeover to land first.
+const CHECK_SETTLE_MS = 4000;
 
 const RELOAD_STATE_KEY = 'freespeech-update-reload-state';
 
@@ -29,17 +43,27 @@ export function registerServiceWorker() {
 
 	workbox = new Workbox('/sw.js');
 
-	// The worker calls skipWaiting() on install, so an update never parks in "waiting" — it takes
-	// control of open pages as soon as it lands. The old flow (show a banner at "waiting", have the
-	// button post SKIP_WAITING and reload on "controlling") depended on exactly the handoff iOS is
-	// flaky about, which is how the banner's button could visibly do nothing. Now the banner only
-	// appears once the new worker is already in control, and the button is a plain reload — the one
-	// step that cannot fail.
+	// The worker calls skipWaiting() on install, so an update normally takes control of open pages
+	// as soon as it lands, and this event is how the banner learns that happened. `isUpdate` alone
+	// is not the right test: workbox sets it from whether the page was controlled at registration
+	// time, so a takeover after an uncontrolled load (hard reload, a registration iOS evicted)
+	// arrives flagged `isExternal` instead — ignoring those left the banner spinning forever under
+	// a worker that had already updated. A first-time install sets neither flag and stays silent.
 	workbox.addEventListener('controlling', (event) => {
-		if (event.isUpdate) {
+		if (event.isUpdate || event.isExternal) {
+			resetSwUpdateStall();
 			setSwUpdateChecking(false);
 			setSwNeedsUpdate(true);
 		}
+	});
+
+	// skipWaiting() during install is exactly the handoff iOS drops sometimes. A worker parked in
+	// "waiting" makes every later update check a byte-identical no-op — permanently, since nothing
+	// else ever promotes it while pages stay open — so kick it with the SKIP_WAITING message the
+	// worker still handles. workbox also fires this at register() time for a worker left waiting
+	// by a previous session, which is what recovers an already-stuck device on its next launch.
+	workbox.addEventListener('waiting', () => {
+		workbox?.messageSkipWaiting();
 	});
 
 	registrationPromise = workbox.register();
@@ -62,20 +86,35 @@ export function registerServiceWorker() {
 	window.addEventListener('online', () => void requestServiceWorkerUpdate());
 }
 
+/** Clears stall tracking so the next mismatch episode judges its own checks fresh. */
+export function resetSwUpdateStall() {
+	futileUpdateChecks = 0;
+	setSwUpdateStalled(false);
+}
+
 /** Checks for a worker update now, coalescing visibility/API/interval triggers into one request. */
 export function requestServiceWorkerUpdate(): Promise<void> {
 	if (!workbox || !registrationPromise) {
 		checkRequestedBeforeRegistration = true;
 		return Promise.resolve();
 	}
-	if (swNeedsUpdate() || !navigator.onLine) return Promise.resolve();
+	// No navigator.onLine gate here: installed iOS PWAs sometimes report it false while the
+	// network works, which silently disabled every check. A genuinely offline update() just
+	// rejects into the catch below.
+	if (swNeedsUpdate()) return Promise.resolve();
 	if (updateCheckPromise) return updateCheckPromise;
 
 	setSwUpdateChecking(true);
 	const wb = workbox;
 	updateCheckPromise = registrationPromise
-		.then((registration) => {
-			if (registration) return wb.update();
+		.then(async (registration) => {
+			if (!registration) return;
+			await wb.update();
+			await new Promise((resolve) => setTimeout(resolve, CHECK_SETTLE_MS));
+			if (!swNeedsUpdate() && apiVersionMismatch()) {
+				futileUpdateChecks += 1;
+				if (futileUpdateChecks >= STALL_AFTER_FUTILE_CHECKS) setSwUpdateStalled(true);
+			}
 		})
 		.catch(() => undefined)
 		.finally(() => {
