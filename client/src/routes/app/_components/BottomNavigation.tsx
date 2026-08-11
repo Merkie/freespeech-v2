@@ -4,12 +4,11 @@ import { setPendingEditModeAction } from '@/components/Modal/_modal_inners/SaveE
 import { discardEditMode, editModeHasChanges, enterEditMode } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
-import { lastVisitedProjectId, navigateToPageInProject } from '@/lib/page-actions';
+import { lastVisitedProjectId, navigateHomeInProject } from '@/lib/page-actions';
 import { pinLockActive } from '@/lib/pin';
 import {
 	editingTiles,
 	project,
-	projectHomePageId,
 	requestPinUnlock,
 	setActiveModalId,
 	setEditingTilePositions,
@@ -45,11 +44,8 @@ const BottomNavigation: Component = () => {
 
 	const handleHomeClick = (e: MouseEvent) => {
 		if (!editingTiles()) {
-			// Not in edit mode — just navigate home
-			const homeId = projectHomePageId();
-			if (homeId) {
-				navigateToPageInProject(homeId);
-			}
+			// Not in edit mode — return to the root and discard the path that led here.
+			navigateHomeInProject();
 			return;
 		}
 
@@ -57,10 +53,7 @@ const BottomNavigation: Component = () => {
 		e.preventDefault();
 
 		const navigateHome = () => {
-			const homeId = projectHomePageId();
-			if (homeId) {
-				navigateToPageInProject(homeId);
-			}
+			navigateHomeInProject();
 		};
 
 		if (editModeHasChanges()) {

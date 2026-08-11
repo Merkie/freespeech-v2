@@ -2,6 +2,7 @@ import { batch } from 'solid-js';
 import api from './api';
 import { loadProjectBlob } from './blob-sync';
 import { getCachedProjects } from './cache/blob-cache';
+import { extendNavigationPath, resetNavigationPath, stepBackInNavigationPath } from './navigation-path';
 import { pickDefaultProject } from './project-order';
 import {
 	currentPageId,
@@ -149,7 +150,7 @@ export function navigateToPageInProject(pageId: string): boolean {
 	// Empty means initial load; capped so a long session can't grow the stack forever.
 	const from = currentPageId();
 	if (from && from !== pageId) {
-		setPageHistory([...pageHistory(), from].slice(-50));
+		setPageHistory(extendNavigationPath(pageHistory(), from, pageId));
 	}
 
 	setCurrentPageId(pageId);
@@ -160,25 +161,47 @@ export function navigateToPageInProject(pageId: string): boolean {
 	return true;
 }
 
+/**
+ * Return to the board's root and start a fresh navigation path. Unlike an ordinary page link,
+ * Home must not leave the page being exited behind for Back to revisit.
+ */
+export function navigateHomeInProject(): boolean {
+	const blob = projectBlob();
+
+	// Clear first so a Home press always resets the visible Back state, even if the board is still
+	// loading or its configured home page was removed from malformed legacy data.
+	setPageHistory(resetNavigationPath());
+	if (!blob) {
+		console.warn('No project blob loaded');
+		return false;
+	}
+
+	const homePageId = getHomePageId(blob);
+	if (!homePageId || !blob.pages.some((page) => page.id === homePageId)) {
+		console.warn('Home page not found in blob');
+		return false;
+	}
+
+	setCurrentPageId(homePageId);
+	trackVisit(blob.id, homePageId);
+	return true;
+}
+
 // Step back to the most recently visited page, skipping any that were deleted since.
 // Does not push onto the history, so repeated presses walk further back.
 export function navigateBackInProject(): boolean {
 	const blob = projectBlob();
 	if (!blob) return false;
 
-	const history = [...pageHistory()];
-	while (history.length > 0) {
-		const target = history.pop();
-		if (target && target !== currentPageId() && blob.pages.some((p) => p.id === target)) {
-			setPageHistory(history);
-			setCurrentPageId(target);
-			trackVisit(blob.id, target);
-			return true;
-		}
-	}
+	const step = stepBackInNavigationPath(pageHistory(), currentPageId(), (pageId) =>
+		blob.pages.some((page) => page.id === pageId),
+	);
+	setPageHistory(step.path);
+	if (!step.target) return false;
 
-	setPageHistory(history);
-	return false;
+	setCurrentPageId(step.target);
+	trackVisit(blob.id, step.target);
+	return true;
 }
 
 // Get home page ID from blob
