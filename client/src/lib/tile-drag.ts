@@ -14,6 +14,7 @@ import {
 	setEditingTilePositions,
 	tilePositionKey,
 } from './state';
+import { type DragGridDelta, dragDeltaBetween, dragGroupFits, translateDragPosition } from './tile-drag-geometry';
 import type { Tile, TilePosition, TilePositionKey } from './types';
 
 /** Which half of a folder tile the pointer is over: "add" drops inside it, "swap" trades places. */
@@ -85,32 +86,6 @@ export function isDropPreviewCell(cell: TilePosition): boolean {
 	return dropPreviewKeys().has(tilePositionKey(cell));
 }
 
-// --- Grid arithmetic ---
-
-type GridDelta = { dx: number; dy: number; dPage: number };
-
-function deltaBetween(anchor: TilePosition, cell: TilePosition): GridDelta {
-	return { dx: cell.x - anchor.x, dy: cell.y - anchor.y, dPage: cell.page - anchor.page };
-}
-
-/**
- * Columns wrap. A tile pushed past the right edge reappears on the left of the same row, so a
- * selection sitting near an edge can still be moved instead of the drop being refused outright.
- * Rows and subpages do not wrap — only the horizontal axis.
- */
-function wrapColumn(x: number, columns: number): number {
-	if (columns <= 0) return x;
-	return ((x % columns) + columns) % columns;
-}
-
-function translate(position: TilePosition, delta: GridDelta, columns: number): TilePosition {
-	return {
-		x: wrapColumn(position.x + delta.dx, columns),
-		y: position.y + delta.dy,
-		page: position.page + delta.dPage,
-	};
-}
-
 /**
  * The cells the group would occupy if dropped here. Empty for an "Add" drop, whose tiles leave
  * this page entirely — the folder's own overlay says that instead.
@@ -122,9 +97,10 @@ function previewKeys(
 	side: FolderDropSide,
 ): Set<TilePositionKey> {
 	if (!anchor || side === 'add') return new Set();
-	const delta = deltaBetween(anchor, cell);
+	const rows = project()?.rows ?? 0;
+	const delta = dragDeltaBetween(anchor, cell, rows);
 	const columns = project()?.columns ?? 0;
-	return new Set(group.map((tile) => tilePositionKey(translate(tile, delta, columns))));
+	return new Set(group.map((tile) => tilePositionKey(translateDragPosition(tile, delta, columns, rows))));
 }
 
 // --- Pointer session ---
@@ -469,11 +445,15 @@ function moveTilesToCell(group: Tile[], anchor: Tile, cell: TilePosition): void 
 	if (!pageId || !groupFits(group, anchor, cell)) return;
 
 	const columns = project()?.columns ?? 0;
-	const delta = deltaBetween(anchor, cell);
-	if (delta.dx === 0 && delta.dy === 0 && delta.dPage === 0) return;
+	const rows = project()?.rows ?? 0;
+	const delta = dragDeltaBetween(anchor, cell, rows);
+	if (delta.dx === 0 && delta.dRow === 0) return;
 
 	const groupKeys = new Set(group.map(tilePositionKey));
-	const moves = group.map((tile) => ({ from: toPosition(tile), to: translate(tile, delta, columns) }));
+	const moves = group.map((tile) => ({
+		from: toPosition(tile),
+		to: translateDragPosition(tile, delta, columns, rows),
+	}));
 
 	const landingKeys = new Set(moves.map((m) => tilePositionKey(m.to)));
 
@@ -489,13 +469,13 @@ function moveTilesToCell(group: Tile[], anchor: Tile, cell: TilePosition): void 
 		(t) => !groupKeys.has(tilePositionKey(t)) && landingKeys.has(tilePositionKey(t)),
 	);
 
-	const inverse: GridDelta = { dx: -delta.dx, dy: -delta.dy, dPage: -delta.dPage };
+	const inverse: DragGridDelta = { dx: -delta.dx, dRow: -delta.dRow };
 	const leftovers: Tile[] = [];
 	for (const tile of displaced) {
 		// Mirror the group's own move. Wrapping is a rotation of each row, so reversing the delta
 		// inverts it exactly — this cell is always one the group is leaving, though not necessarily
 		// one it frees up when the group overlaps itself.
-		const mirrored = translate(tile, inverse, columns);
+		const mirrored = translateDragPosition(tile, inverse, columns, rows);
 		if (freeCells.delete(tilePositionKey(mirrored))) {
 			moves.push({ from: toPosition(tile), to: mirrored });
 		} else {
@@ -561,21 +541,13 @@ function toPosition(tile: TilePosition): TilePosition {
 }
 
 /**
- * Whether translating the group onto `cell` keeps every tile on the board. Columns wrap, so only
- * the row and the subpage can actually run off it.
+ * Whether translating the group onto `cell` keeps every tile on the board. Subpages form one
+ * continuous vertical grid, so crossing a seam is valid; only moving above subpage zero is not.
  */
 function groupFits(group: Tile[], anchor: Tile | null, cell: TilePosition): boolean {
-	if (!anchor || group.length === 0) return false;
-
 	const columns = project()?.columns ?? 0;
 	const rows = project()?.rows ?? 0;
-	if (columns <= 0 || rows <= 0) return false;
-
-	const delta = deltaBetween(anchor, cell);
-	return group.every((tile) => {
-		const y = tile.y + delta.dy;
-		return y >= 0 && y < rows && tile.page + delta.dPage >= 0;
-	});
+	return dragGroupFits(group, anchor, cell, columns, rows);
 }
 
 /**
