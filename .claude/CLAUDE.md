@@ -21,6 +21,20 @@ cd server && npm install && npx prisma generate && bun --watch src/index.ts
 cd client && npm run build   # tsc -b && vite build
 ```
 
+### Per-account migration from the original FreeSpeech database
+
+Use `server/scripts/migrate-account-to-v2.sh` to copy one account from the normalized
+`freespeech_api` database into the blob-based `freespeech_v2` database. It builds a throwaway
+database containing only that account, runs `migrate-to-blob.ts` there, validates counts and blobs,
+backs up `freespeech_v2`, and imports the converted `User` and `Project` rows in one transaction.
+The source database is read-only throughout; never run `migrate-to-blob.ts` against it directly.
+
+```bash
+cd /opt/freespeech-v2/server
+bash scripts/migrate-account-to-v2.sh --email user@example.com          # target-safe dry run
+bash scripts/migrate-account-to-v2.sh --email user@example.com --apply  # back up and import
+```
+
 ## Architecture
 
 All project data (pages, tiles, templates) lives in a single `Project.blob` JSON column. The client downloads the full blob, edits locally via `mutateBlob()`, and debounce-syncs back to the server. Page navigation is instant (signal swap, zero network calls).

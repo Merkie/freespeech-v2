@@ -8,6 +8,7 @@
 		"db:generate": "prisma generate",
 		"db:push": "prisma db push",
 		"db:studio": "prisma studio",
+		"migrate:account-to-v2": "bash scripts/migrate-account-to-v2.sh",
 		"seed:templates": "bun scripts/seed-templates.ts"
 	},
 	"keywords": [],
