@@ -1,6 +1,8 @@
 import { A } from '@solidjs/router';
-import type { Component } from 'solid-js';
+import { type Component, For } from 'solid-js';
+import { cn } from '@/lib/cn';
 import OfflineSettingsNotice from './_components/OfflineSettingsNotice';
+import { SETTINGS_SECTIONS } from './_components/settings-sections';
 
 const SettingsPage: Component = () => {
 	return (
@@ -10,58 +12,27 @@ const SettingsPage: Component = () => {
 				<OfflineSettingsNotice />
 			</div>
 
-			<div class="flex flex-col gap-8 p-8 pb-[200px]">
-				<div class="flex flex-col gap-8 md:flex-row">
-					<A
-						href="/app/dashboard/settings/voice"
-						class="group flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 transition-all select-none hover:border-blue-200 hover:bg-blue-50"
-					>
-						<div class="grid h-[70px] w-[70px] place-items-center rounded-lg bg-blue-100">
-							<i class="bi bi-volume-up-fill text-[40px] text-blue-500"></i>
-						</div>
-						<span class="text-3xl text-zinc-800 transition-all group-hover:text-blue-500">Voice</span>
-						<div class="flex-1"></div>
-						<i class="bi bi-arrow-right-short text-6xl text-zinc-500 transition-all group-hover:text-blue-500"></i>
-					</A>
-
-					<A
-						href="/app/dashboard/settings/behavior"
-						class="group flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 transition-all select-none hover:border-pink-200 hover:bg-pink-50"
-					>
-						<div class="grid h-[70px] w-[70px] place-items-center rounded-lg bg-pink-100">
-							<i class="bi bi-gear-wide-connected text-[40px] text-pink-500"></i>
-						</div>
-						<span class="text-3xl text-zinc-800 transition-all group-hover:text-pink-500">Behavior</span>
-						<div class="flex-1"></div>
-						<i class="bi bi-arrow-right-short text-6xl text-zinc-500 transition-all group-hover:text-pink-500"></i>
-					</A>
-				</div>
-
-				<div class="flex flex-col gap-8 md:flex-row">
-					<A
-						href="/app/dashboard/settings/access-controls"
-						class="group flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 transition-all select-none hover:border-amber-200 hover:bg-amber-50"
-					>
-						<div class="grid h-[70px] w-[70px] place-items-center rounded-lg bg-amber-100">
-							<i class="bi bi-lock-fill text-[40px] text-amber-500"></i>
-						</div>
-						<span class="text-3xl text-zinc-800 transition-all group-hover:text-amber-500">Access Controls</span>
-						<div class="flex-1"></div>
-						<i class="bi bi-arrow-right-short text-6xl text-zinc-500 transition-all group-hover:text-amber-500"></i>
-					</A>
-
-					<A
-						href="/app/dashboard/settings/appearance"
-						class="group flex flex-1 items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 transition-all select-none hover:border-purple-200 hover:bg-purple-50"
-					>
-						<div class="grid h-[70px] w-[70px] place-items-center rounded-lg bg-purple-100">
-							<i class="bi bi-palette-fill text-[40px] text-purple-500"></i>
-						</div>
-						<span class="text-3xl text-zinc-800 transition-all group-hover:text-purple-500">Appearance</span>
-						<div class="flex-1"></div>
-						<i class="bi bi-arrow-right-short text-6xl text-zinc-500 transition-all group-hover:text-purple-500"></i>
-					</A>
-				</div>
+			<div class="grid grid-cols-1 gap-8 p-8 pb-[200px] md:grid-cols-2">
+				<For each={Object.values(SETTINGS_SECTIONS)}>
+					{(section) => (
+						<A
+							href={section.href}
+							class={cn(
+								'group flex items-center gap-4 rounded-xl border-2 border-zinc-300 p-4 transition-all select-none',
+								section.cardHoverClass,
+							)}
+						>
+							<div class={cn('grid h-[70px] w-[70px] place-items-center rounded-lg', section.iconClass)}>
+								<i class={cn(section.icon, 'text-[40px]')}></i>
+							</div>
+							<span class={cn('text-3xl text-zinc-800 transition-all', section.labelHoverClass)}>{section.title}</span>
+							<div class="flex-1"></div>
+							<i
+								class={cn('bi bi-arrow-right-short text-6xl text-zinc-500 transition-all', section.labelHoverClass)}
+							></i>
+						</A>
+					)}
+				</For>
 			</div>
 		</>
 	);

@@ -117,7 +117,17 @@ async function saveAccountSettings(
 	const userId = user()?.id;
 	if (!userId) throw new Error('No signed-in account');
 
-	const saved = await api.user.updateAccessControls(settings);
+	// Applied optimistically so the controls respond on tap like the device-local settings do,
+	// then reconciled with the server's copy — or rolled back — when the request settles.
+	const previous = accessControlSettings();
+	replaceSettings({ ...previous, ...settings });
+	let saved: AccessControlSettings;
+	try {
+		saved = await api.user.updateAccessControls(settings);
+	} catch (error) {
+		replaceSettings(previous);
+		throw error;
+	}
 	replaceSettings(saved);
 	clearLockout();
 	await cacheAccessControlSettings(userId, saved).catch(() => undefined);
@@ -160,7 +170,16 @@ export async function disablePinLock(): Promise<void> {
 }
 
 export async function setBoardCollaborationEnabled(enabled: boolean): Promise<void> {
-	const saved = await api.user.updateCollaboration(enabled);
+	// Optimistic for the same reason as saveAccountSettings: the switch should move on tap.
+	const previous = accessControlSettings();
+	replaceSettings({ ...previous, collaborationEnabled: enabled });
+	let saved: boolean;
+	try {
+		saved = await api.user.updateCollaboration(enabled);
+	} catch (error) {
+		replaceSettings(previous);
+		throw error;
+	}
 	const settings = { ...accessControlSettings(), collaborationEnabled: saved };
 	replaceSettings(settings);
 	const userId = user()?.id;

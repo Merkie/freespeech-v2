@@ -1,9 +1,27 @@
 import { A } from '@solidjs/router';
 import { For, type JSX, Show } from 'solid-js';
 import { cn } from '@/lib/cn';
+import OfflineSettingsNotice from './OfflineSettingsNotice';
+import type { SettingsSection } from './settings-sections';
 
 // Shared controls for the settings screens. The dashboard is used on tablets by carers as often
 // as by communicators, so hit targets stay large and every control is labelled for screen readers.
+
+// Every settings subpage is the same shell: centred column, offline notice, section header.
+export function SettingsPageLayout(props: { section: SettingsSection; children: JSX.Element }) {
+	return (
+		<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 pb-[200px] sm:p-6 lg:p-8">
+			<OfflineSettingsNotice />
+			<SettingsPageHeader
+				title={props.section.title}
+				description={props.section.tagline}
+				icon={props.section.icon}
+				iconClass={props.section.iconClass}
+			/>
+			{props.children}
+		</div>
+	);
+}
 
 // Back button + icon badge + title. The badge repeats the icon and colour of the card that was
 // tapped on the settings index, so landing on a subpage confirms where the tap went.
@@ -39,16 +57,20 @@ export function SettingCard(props: { children: JSX.Element; class?: string }) {
 // One setting inside a SettingCard. Rows are separated by the card's divide-y rather than their
 // own borders. 'inline' seats the control beside the title (toggles, small buttons); 'stacked'
 // seats it under the description for controls too wide to share the title row (segmented rows).
+// 'sub' marks a secondary setting that only exists inside another setting's card (h3, smaller).
 export function SettingRow(props: {
 	title: string;
-	description?: string;
+	description?: JSX.Element;
 	layout?: 'inline' | 'stacked';
+	sub?: boolean;
 	children: JSX.Element;
 }) {
 	return (
 		<div class="flex flex-col gap-1 p-5 sm:p-6">
 			<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-				<h2 class="text-2xl font-semibold text-zinc-900">{props.title}</h2>
+				<Show when={props.sub} fallback={<h2 class="text-2xl font-semibold text-zinc-900">{props.title}</h2>}>
+					<h3 class="text-xl font-semibold text-zinc-900">{props.title}</h3>
+				</Show>
 				<Show when={props.layout !== 'stacked'}>{props.children}</Show>
 			</div>
 			<Show when={props.description}>
@@ -57,6 +79,16 @@ export function SettingRow(props: {
 			<Show when={props.layout === 'stacked'}>
 				<div class="pt-3">{props.children}</div>
 			</Show>
+		</div>
+	);
+}
+
+// The muted strip at the bottom of a card for context that isn't a setting itself.
+export function SettingFootnote(props: { icon: string; iconClass?: string; children: JSX.Element }) {
+	return (
+		<div class="flex items-start gap-3 border-t border-zinc-100 bg-zinc-50 p-5 sm:px-6">
+			<i class={cn(props.icon, 'mt-0.5 text-lg', props.iconClass ?? 'text-zinc-400')} />
+			<p class="max-w-prose text-base text-zinc-500">{props.children}</p>
 		</div>
 	);
 }

@@ -2,8 +2,8 @@ import type { Component } from 'solid-js';
 import { localSettings, setLocalSettings } from '@/lib/state';
 import { TILE_IMAGE_FIT_OPTIONS, TILE_TEXT_OVERFLOW_OPTIONS, TILE_TEXT_SIZE_OPTIONS } from '@/lib/tile-appearance';
 import type { LocalSettings } from '@/lib/types';
-import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
-import { SegmentedControl, SettingCard, SettingRow, SettingsPageHeader } from '../_components/SettingControls';
+import { SegmentedControl, SettingCard, SettingRow, SettingsPageLayout } from '../_components/SettingControls';
+import { SETTINGS_SECTIONS } from '../_components/settings-sections';
 import TilePreview from './_components/TilePreview';
 
 const AppearanceSettingsPage: Component = () => {
@@ -12,16 +12,7 @@ const AppearanceSettingsPage: Component = () => {
 		setLocalSettings({ ...localSettings(), [key]: value });
 
 	return (
-		<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 pb-[200px] sm:p-6 lg:p-8">
-			<OfflineSettingsNotice />
-
-			<SettingsPageHeader
-				title="Appearance"
-				description="How tiles look on every board"
-				icon="bi bi-palette-fill"
-				iconClass="bg-purple-100 text-purple-500"
-			/>
-
+		<SettingsPageLayout section={SETTINGS_SECTIONS.appearance}>
 			<SettingCard>
 				<div class="divide-y divide-zinc-100">
 					<SettingRow layout="stacked" title="Tile text size" description="How large the label on each tile is drawn.">
@@ -65,17 +56,15 @@ const AppearanceSettingsPage: Component = () => {
 			</SettingCard>
 
 			<SettingCard>
-				<div class="flex flex-col gap-5 p-5 sm:p-6">
-					<div class="flex flex-col gap-1">
-						<h2 class="text-2xl font-semibold text-zinc-900">Preview</h2>
-						<p class="max-w-prose text-lg text-zinc-500">
-							Sample tiles drawn with the settings above. These settings apply to every board on this device.
-						</p>
-					</div>
+				<SettingRow
+					layout="stacked"
+					title="Preview"
+					description="Sample tiles drawn with the settings above. These settings apply to every board on this device."
+				>
 					<TilePreview />
-				</div>
+				</SettingRow>
 			</SettingCard>
-		</div>
+		</SettingsPageLayout>
 	);
 };
 

@@ -2,7 +2,7 @@ import { type Component, createSignal, onCleanup, Show } from 'solid-js';
 import api from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { setUser, user } from '@/lib/state';
-import { Toggle } from '../../_components/SettingControls';
+import { SettingRow, Toggle } from '../../_components/SettingControls';
 
 interface ElevenLabsPersonalKeyProps {
 	apiKey: string;
@@ -56,29 +56,31 @@ const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => 
 	};
 
 	return (
-		<div class="flex flex-col gap-4 p-5 sm:p-6">
-			<div class="flex flex-col gap-1">
-				<div class="flex items-center justify-between gap-6">
-					<h3 class="text-xl font-semibold text-zinc-900">Use my own ElevenLabs key</h3>
-					<Toggle checked={usePersonalKey()} onChange={handleToggle} label="Use personal ElevenLabs key" />
-				</div>
-				<p class="max-w-prose text-lg text-zinc-500">
-					A personal API key unlocks custom voices you've created from short audio clips, and helps reduce our costs.
-					Get one at{' '}
-					<a
-						class="font-medium text-blue-600 underline underline-offset-2"
-						target="_blank"
-						href="https://elevenlabs.io/"
-						rel="noopener"
-					>
-						elevenlabs.io
-					</a>
-					.
-				</p>
-			</div>
+		<>
+			<SettingRow
+				sub
+				title="Use my own ElevenLabs key"
+				description={
+					<>
+						A personal API key unlocks custom voices you've created from short audio clips, and helps reduce our costs.
+						Get one at{' '}
+						<a
+							class="font-medium text-blue-600 underline underline-offset-2"
+							target="_blank"
+							href="https://elevenlabs.io/"
+							rel="noopener"
+						>
+							elevenlabs.io
+						</a>
+						.
+					</>
+				}
+			>
+				<Toggle checked={usePersonalKey()} onChange={handleToggle} label="Use personal ElevenLabs key" />
+			</SettingRow>
 
 			<Show when={usePersonalKey()}>
-				<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2 px-5 pb-5 sm:px-6 sm:pb-6">
 					<label class="text-lg font-medium text-zinc-700" for="elevenlabs-api-key">
 						API key
 					</label>
@@ -133,7 +135,7 @@ const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => 
 					</p>
 				</div>
 			</Show>
-		</div>
+		</>
 	);
 };
 

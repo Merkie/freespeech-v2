@@ -3,8 +3,8 @@ import { clearCache, getCacheStats } from '@/lib/cache';
 import { cn } from '@/lib/cn';
 import { enableSentenceCopyButton, localSettings, setEnableSentenceCopyButton, setLocalSettings } from '@/lib/state';
 import type { LocalSettings } from '@/lib/types';
-import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
-import { SettingButton, SettingCard, SettingRow, SettingsPageHeader, Toggle } from '../_components/SettingControls';
+import { SettingButton, SettingCard, SettingRow, SettingsPageLayout, Toggle } from '../_components/SettingControls';
+import { SETTINGS_SECTIONS } from '../_components/settings-sections';
 
 function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
@@ -46,16 +46,7 @@ const BehaviorSettingsPage: Component = () => {
 	};
 
 	return (
-		<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 pb-[200px] sm:p-6 lg:p-8">
-			<OfflineSettingsNotice />
-
-			<SettingsPageHeader
-				title="Behavior"
-				description="What happens when tiles are tapped"
-				icon="bi bi-gear-wide-connected"
-				iconClass="bg-pink-100 text-pink-500"
-			/>
-
+		<SettingsPageLayout section={SETTINGS_SECTIONS.behavior}>
 			<SettingCard>
 				<div class="divide-y divide-zinc-100">
 					<SettingRow
@@ -110,38 +101,37 @@ const BehaviorSettingsPage: Component = () => {
 			</SettingCard>
 
 			<SettingCard>
-				<div class="flex flex-col gap-5 p-5 sm:p-6">
-					<div class="flex flex-col gap-1">
-						<h2 class="text-2xl font-semibold text-zinc-900">Offline cache</h2>
-						<p class="max-w-prose text-lg text-zinc-500">
-							Project data is cached on this device for offline use and faster loading.
-						</p>
-					</div>
+				<SettingRow
+					layout="stacked"
+					title="Offline cache"
+					description="Project data is cached on this device for offline use and faster loading."
+				>
+					<div class="flex flex-col gap-5">
+						<div class="flex flex-col gap-3">
+							<div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+								<p class="text-lg text-zinc-600">
+									{formatBytes(cacheUsed())} of {formatBytes(cacheMax())} used
+								</p>
+								<p class="text-lg text-zinc-500">
+									{cacheEntries()} {cacheEntries() === 1 ? 'project' : 'projects'} cached
+								</p>
+							</div>
 
-					<div class="flex flex-col gap-3">
-						<div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-							<p class="text-lg text-zinc-600">
-								{formatBytes(cacheUsed())} of {formatBytes(cacheMax())} used
-							</p>
-							<p class="text-lg text-zinc-500">
-								{cacheEntries()} {cacheEntries() === 1 ? 'project' : 'projects'} cached
-							</p>
+							<div class="h-3 w-full overflow-hidden rounded-full bg-zinc-200">
+								<div
+									class={cn('h-full rounded-full transition-all', usagePercent() > 80 ? 'bg-red-400' : 'bg-blue-500')}
+									style={{ width: `${usagePercent()}%` }}
+								></div>
+							</div>
 						</div>
 
-						<div class="h-3 w-full overflow-hidden rounded-full bg-zinc-200">
-							<div
-								class={cn('h-full rounded-full transition-all', usagePercent() > 80 ? 'bg-red-400' : 'bg-blue-500')}
-								style={{ width: `${usagePercent()}%` }}
-							></div>
-						</div>
+						<SettingButton variant="danger" onClick={handleClearCache} disabled={clearing() || cacheEntries() === 0}>
+							{clearing() ? 'Clearing…' : 'Clear cache'}
+						</SettingButton>
 					</div>
-
-					<SettingButton variant="danger" onClick={handleClearCache} disabled={clearing() || cacheEntries() === 0}>
-						{clearing() ? 'Clearing…' : 'Clear cache'}
-					</SettingButton>
-				</div>
+				</SettingRow>
 			</SettingCard>
-		</div>
+		</SettingsPageLayout>
 	);
 };
 
