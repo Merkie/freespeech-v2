@@ -14,11 +14,17 @@ import {
 	setEditingTilePositions,
 	tilePositionKey,
 } from './state';
-import { type DragGridDelta, dragDeltaBetween, dragGroupFits, translateDragPosition } from './tile-drag-geometry';
+import {
+	compareTilePositions,
+	type DragGridDelta,
+	type DropAction,
+	dragDeltaBetween,
+	dragGroupFits,
+	findFirstAvailableSlots,
+	resolveDropAction,
+	translateDragPosition,
+} from './tile-drag-geometry';
 import type { Tile, TilePosition, TilePositionKey } from './types';
-
-/** Which half of a folder tile the pointer is over: "add" drops inside it, "swap" trades places. */
-export type FolderDropSide = 'add' | 'swap' | null;
 
 /**
  * One tile in the lifted ghost. The offsets are measured from the grabbed tile's cell at pickup,
@@ -53,9 +59,9 @@ const EDGE_SCROLL_SPEED_PX = 14;
 const [draggedTiles, setDraggedTiles] = createSignal<Tile[]>([]);
 // The tile the pointer grabbed. The rest of the group keeps its offset from this one.
 const [dragAnchor, setDragAnchor] = createSignal<Tile | null>(null);
-// The cell under the pointer, and which folder half is active over it.
+// The cell under the pointer and any directional action it represents.
 const [dragOverKey, setDragOverKey] = createSignal<TilePositionKey | null>(null);
-const [folderDropSide, setFolderDropSide] = createSignal<FolderDropSide>(null);
+const [dropAction, setDropAction] = createSignal<DropAction>(null);
 // Every cell the group would land on, so the board can outline the whole footprint rather than
 // just the one cell under the pointer.
 const [dropPreviewKeys, setDropPreviewKeys] = createSignal<Set<TilePositionKey>>(new Set());
@@ -72,7 +78,7 @@ const [dragGhost, setDragGhost] = createSignal<{
 } | null>(null);
 const [dragGhostPosition, setDragGhostPosition] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
 
-export { draggedTiles, dragOverKey, folderDropSide, dragGhost, dragGhostPosition, dropPreviewKeys };
+export { draggedTiles, dragOverKey, dropAction, dragGhost, dragGhostPosition, dropPreviewKeys };
 
 export const isDraggingTiles = () => draggedTiles().length > 0;
 
@@ -88,15 +94,10 @@ export function isDropPreviewCell(cell: TilePosition): boolean {
 
 /**
  * The cells the group would occupy if dropped here. Empty for an "Add" drop, whose tiles leave
- * this page entirely — the folder's own overlay says that instead.
+ * this page entirely—the folder's own overlay communicates that destination instead.
  */
-function previewKeys(
-	group: Tile[],
-	anchor: Tile | null,
-	cell: TilePosition,
-	side: FolderDropSide,
-): Set<TilePositionKey> {
-	if (!anchor || side === 'add') return new Set();
+function previewKeys(group: Tile[], anchor: Tile | null, cell: TilePosition, action: DropAction): Set<TilePositionKey> {
+	if (!anchor || action === 'add') return new Set();
 	const rows = project()?.rows ?? 0;
 	const delta = dragDeltaBetween(anchor, cell, rows);
 	const columns = project()?.columns ?? 0;
@@ -304,7 +305,7 @@ function clearDragState(): void {
 		setDraggedTiles([]);
 		setDragAnchor(null);
 		setDragOverKey(null);
-		setFolderDropSide(null);
+		setDropAction(null);
 		setDropPreviewKeys(new Set<TilePositionKey>());
 		setDragGhost(null);
 	});
@@ -330,19 +331,15 @@ function updateDropTarget(clientX: number, clientY: number): void {
 	}
 
 	const occupant = findTileByPosition(getCurrentPageTiles(), cell) ?? null;
-	// A folder that is itself being dragged is not a target — that is the group passing over its
-	// own cell.
-	const overFolder = !!occupant?.navigation && !isTileBeingDragged(occupant);
-	let side: FolderDropSide = null;
-
-	if (overFolder) {
-		const rect = element.getBoundingClientRect();
-		side = clientX - rect.left < rect.width / 2 ? 'add' : 'swap';
-	}
+	const group = draggedTiles();
+	// A tile in the moving selection is not its own target. Every other folder is one unambiguous
+	// Add target across its full surface; Swap is the reverse folder-to-regular-tile gesture.
+	const occupantIsDragged = occupant ? isTileBeingDragged(occupant) : false;
+	const action = resolveDropAction(group, occupant, occupantIsDragged);
 
 	// "Add" sends the group to another page entirely, so the board grid does not constrain it.
 	// Everything else slides the group across this board and has to stay on it.
-	if (side !== 'add' && !groupFits(draggedTiles(), dragAnchor(), cell)) {
+	if (action !== 'add' && !groupFits(group, dragAnchor(), cell)) {
 		clearDropTarget();
 		return;
 	}
@@ -351,8 +348,8 @@ function updateDropTarget(clientX: number, clientY: number): void {
 	dropTargetOccupant = occupant;
 	batch(() => {
 		setDragOverKey(tilePositionKey(cell));
-		setFolderDropSide(side);
-		setDropPreviewKeys(previewKeys(draggedTiles(), dragAnchor(), cell, side));
+		setDropAction(action);
+		setDropPreviewKeys(previewKeys(group, dragAnchor(), cell, action));
 	});
 }
 
@@ -361,7 +358,7 @@ function clearDropTarget(): void {
 	dropTargetOccupant = null;
 	batch(() => {
 		setDragOverKey(null);
-		setFolderDropSide(null);
+		setDropAction(null);
 		setDropPreviewKeys(new Set<TilePositionKey>());
 	});
 }
@@ -372,7 +369,7 @@ function commitDrop(): void {
 	const cell = dropTargetCell;
 	const occupant = dropTargetOccupant;
 	const folderPageId =
-		folderDropSide() === 'add' && occupant?.navigation && !isTileBeingDragged(occupant) ? occupant.navigation : null;
+		dropAction() === 'add' && occupant?.navigation && !isTileBeingDragged(occupant) ? occupant.navigation : null;
 
 	clearDragState();
 	if (!anchor || !cell) return;
@@ -516,11 +513,17 @@ function moveTilesIntoFolder(group: Tile[], folderPageId: string): void {
 		destination.tiles.map((t) => tilePositionKey(t)).filter((key) => folderPageId !== pageId || !movingKeys.has(key)),
 	);
 
-	const moves = group.map((tile) => {
-		const slot = findNextAvailableSlot(occupied, columns, rows);
-		occupied.add(tilePositionKey(slot));
-		return { from: toPosition(tile), to: slot };
-	});
+	// Source order and destination order are both row-major. The dragged footprint is intentionally
+	// discarded: a 2x2 selection lands top-left, top-right, bottom-left, bottom-right in the first
+	// four free destination cells, even when those openings are scattered.
+	const orderedGroup = [...group].sort(compareTilePositions);
+	const slots = findFirstAvailableSlots(
+		(position) => occupied.has(tilePositionKey(position)),
+		group.length,
+		columns,
+		rows,
+	);
+	const moves = orderedGroup.map((tile, index) => ({ from: toPosition(tile), to: slots[index] }));
 
 	batch(() => {
 		blobMoveTilesToPage(pageId, folderPageId, moves);
@@ -548,28 +551,6 @@ function groupFits(group: Tile[], anchor: Tile | null, cell: TilePosition): bool
 	const columns = project()?.columns ?? 0;
 	const rows = project()?.rows ?? 0;
 	return dragGroupFits(group, anchor, cell, columns, rows);
-}
-
-/**
- * First free cell on a page, scanning each row right-to-left and top-to-bottom, then overflowing
- * onto later subpages. Mirrors how the SvelteKit board placed tiles dropped into a folder.
- */
-function findNextAvailableSlot(occupied: Set<TilePositionKey>, columns: number, rows: number): TilePosition {
-	let maxPage = 0;
-	for (const key of occupied) {
-		maxPage = Math.max(maxPage, parseTilePositionKey(key).page);
-	}
-
-	// maxPage + 1 guarantees an empty subpage is always reachable as a fallback.
-	for (let page = 0; page <= maxPage + 1; page++) {
-		for (let y = 0; y < rows; y++) {
-			for (let x = columns - 1; x >= 0; x--) {
-				if (!occupied.has(tilePositionKey({ x, y, page }))) return { x, y, page };
-			}
-		}
-	}
-
-	return { x: columns - 1, y: 0, page: maxPage + 1 };
 }
 
 /**

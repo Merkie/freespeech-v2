@@ -2,7 +2,7 @@ import { For, Show } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { cn } from '@/lib/cn';
 import { tileImageFitClass, tileTextSizeClass, tileTextWraps } from '@/lib/tile-appearance';
-import { dragGhost, dragGhostPosition, folderDropSide } from '@/lib/tile-drag';
+import { dragGhost, dragGhostPosition, dropAction } from '@/lib/tile-drag';
 import type { Tile as TileType } from '@/lib/types';
 
 // Drawn smaller than the tiles it came from, so the cells it is passing over stay visible.
@@ -22,13 +22,13 @@ const STACK_EASE = 'transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1)';
  * browser's desktop one only ever shows a single element, so both platforms use this instead.
  *
  * A multi-select keeps its shape while it travels — an L stays an L — which is what makes it
- * readable as "these tiles". Over a folder's "Add" half the tiles gather into a fanned stack,
+ * readable as "these tiles". Over a folder's full "Add" target the tiles gather into a fanned stack,
  * previewing the pile they are about to become inside that folder. Rendered through a Portal so
  * the board's scroll container cannot clip it.
  */
 export default function DragGhost() {
 	// A lone tile is already its own pile, so it keeps the tilt at all times.
-	const isStacked = () => folderDropSide() === 'add' || (dragGhost()?.count ?? 0) <= 1;
+	const isStacked = () => dropAction() === 'add' || (dragGhost()?.count ?? 0) <= 1;
 
 	return (
 		<Show when={dragGhost()}>

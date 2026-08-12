@@ -1,11 +1,63 @@
 import { describe, expect, test } from 'bun:test';
-import { dragDeltaBetween, dragGroupFits, translateDragPosition } from '../src/lib/tile-drag-geometry';
+import {
+	compareTilePositions,
+	dragDeltaBetween,
+	dragGroupFits,
+	findFirstAvailableSlots,
+	resolveDropAction,
+	translateDragPosition,
+} from '../src/lib/tile-drag-geometry';
 import type { TilePosition } from '../src/lib/types';
 
 const columns = 4;
 const rows = 3;
 
 describe('tile drag geometry', () => {
+	test('makes tile-to-folder Add and the reverse folder-to-tile gesture Swap', () => {
+		const regular = { navigation: '' };
+		const folder = { navigation: 'linked-page' };
+
+		expect(resolveDropAction([regular], folder, false)).toBe('add');
+		expect(resolveDropAction([regular, folder], folder, false)).toBe('add');
+		expect(resolveDropAction([folder], regular, false)).toBe('swap');
+		expect(resolveDropAction([regular], regular, false)).toBeNull();
+		expect(resolveDropAction([folder, regular], regular, false)).toBeNull();
+		expect(resolveDropAction([regular], folder, true)).toBeNull();
+	});
+
+	test('orders a dragged selection left-to-right and top-to-bottom across subpages', () => {
+		const positions: TilePosition[] = [
+			{ x: 1, y: 0, page: 1 },
+			{ x: 2, y: 1, page: 0 },
+			{ x: 1, y: 1, page: 0 },
+			{ x: 2, y: 0, page: 0 },
+		];
+
+		expect(positions.sort(compareTilePositions)).toEqual([
+			{ x: 2, y: 0, page: 0 },
+			{ x: 1, y: 1, page: 0 },
+			{ x: 2, y: 1, page: 0 },
+			{ x: 1, y: 0, page: 1 },
+		]);
+	});
+
+	test('packs a folder drop into the first free cells in reading order without keeping its shape', () => {
+		const occupied = new Set(['0-0-0', '2-0-0', '0-1-0', '1-1-0', '2-1-0', '3-1-0']);
+		const slots = findFirstAvailableSlots(
+			(position) => occupied.has(`${position.x}-${position.y}-${position.page}`),
+			4,
+			columns,
+			2,
+		);
+
+		expect(slots).toEqual([
+			{ x: 1, y: 0, page: 0 },
+			{ x: 3, y: 0, page: 0 },
+			{ x: 0, y: 0, page: 1 },
+			{ x: 1, y: 0, page: 1 },
+		]);
+	});
+
 	test('lets a landing footprint continue onto the next subpage', () => {
 		const anchor: TilePosition = { x: 1, y: 1, page: 0 };
 		const group = [anchor, { x: 1, y: 2, page: 0 }];

@@ -5,7 +5,7 @@ import { tileImageFitClass, tileTextRowHeightClass, tileTextSizeClass, tileTextW
 import {
 	consumeDragClick,
 	dragOverKey,
-	folderDropSide,
+	dropAction,
 	handleTilePointerDown,
 	isDraggingTiles,
 	isDropPreviewCell,
@@ -26,12 +26,13 @@ export default function Tile(props: TileProps) {
 	const isDragged = () => isTileBeingDragged(props.tile);
 	const isHovered = () => isDraggingTiles() && dragOverKey() === tilePositionKey(props.tile);
 
-	// Folders offer a choice between dropping inside and trading places, so they get the split
-	// overlay instead of the plain drop ring every other tile shows.
-	const showFolderOverlay = () => isHovered() && isFolder() && !isDragged();
+	// Drop behavior is directional: tile → folder adds, while one folder → regular tile swaps.
+	const showAddOverlay = () => isHovered() && isFolder() && !isDragged() && dropAction() === 'add';
+	const showSwapOverlay = () => isHovered() && !isFolder() && !isDragged() && dropAction() === 'swap';
+	const showActionOverlay = () => showAddOverlay() || showSwapOverlay();
 	// Outlines every cell the drop would fill, not just the one under the pointer, so a
 	// multi-select shows its whole landing footprint in the shape it is being carried in.
-	const showDropRing = () => isDraggingTiles() && isDropPreviewCell(props.tile) && !showFolderOverlay();
+	const showDropPreview = () => isDraggingTiles() && isDropPreviewCell(props.tile) && !showActionOverlay();
 
 	// A drag ends in a click on the tile it started from; without this the tile would toggle its
 	// own selection the instant the user lets go.
@@ -50,7 +51,7 @@ export default function Tile(props: TileProps) {
 		// held — ordinary text everywhere else in the app stays selectable and copyable.
 		<div
 			class={cn('relative rounded-md transition-shadow select-none [-webkit-touch-callout:none]', {
-				'ring-2 ring-blue-500': showDropRing(),
+				'ring-2 ring-blue-500': showDropPreview(),
 			})}
 			style={{
 				'grid-column-start': props.tile.x + 1,
@@ -147,43 +148,31 @@ export default function Tile(props: TileProps) {
 				</Show>
 			</div>
 
-			<Show when={showFolderOverlay()}>
-				{/* Add / Swap drop overlay for folder tiles. Extends up over the folder "nub" so it
-				    reads as one cohesive panel, and stays click-through so dragover keeps firing. */}
-				<div class="pointer-events-none absolute top-[-4px] right-0 bottom-0 left-0 z-20 flex overflow-hidden rounded-md">
-					<div
-						class={cn(
-							'flex flex-1 flex-col items-center justify-center gap-1 text-center transition-all',
-							folderDropSide() === 'add'
-								? 'bg-emerald-600 text-white ring-2 ring-inset ring-white'
-								: 'bg-zinc-900/85 text-white/50',
-						)}
-					>
-						<i
-							class={cn('bi bi-folder-plus leading-none drop-shadow transition-transform', {
-								'scale-110': folderDropSide() === 'add',
-							})}
-							style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }}
-						/>
-						<span class="text-xs font-extrabold tracking-wide uppercase drop-shadow">Add</span>
-					</div>
-					<div class="w-0 self-stretch border-l-2 border-dashed border-white" />
-					<div
-						class={cn(
-							'flex flex-1 flex-col items-center justify-center gap-1 text-center transition-all',
-							folderDropSide() === 'swap'
-								? 'bg-blue-600 text-white ring-2 ring-inset ring-white'
-								: 'bg-zinc-900/85 text-white/50',
-						)}
-					>
-						<i
-							class={cn('bi bi-arrow-left-right leading-none drop-shadow transition-transform', {
-								'scale-110': folderDropSide() === 'swap',
-							})}
-							style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }}
-						/>
-						<span class="text-xs font-extrabold tracking-wide uppercase drop-shadow">Swap</span>
-					</div>
+			<Show when={showDropPreview()}>
+				{/* The translucent fill makes every landing cell visible through the lifted ghost, like
+				    the landing projection in a block puzzle. */}
+				<div class="pointer-events-none absolute inset-0 z-20 rounded-md border-2 border-blue-500 bg-blue-400/30 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.65)]" />
+			</Show>
+
+			<Show when={showActionOverlay()}>
+				{/* A folder is one full Add target. Swap only appears in the reverse direction, when a
+				    single folder is carried onto a regular tile. */}
+				<div
+					class={cn(
+						'pointer-events-none absolute right-0 bottom-0 left-0 z-20 flex flex-col items-center justify-center gap-1 rounded-md bg-blue-600 text-center text-white ring-2 ring-inset ring-white',
+						{ 'top-[-4px]': showAddOverlay(), 'top-0': showSwapOverlay() },
+					)}
+				>
+					<i
+						class={cn('bi leading-none drop-shadow', {
+							'bi-folder-plus': showAddOverlay(),
+							'bi-arrow-left-right': showSwapOverlay(),
+						})}
+						style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }}
+					/>
+					<span class="text-xs font-extrabold tracking-wide uppercase drop-shadow">
+						{showAddOverlay() ? 'Add' : 'Swap'}
+					</span>
 				</div>
 			</Show>
 		</div>
