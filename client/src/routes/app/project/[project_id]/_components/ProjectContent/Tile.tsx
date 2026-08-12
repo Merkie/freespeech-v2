@@ -26,12 +26,12 @@ export default function Tile(props: TileProps) {
 	const isDragged = () => isTileBeingDragged(props.tile);
 	const isHovered = () => isDraggingTiles() && dragOverKey() === tilePositionKey(props.tile);
 
-	// A folder is an explicit Add target. Dragging a folder onto a regular tile uses the same
-	// unlabelled landing preview as every other ordinary move/swap.
-	const showAddOverlay = () => isHovered() && isFolder() && !isDragged() && dropAction() === 'add';
+	// A folder stays visible as a folder while it is targeted. Its green silhouette and small
+	// folder-plus badge distinguish "move inside" from the board's blue landing preview.
+	const showFolderAddTarget = () => isHovered() && isFolder() && !isDragged() && dropAction() === 'add';
 	// Outlines every cell the drop would fill, not just the one under the pointer, so a
 	// multi-select shows its whole landing footprint in the shape it is being carried in.
-	const showDropPreview = () => isDraggingTiles() && isDropPreviewCell(props.tile) && !showAddOverlay();
+	const showDropPreview = () => isDraggingTiles() && isDropPreviewCell(props.tile) && !showFolderAddTarget();
 
 	// A drag ends in a click on the tile it started from; without this the tile would toggle its
 	// own selection the instant the user lets go.
@@ -75,6 +75,13 @@ export default function Tile(props: TileProps) {
 				<Show when={props.tile.navigation}>
 					<div class="pointer-events-none absolute top-[-6px] left-[-2px] h-[8px] w-[calc(50%+4px)] rounded-t-[8px] bg-blue-300" />
 				</Show>
+			</Show>
+
+			<Show when={showFolderAddTarget()}>
+				{/* Sit behind the opaque folder rather than over it. The two pieces trace the body and
+				    navigation bump as one soft green target while leaving its label and picture readable. */}
+				<div class="pointer-events-none absolute -inset-1 rounded-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
+				<div class="pointer-events-none absolute top-[-8px] left-[-4px] h-[12px] w-[calc(50%+8px)] rounded-t-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
 			</Show>
 
 			{/* Fade the opaque tile and bump as one composited shape. Dimming or pulsing them
@@ -154,11 +161,11 @@ export default function Tile(props: TileProps) {
 				<div class="pointer-events-none absolute inset-0 z-20 rounded-md border-2 border-blue-300 bg-blue-200/50 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.7)]" />
 			</Show>
 
-			<Show when={showAddOverlay()}>
-				{/* A folder is one full Add target, with no competing action inside it. */}
-				<div class="pointer-events-none absolute top-[-4px] right-0 bottom-0 left-0 z-20 flex flex-col items-center justify-center gap-1 rounded-md bg-blue-200/90 text-center text-blue-900 ring-2 ring-inset ring-white/80">
-					<i class="bi bi-folder-plus leading-none" style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }} />
-					<span class="text-xs font-extrabold tracking-wide uppercase">Add</span>
+			<Show when={showFolderAddTarget()}>
+				{/* The gathering drag ghost already communicates the motion, so a compact icon is enough
+				    confirmation without covering the folder with a redundant Add label. */}
+				<div class="pointer-events-none absolute -top-2 -right-2 z-20 grid h-8 w-8 place-items-center rounded-full bg-emerald-500 text-white shadow-lg ring-2 ring-white">
+					<i class="bi bi-folder-plus text-base leading-none" />
 				</div>
 			</Show>
 		</div>
