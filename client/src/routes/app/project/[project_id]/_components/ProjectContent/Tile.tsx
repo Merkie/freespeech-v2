@@ -80,8 +80,10 @@ export default function Tile(props: TileProps) {
 			<Show when={showFolderAddTarget()}>
 				{/* Sit behind the opaque folder rather than over it. The two pieces trace the body and
 				    navigation bump as one soft green target while leaving its label and picture readable. */}
-				<div class="pointer-events-none absolute -inset-1 rounded-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
-				<div class="pointer-events-none absolute top-[-8px] left-[-4px] h-[12px] w-[calc(50%+8px)] rounded-t-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
+				<div class="folder-add-target-in pointer-events-none absolute inset-0">
+					<div class="absolute -inset-1 rounded-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
+					<div class="absolute top-[-8px] left-[-4px] h-[12px] w-[calc(50%+8px)] rounded-t-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
+				</div>
 			</Show>
 
 			{/* Fade the opaque tile and bump as one composited shape. Dimming or pulsing them
@@ -164,7 +166,7 @@ export default function Tile(props: TileProps) {
 			<Show when={showFolderAddTarget()}>
 				{/* The gathering drag ghost already communicates the motion, so a compact icon is enough
 				    confirmation without covering the folder with a redundant Add label. */}
-				<div class="pointer-events-none absolute -top-2 -right-2 z-20 grid h-8 w-8 place-items-center rounded-full bg-emerald-500 text-white shadow-lg ring-2 ring-white">
+				<div class="folder-add-badge-in pointer-events-none absolute -top-2 -right-2 z-20 grid h-8 w-8 place-items-center rounded-full bg-emerald-500 text-white shadow-lg ring-2 ring-white">
 					<i class="bi bi-folder-plus text-base leading-none" />
 				</div>
 			</Show>
