@@ -155,3 +155,27 @@ html {
 .animate-splash-breathe {
 	animation: splash-breathe 2.2s ease-in-out infinite;
 }
+
+/* The board copy of each lifted tile remains in place while its drag ghost follows the pointer.
+   Pulse that original copy so both a single tile and every tile in a multi-selection clearly read
+   as "in motion" without animating the ghost or any destination cells. */
+@keyframes tile-drag-origin-pulse {
+	0%,
+	100% {
+		opacity: 0.25;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+.tile-drag-origin-pulse {
+	animation: tile-drag-origin-pulse 0.9s ease-in-out infinite;
+	will-change: opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tile-drag-origin-pulse {
+		animation: none;
+		opacity: 0.4;
+	}
+}

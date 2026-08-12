@@ -77,12 +77,13 @@ export default function Tile(props: TileProps) {
 				</Show>
 			</Show>
 
-			{/* Dim the opaque tile and bump as one composited shape. Dimming them separately
-			    makes their overlap show through at the top edge. */}
+			{/* Fade the opaque tile and bump as one composited shape. Dimming or pulsing them
+			    separately would make their overlap show through at the top edge. */}
 			<div
 				class={cn('absolute inset-0 transition-opacity', {
-					'opacity-40': props.isDimmed || isDragged(),
+					'opacity-40': props.isDimmed && !isDragged(),
 					'opacity-50': props.isSpeaking,
+					'tile-drag-origin-pulse': isDragged(),
 				})}
 			>
 				<button
