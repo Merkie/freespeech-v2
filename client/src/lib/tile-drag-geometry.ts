@@ -1,20 +1,15 @@
 import type { Tile, TilePosition } from './types';
 
 export type DragGridDelta = { dx: number; dRow: number };
-export type DropAction = 'add' | 'swap' | null;
+export type DropAction = 'add' | null;
 
 /**
- * Drop actions are directional. Anything carried onto a folder is added to its page; Swap is
- * offered only for the reverse gesture of carrying one folder onto a regular tile.
+ * Anything carried onto a folder is explicitly added to its page. Every other target—including
+ * a regular tile under a carried folder—uses the board's ordinary move/swap behavior.
  */
-export function resolveDropAction(
-	group: readonly Pick<Tile, 'navigation'>[],
-	occupant: Pick<Tile, 'navigation'> | null,
-	occupantIsDragged: boolean,
-): DropAction {
+export function resolveDropAction(occupant: Pick<Tile, 'navigation'> | null, occupantIsDragged: boolean): DropAction {
 	if (!occupant || occupantIsDragged) return null;
-	if (occupant.navigation) return 'add';
-	return group.length === 1 && !!group[0]?.navigation ? 'swap' : null;
+	return occupant.navigation ? 'add' : null;
 }
 
 /** Reading order across the board: left-to-right, then top-to-bottom, then later subpages. */

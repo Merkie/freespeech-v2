@@ -13,16 +13,13 @@ const columns = 4;
 const rows = 3;
 
 describe('tile drag geometry', () => {
-	test('makes tile-to-folder Add and the reverse folder-to-tile gesture Swap', () => {
+	test('labels folder targets Add and leaves ordinary tile swaps unlabelled', () => {
 		const regular = { navigation: '' };
 		const folder = { navigation: 'linked-page' };
 
-		expect(resolveDropAction([regular], folder, false)).toBe('add');
-		expect(resolveDropAction([regular, folder], folder, false)).toBe('add');
-		expect(resolveDropAction([folder], regular, false)).toBe('swap');
-		expect(resolveDropAction([regular], regular, false)).toBeNull();
-		expect(resolveDropAction([folder, regular], regular, false)).toBeNull();
-		expect(resolveDropAction([regular], folder, true)).toBeNull();
+		expect(resolveDropAction(folder, false)).toBe('add');
+		expect(resolveDropAction(regular, false)).toBeNull();
+		expect(resolveDropAction(folder, true)).toBeNull();
 	});
 
 	test('orders a dragged selection left-to-right and top-to-bottom across subpages', () => {

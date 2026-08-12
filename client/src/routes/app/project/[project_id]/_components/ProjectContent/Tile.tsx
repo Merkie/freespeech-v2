@@ -26,13 +26,12 @@ export default function Tile(props: TileProps) {
 	const isDragged = () => isTileBeingDragged(props.tile);
 	const isHovered = () => isDraggingTiles() && dragOverKey() === tilePositionKey(props.tile);
 
-	// Drop behavior is directional: tile → folder adds, while one folder → regular tile swaps.
+	// A folder is an explicit Add target. Dragging a folder onto a regular tile uses the same
+	// unlabelled landing preview as every other ordinary move/swap.
 	const showAddOverlay = () => isHovered() && isFolder() && !isDragged() && dropAction() === 'add';
-	const showSwapOverlay = () => isHovered() && !isFolder() && !isDragged() && dropAction() === 'swap';
-	const showActionOverlay = () => showAddOverlay() || showSwapOverlay();
 	// Outlines every cell the drop would fill, not just the one under the pointer, so a
 	// multi-select shows its whole landing footprint in the shape it is being carried in.
-	const showDropPreview = () => isDraggingTiles() && isDropPreviewCell(props.tile) && !showActionOverlay();
+	const showDropPreview = () => isDraggingTiles() && isDropPreviewCell(props.tile) && !showAddOverlay();
 
 	// A drag ends in a click on the tile it started from; without this the tile would toggle its
 	// own selection the instant the user lets go.
@@ -51,7 +50,7 @@ export default function Tile(props: TileProps) {
 		// held — ordinary text everywhere else in the app stays selectable and copyable.
 		<div
 			class={cn('relative rounded-md transition-shadow select-none [-webkit-touch-callout:none]', {
-				'ring-2 ring-blue-500': showDropPreview(),
+				'ring-2 ring-blue-300': showDropPreview(),
 			})}
 			style={{
 				'grid-column-start': props.tile.x + 1,
@@ -151,28 +150,14 @@ export default function Tile(props: TileProps) {
 			<Show when={showDropPreview()}>
 				{/* The translucent fill makes every landing cell visible through the lifted ghost, like
 				    the landing projection in a block puzzle. */}
-				<div class="pointer-events-none absolute inset-0 z-20 rounded-md border-2 border-blue-500 bg-blue-400/30 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.65)]" />
+				<div class="pointer-events-none absolute inset-0 z-20 rounded-md border-2 border-blue-300 bg-blue-200/50 shadow-[inset_0_0_0_2px_rgba(255,255,255,0.7)]" />
 			</Show>
 
-			<Show when={showActionOverlay()}>
-				{/* A folder is one full Add target. Swap only appears in the reverse direction, when a
-				    single folder is carried onto a regular tile. */}
-				<div
-					class={cn(
-						'pointer-events-none absolute right-0 bottom-0 left-0 z-20 flex flex-col items-center justify-center gap-1 rounded-md bg-blue-600 text-center text-white ring-2 ring-inset ring-white',
-						{ 'top-[-4px]': showAddOverlay(), 'top-0': showSwapOverlay() },
-					)}
-				>
-					<i
-						class={cn('bi leading-none drop-shadow', {
-							'bi-folder-plus': showAddOverlay(),
-							'bi-arrow-left-right': showSwapOverlay(),
-						})}
-						style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }}
-					/>
-					<span class="text-xs font-extrabold tracking-wide uppercase drop-shadow">
-						{showAddOverlay() ? 'Add' : 'Swap'}
-					</span>
+			<Show when={showAddOverlay()}>
+				{/* A folder is one full Add target, with no competing action inside it. */}
+				<div class="pointer-events-none absolute top-[-4px] right-0 bottom-0 left-0 z-20 flex flex-col items-center justify-center gap-1 rounded-md bg-blue-200/90 text-center text-blue-900 ring-2 ring-inset ring-white/80">
+					<i class="bi bi-folder-plus leading-none" style={{ 'font-size': 'clamp(20px, 3vw, 44px)' }} />
+					<span class="text-xs font-extrabold tracking-wide uppercase">Add</span>
 				</div>
 			</Show>
 		</div>

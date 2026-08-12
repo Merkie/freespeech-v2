@@ -333,9 +333,9 @@ function updateDropTarget(clientX: number, clientY: number): void {
 	const occupant = findTileByPosition(getCurrentPageTiles(), cell) ?? null;
 	const group = draggedTiles();
 	// A tile in the moving selection is not its own target. Every other folder is one unambiguous
-	// Add target across its full surface; Swap is the reverse folder-to-regular-tile gesture.
+	// Add target across its full surface; regular targets keep the ordinary move/swap preview.
 	const occupantIsDragged = occupant ? isTileBeingDragged(occupant) : false;
-	const action = resolveDropAction(group, occupant, occupantIsDragged);
+	const action = resolveDropAction(occupant, occupantIsDragged);
 
 	// "Add" sends the group to another page entirely, so the board grid does not constrain it.
 	// Everything else slides the group across this board and has to stay on it.
