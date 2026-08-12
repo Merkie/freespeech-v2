@@ -7,6 +7,7 @@ import { getCachedProjects } from '@/lib/cache/blob-cache';
 import { MODAL_ID } from '@/lib/constants';
 import { lastVisitedProjectId } from '@/lib/page-actions';
 import { setActiveModalId } from '@/lib/state';
+import CollaborationInvitations from '@/routes/app/dashboard/projects/_components/CollaborationInvitations';
 import ProjectCard from '@/routes/app/dashboard/projects/_components/ProjectCard';
 import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
 
@@ -14,7 +15,7 @@ const ProjectsPage: Component = () => {
 	const [searchQuery, setSearchQuery] = createSignal('');
 	const [showingCached, setShowingCached] = createSignal(false);
 
-	const [projects, { mutate: mutateProjects }] = createResource(
+	const [projects, { mutate: mutateProjects, refetch: refetchProjects }] = createResource(
 		() => (globalIsOnline() ? 'online' : 'offline'),
 		async (connection) => {
 			if (connection === 'offline') {
@@ -116,6 +117,10 @@ const ProjectsPage: Component = () => {
 				</div>
 			</Show>
 
+			<Show when={!showingCached()}>
+				<CollaborationInvitations onAccepted={() => void refetchProjects()} />
+			</Show>
+
 			{/* Projects Grid */}
 			<Show
 				when={!projects.loading}
@@ -171,7 +176,12 @@ const ProjectsPage: Component = () => {
 					<div class="m-8 grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3">
 						<For each={sortedProjects()}>
 							{(project) => (
-								<ProjectCard project={project} onToggleFavorite={handleToggleFavorite} onDelete={handleDelete} />
+								<ProjectCard
+									project={project}
+									onToggleFavorite={handleToggleFavorite}
+									onDelete={handleDelete}
+									onDuplicate={() => void refetchProjects()}
+								/>
 							)}
 						</For>
 					</div>

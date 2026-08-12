@@ -5,6 +5,7 @@ import { authenticateRequest } from '@/middleware/authenticate-request';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { CLIENT_HOST, R2_BUCKET } from '@/utils/env';
+import { projectAccessWhere } from '@/utils/project-access';
 import slugify from '@/utils/slugify';
 import { generateToken } from '@/utils/token';
 
@@ -27,11 +28,8 @@ async function getBrowserInstance() {
 export const POST = [
 	authenticateRequest(),
 	async (req: Request, res: Response) => {
-		const project = await prisma.project.findUnique({
-			where: {
-				id: req.params.id as string,
-				userId: req.userId!,
-			},
+		const project = await prisma.project.findFirst({
+			where: projectAccessWhere(req.params.id as string, req.userId!),
 			include: {
 				user: { select: { id: true, name: true } },
 			},

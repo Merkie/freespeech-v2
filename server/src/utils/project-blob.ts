@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import prisma from '@/resources/prisma';
+import { projectAccessWhere } from '@/utils/project-access';
 
 // --- Types ---
 
@@ -53,7 +54,7 @@ export function getRecordSyncData(blob: ProjectBlob) {
 
 export async function buildProjectBlob(projectId: string, userId: string): Promise<ProjectBlob | null> {
 	const project = await prisma.project.findFirst({
-		where: { id: projectId, userId },
+		where: projectAccessWhere(projectId, userId),
 		select: { id: true, blob: true, lastEditedAt: true },
 	});
 
@@ -114,7 +115,7 @@ export async function applyProjectBlob(
 	force = false,
 ): Promise<{ success: boolean; conflict?: boolean; serverBlob?: ProjectBlob; newLastEditedAt?: string }> {
 	const project = await prisma.project.findFirst({
-		where: { id: projectId, userId },
+		where: projectAccessWhere(projectId, userId),
 		select: { id: true, lastEditedAt: true, imageUrl: true },
 	});
 

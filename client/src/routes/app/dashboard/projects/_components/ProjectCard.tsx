@@ -6,13 +6,20 @@ import api from '@/lib/api';
 import { deleteCachedBlob, isBlobCached } from '@/lib/cache/blob-cache';
 import { MODAL_ID } from '@/lib/constants';
 import { lastVisitedProjectId } from '@/lib/page-actions';
-import { localSettings, setActiveModalId, setLocalSettings, setProjectToOptimize } from '@/lib/state';
+import {
+	localSettings,
+	setActiveModalId,
+	setLocalSettings,
+	setProjectToCollaborate,
+	setProjectToOptimize,
+} from '@/lib/state';
 import type { Project } from '@/lib/types';
 
 interface ProjectCardProps {
 	project: Project;
 	onToggleFavorite?: (projectId: string, newValue: boolean) => void;
 	onDelete?: (projectId: string) => void;
+	onDuplicate?: () => void | Promise<void>;
 }
 
 const ProjectCard: Component<ProjectCardProps> = (props) => {
@@ -23,12 +30,14 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 	const [cardRef, setCardRef] = createSignal<HTMLDivElement | undefined>(undefined);
 	const [cached, setCached] = createSignal(false);
 	const [favoriteOverride, setFavoriteOverride] = createSignal<boolean | null>(null);
+	const [duplicating, setDuplicating] = createSignal(false);
 
 	onMount(async () => {
 		setCached(await isBlobCached(props.project.id));
 	});
 
 	const isFavorite = () => favoriteOverride() ?? props.project.isFavorite;
+	const isShared = () => props.project.accessRole === 'collaborator';
 	const projectUrl = () => `/app/project/${props.project.id}`;
 
 	useOutsideClick(cardRef, () => {
@@ -71,11 +80,32 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 		// TODO: Implement rename functionality
 	};
 
-	const handleDuplicate = (e: MouseEvent) => {
+	const handleManageCollaborators = (e: MouseEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
 		setMenuOpen(false);
-		// TODO: Implement duplicate functionality
+		setProjectToCollaborate({ id: props.project.id, name: props.project.name });
+		setActiveModalId(MODAL_ID.MANAGE_COLLABORATORS);
+	};
+
+	const handleDuplicate = async (e: MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setMenuOpen(false);
+		if (duplicating()) return;
+
+		setDuplicating(true);
+		try {
+			const response = await api.project.duplicate(props.project.id);
+			if (!response.success || !response.project) return;
+			await props.onDuplicate?.();
+			void api.project
+				.updateThumbnail(response.project.id)
+				.then(() => props.onDuplicate?.())
+				.catch(() => undefined);
+		} finally {
+			setDuplicating(false);
+		}
 	};
 
 	const handleDelete = async (e: MouseEvent) => {
@@ -98,6 +128,24 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 				lastVisitedProjectId: '',
 				lastVisitedPageId: '',
 			});
+		}
+		props.onDelete?.(props.project.id);
+	};
+
+	const handleLeave = async (e: MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setMenuOpen(false);
+
+		const confirmed = window.confirm(`Leave the shared board "${props.project.name}"?`);
+		if (!confirmed) return;
+		const response = await api.project.leaveCollaboration(props.project.id).catch(() => undefined);
+		if (!response?.success) return;
+
+		await deleteCachedBlob(props.project.id).catch(() => undefined);
+		const settings = localSettings();
+		if (settings.lastVisitedProjectId === props.project.id) {
+			setLocalSettings({ ...settings, lastVisitedProjectId: '', lastVisitedPageId: '' });
 		}
 		props.onDelete?.(props.project.id);
 	};
@@ -131,6 +179,15 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 							<i class="bi bi-star-fill shrink-0 text-base leading-none text-amber-400" />
 						</Show>
 						<p class="truncate whitespace-nowrap">{props.project.name}</p>
+						<Show when={isShared()}>
+							<span
+								title={`Shared by ${props.project.owner?.name ?? 'another FreeSpeech user'}`}
+								class="flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700"
+							>
+								<i class="bi bi-people-fill leading-none" />
+								Shared
+							</span>
+						</Show>
 						<Show when={cached()}>
 							{/*
 							  An optical nudge, not a fix for a broken box. items-center already lands the glyph
@@ -186,104 +243,60 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 				class="absolute right-4 z-10 flex w-fit flex-col whitespace-nowrap rounded-md border border-zinc-200 bg-white p-2 text-sm shadow-lg transition-all"
 			>
 				<button
+					type="button"
 					onClick={handleToggleFavorite}
 					class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4"
-						viewBox="0 0 24 24"
-						fill={isFavorite() ? 'currentColor' : 'none'}
-						stroke="currentColor"
-						stroke-width="2"
-						classList={{ 'text-amber-400': isFavorite() }}
-					>
-						<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-					</svg>
+					<i class={`bi ${isFavorite() ? 'bi-star-fill text-amber-400' : 'bi-star'} text-base leading-none`} />
 					{isFavorite() ? 'Remove from Favorites' : 'Add to Favorites'}
 				</button>
-				<button
-					onClick={handleRename}
-					class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
+				<Show when={!isShared()}>
+					<button
+						type="button"
+						onClick={handleRename}
+						class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"
 					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-						/>
-					</svg>
-					Rename
-				</button>
+						<i class="bi bi-pencil text-base leading-none" />
+						Rename
+					</button>
+				</Show>
 				<button
+					type="button"
 					onClick={handleDuplicate}
+					disabled={duplicating()}
 					class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-						/>
-					</svg>
-					Duplicate
+					<i class={`bi ${duplicating() ? 'bi-arrow-repeat animate-spin' : 'bi-copy'} text-base leading-none`} />
+					{duplicating() ? 'Duplicating…' : 'Duplicate'}
 				</button>
+				<Show when={!isShared() && props.project.collaborationEnabled}>
+					<button
+						type="button"
+						onClick={handleManageCollaborators}
+						class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-sky-50 hover:text-sky-700"
+					>
+						<i class="bi bi-people text-base leading-none" />
+						Manage Collaborators
+					</button>
+				</Show>
 				<button
+					type="button"
 					onClick={handleOptimizeImages}
 					class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-						/>
-					</svg>
+					<i class="bi bi-images text-base leading-none" />
 					Optimize Images
 				</button>
 
 				<div class="my-2 border-t border-zinc-200" />
 
 				<button
-					onClick={handleDelete}
+					type="button"
+					onClick={isShared() ? handleLeave : handleDelete}
 					class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-red-500 transition-all hover:bg-red-50"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-						/>
-					</svg>
-					Delete
+					<i class={`bi ${isShared() ? 'bi-box-arrow-right' : 'bi-trash'} text-base leading-none`} />
+					{isShared() ? 'Leave Shared Board' : 'Delete'}
 				</button>
 			</div>
 		</div>

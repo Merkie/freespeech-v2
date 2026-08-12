@@ -7,6 +7,7 @@ import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
+import { projectAccessWhere } from '@/utils/project-access';
 import type { PageBlob } from '@/utils/project-blob';
 
 const schema = z.object({
@@ -37,7 +38,7 @@ export const POST = [
 		const projectId = req.params.id;
 
 		const project = await prisma.project.findFirst({
-			where: { id: projectId, userId: req.userId },
+			where: projectAccessWhere(projectId, req.userId!),
 		});
 
 		if (!project) {

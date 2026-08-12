@@ -10,7 +10,8 @@ datasource db {
 model User {
   id String @id @default(cuid())
 
-  Project Project[]
+  Project               Project[]
+  projectCollaborations ProjectCollaborator[]
 
   email                    String  @unique
   name                     String
@@ -27,6 +28,10 @@ model User {
   editPinSalt      String?
   editPinUpdatedAt DateTime @default(now())
 
+  // Account-level opt-in. Disabling it pauses every invitation and accepted
+  // collaborator's access without deleting the per-board collaborator list.
+  collaborationEnabled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -36,6 +41,8 @@ model Project {
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
+
+  collaborators ProjectCollaborator[]
 
   name        String
   description String?
@@ -54,4 +61,27 @@ model Project {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum ProjectCollaborationStatus {
+  PENDING
+  ACCEPTED
+}
+
+model ProjectCollaborator {
+  id String @id @default(cuid())
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  status      ProjectCollaborationStatus @default(PENDING)
+  isFavorite  Boolean                    @default(false)
+  invitedAt   DateTime                   @default(now())
+  respondedAt DateTime?
+
+  @@unique([projectId, userId])
+  @@index([userId, status])
 }

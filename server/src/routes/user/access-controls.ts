@@ -29,6 +29,7 @@ function serialize(settings: {
 	editPinHash: string | null;
 	editPinSalt: string | null;
 	editPinUpdatedAt: Date;
+	collaborationEnabled: boolean;
 }) {
 	return {
 		enabled: settings.editPinEnabled,
@@ -36,6 +37,7 @@ function serialize(settings: {
 		pinHash: settings.editPinHash,
 		pinSalt: settings.editPinSalt,
 		updatedAt: settings.editPinUpdatedAt.toISOString(),
+		collaborationEnabled: settings.collaborationEnabled,
 	};
 }
 
@@ -45,6 +47,7 @@ const select = {
 	editPinHash: true,
 	editPinSalt: true,
 	editPinUpdatedAt: true,
+	collaborationEnabled: true,
 } as const;
 
 export const GET = [

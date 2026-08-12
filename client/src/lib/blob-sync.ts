@@ -66,6 +66,13 @@ export function discardEditMode(): void {
 	editModeSnapshot = null;
 }
 
+/** Clear edit-mode bookkeeping after a newer server blob has replaced the clean editor snapshot. */
+export function exitEditModeAfterExternalUpdate(): void {
+	editModeActive = false;
+	editModeSnapshot = null;
+	setEditModeHasChanges(false);
+}
+
 export function hasUnsavedEditChanges(): boolean {
 	return editModeActive && editModeHasChanges();
 }
@@ -251,9 +258,9 @@ export function syncBlobToServer(): Promise<boolean> {
 }
 
 // --- Background revalidation ---
-export async function checkAndRevalidate(projectId: string): Promise<void> {
+export async function checkAndRevalidate(projectId: string): Promise<boolean> {
 	try {
-		if ((await getCachedBlobEntry(projectId))?.dirty) return;
+		if (hasUnsavedEditChanges() || (await getCachedBlobEntry(projectId))?.dirty) return false;
 		const beforeRequest = projectBlob();
 		const { lastEditedAt } = await api.project.syncCheck(projectId);
 		const current = projectBlob();
@@ -264,11 +271,13 @@ export async function checkAndRevalidate(projectId: string): Promise<void> {
 			if (blob && projectBlob() === current && !(await getCachedBlobEntry(projectId))?.dirty) {
 				setProjectBlob(blob);
 				await cacheBlob(blob, false);
+				return true;
 			}
 		}
 	} catch {
 		// Network error — ignore, we have cached data
 	}
+	return false;
 }
 
 // --- Flush all dirty blobs (called on reconnect) ---

@@ -79,7 +79,9 @@ function writeRuntime(runtime: AccessControlRuntime): void {
 }
 
 function replaceSettings(settings: AccessControlSettings): void {
-	setAccessControlSettings(settings);
+	// Older offline caches predate collaborationEnabled. Merge defaults so an upgraded PWA
+	// never exposes an undefined toggle while it is waiting to reconnect.
+	setAccessControlSettings({ ...DEFAULT_ACCESS_CONTROL_SETTINGS, ...settings });
 }
 
 /** Prefer the account record, falling back to this account's last IndexedDB copy when offline. */
@@ -109,7 +111,9 @@ export function useDefaultAccessControlSettings(): void {
 	setAccessControlSettingsLoaded(true);
 }
 
-async function saveAccountSettings(settings: Omit<AccessControlSettings, 'updatedAt'>): Promise<void> {
+async function saveAccountSettings(
+	settings: Pick<AccessControlSettings, 'enabled' | 'mode' | 'pinHash' | 'pinSalt'>,
+): Promise<void> {
 	const userId = user()?.id;
 	if (!userId) throw new Error('No signed-in account');
 
@@ -153,6 +157,14 @@ export async function disablePinLock(): Promise<void> {
 		pinHash: null,
 		pinSalt: null,
 	});
+}
+
+export async function setBoardCollaborationEnabled(enabled: boolean): Promise<void> {
+	const saved = await api.user.updateCollaboration(enabled);
+	const settings = { ...accessControlSettings(), collaborationEnabled: saved };
+	replaceSettings(settings);
+	const userId = user()?.id;
+	if (userId) await cacheAccessControlSettings(userId, settings).catch(() => undefined);
 }
 
 export async function verifyPin(pin: string): Promise<boolean> {

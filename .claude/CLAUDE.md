@@ -68,6 +68,7 @@ IndexedDB revision check → dirty: false only if the response matches the revis
 User     // id, email, name, password (hashed), profileImgUrl, elevenLabsApiKey (encrypted)
 Project  // id, userId, name, description, imageUrl, columns, rows, homePageId,
          // isPublic, isFavorite, blob (JSON — full ProjectBlob), lastEditedAt
+ProjectCollaborator // projectId, userId, pending/accepted status, per-user favorite
 ```
 
 Everything else is in the blob:
@@ -218,6 +219,20 @@ Pre-built vocabulary sets (CommuniKate, Quick Core, Vocal Flair, Sequoia, Projec
 Cold offline launches keep a stored session unless `/auth/me` returns a definitive 401/403/404; transport failures never delete the token. A safe subset of the last authenticated user is cached in IndexedDB so the app shell can render without the API. The projects dashboard falls back to summaries built from `projectBlobs`, so it shows only boards that can actually open offline rather than a stale full server list or an indefinite loading state.
 
 A dirty IndexedDB board always wins on cold start, including when connectivity has returned. It is synced through the normal timestamp/conflict path before any server GET may replace it. Cache records carry a local revision number so an older foreground or Background Sync response can never mark a newer edit clean.
+
+### Board collaboration
+
+Collaboration is an account-level opt-in under Access Controls. An owner can find an existing
+FreeSpeech account by exact email, send a per-board invitation, and remove pending or accepted
+collaborators. Accepted boards appear in the collaborator's normal project list with a Shared badge;
+the collaborator can edit, optimize images, keep a personal favorite flag, duplicate a private copy,
+or leave, but cannot rename or delete the owner's board. Disabling the owner's opt-in pauses online
+shared access and invitations without deleting the collaborator list.
+
+Shared edits use the existing full-blob revision/conflict protocol. An open board checks for a newer
+server revision every five seconds while visible and clean, so saved edits from another account replace
+the local clean copy and close a clean edit session. No WebSocket service is required. Concurrent dirty
+edits continue through the existing explicit conflict flow rather than silently overwriting one another.
 
 ### File-based routing (server)
 

@@ -16,6 +16,7 @@ export type AccessControlSettings = {
 	pinHash: string | null;
 	pinSalt: string | null;
 	updatedAt: string | null;
+	collaborationEnabled: boolean;
 };
 
 export type LocalSettings = {
@@ -60,6 +61,32 @@ export type Project = {
 	lastEditedAt: string | Date;
 	createdAt: string | Date;
 	updatedAt: string | Date;
+	accessRole?: 'owner' | 'collaborator';
+	owner?: CollaborationUser;
+	collaborationEnabled?: boolean;
+	collaboratorCount?: number;
+};
+
+export type CollaborationUser = {
+	id?: string;
+	name: string;
+	email?: string;
+	profileImgUrl: string | null;
+};
+
+export type ProjectCollaborator = {
+	id: string;
+	status: 'pending' | 'accepted';
+	invitedAt: string;
+	respondedAt: string | null;
+	user: Required<Pick<CollaborationUser, 'id' | 'name' | 'email'>> & Pick<CollaborationUser, 'profileImgUrl'>;
+};
+
+export type CollaborationInvitation = {
+	id: string;
+	invitedAt: string;
+	project: Pick<Project, 'id' | 'name' | 'description' | 'imageUrl'>;
+	owner: CollaborationUser;
 };
 
 // Tile is now identified by position (x, y, page) instead of ID

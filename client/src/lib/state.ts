@@ -83,6 +83,11 @@ export const [projectToOptimize, setProjectToOptimize] = createSignal<{
 	name: string;
 } | null>(null);
 
+export const [projectToCollaborate, setProjectToCollaborate] = createSignal<{
+	id: string;
+	name: string;
+} | null>(null);
+
 // Loading states for project/page transitions
 export const [projectLoading, setProjectLoading] = createSignal(false);
 export const [pageLoading, setPageLoading] = createSignal(false);
@@ -169,6 +174,7 @@ export const DEFAULT_ACCESS_CONTROL_SETTINGS: AccessControlSettings = {
 	pinHash: null,
 	pinSalt: null,
 	updatedAt: null,
+	collaborationEnabled: false,
 };
 export const [accessControlSettings, setAccessControlSettings] = createSignal<AccessControlSettings>(
 	DEFAULT_ACCESS_CONTROL_SETTINGS,

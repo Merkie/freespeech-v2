@@ -2,6 +2,7 @@ import { MODAL_ID, type ModalIdType } from '@/lib/constants';
 import CreatePage from './_modal_inners/CreatePage';
 import CreateProject from './_modal_inners/CreateProject';
 import EditPage from './_modal_inners/EditPage';
+import ManageCollaborators from './_modal_inners/ManageCollaborators';
 import ManagePages from './_modal_inners/ManagePages';
 import OptimizeImages from './_modal_inners/OptimizeImages';
 import PinEntry, { pinEntryTitle } from './_modal_inners/PinEntry';
@@ -50,5 +51,9 @@ export const MODAL_REGISTRY: Record<ModalIdType, ModalConfig> = {
 	[MODAL_ID.PIN_SETUP]: {
 		title: 'Set Passcode',
 		innerElement: PinSetup,
+	},
+	[MODAL_ID.MANAGE_COLLABORATORS]: {
+		title: 'Manage Collaborators',
+		innerElement: ManageCollaborators,
 	},
 };

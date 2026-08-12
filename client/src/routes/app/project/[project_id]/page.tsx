@@ -1,7 +1,12 @@
 import { useNavigate, useParams } from '@solidjs/router';
 import { type Component, createEffect, on, onCleanup, onMount, Show } from 'solid-js';
-import { flushDirtyBlobs } from '@/lib/blob-sync';
-import { clearLastVisitedProject, lastVisitedProjectId, loadProject } from '@/lib/page-actions';
+import {
+	checkAndRevalidate,
+	exitEditModeAfterExternalUpdate,
+	flushDirtyBlobs,
+	hasUnsavedEditChanges,
+} from '@/lib/blob-sync';
+import { clearLastVisitedProject, lastVisitedProjectId, loadProject, navigateHomeInProject } from '@/lib/page-actions';
 import {
 	currentPageId,
 	editingTiles,
@@ -9,7 +14,11 @@ import {
 	projectBlob,
 	projectLoading,
 	resetProjectState,
+	setEditingTilePositions,
+	setEditingTiles,
+	setMultiSelectMode,
 	setSyncStatus,
+	setUsingOnlineSearch,
 } from '@/lib/state';
 import ProjectContent from './_components/ProjectContent';
 import ProjectContentSkeleton from './_components/ProjectContentSkeleton';
@@ -19,10 +28,44 @@ import SentenceBuilder from './_components/SentenceBuilder';
 const AppProjectPage: Component = () => {
 	const params = useParams();
 	const navigate = useNavigate();
+	let refreshInFlight = false;
+
+	const refreshBoard = async () => {
+		const projectId = params.project_id;
+		if (
+			!projectId ||
+			!navigator.onLine ||
+			document.visibilityState !== 'visible' ||
+			refreshInFlight ||
+			hasUnsavedEditChanges()
+		)
+			return;
+		refreshInFlight = true;
+		try {
+			const updated = await checkAndRevalidate(projectId);
+			if (!updated) return;
+
+			if (editingTiles()) {
+				exitEditModeAfterExternalUpdate();
+				setEditingTiles(false);
+				setEditingTilePositions([]);
+				setMultiSelectMode(false);
+				setUsingOnlineSearch(false);
+			}
+
+			const current = currentPageId();
+			if (current && !projectBlob()?.pages.some((page) => page.id === current)) {
+				navigateHomeInProject();
+			}
+		} finally {
+			refreshInFlight = false;
+		}
+	};
 
 	// Online/offline listeners for sync
 	const handleOnline = () => {
 		flushDirtyBlobs().catch((err) => console.error('Failed to flush dirty blobs:', err));
+		void refreshBoard();
 	};
 	const handleOffline = () => {
 		setSyncStatus('offline');
@@ -33,17 +76,20 @@ const AppProjectPage: Component = () => {
 		// usable again, even if WebKit does not replay an `online` event on resume.
 		if (document.visibilityState === 'visible' && navigator.onLine) handleOnline();
 	};
+	let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
 	onMount(() => {
 		window.addEventListener('online', handleOnline);
 		window.addEventListener('offline', handleOffline);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
+		refreshTimer = setInterval(() => void refreshBoard(), 5000);
 	});
 
 	onCleanup(() => {
 		window.removeEventListener('online', handleOnline);
 		window.removeEventListener('offline', handleOffline);
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
+		if (refreshTimer) clearInterval(refreshTimer);
 	});
 
 	// React to route param changes

@@ -8,6 +8,7 @@ export const MODAL_ID = {
 	SYNC_CONFLICT: 'sync-conflict',
 	PIN_ENTRY: 'pin-entry',
 	PIN_SETUP: 'pin-setup',
+	MANAGE_COLLABORATORS: 'manage-collaborators',
 } as const;
 
 export type ModalIdType = (typeof MODAL_ID)[keyof typeof MODAL_ID];

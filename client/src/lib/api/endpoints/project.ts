@@ -1,4 +1,10 @@
-import type { Project, ProjectBlob } from '@/lib/types';
+import type {
+	CollaborationInvitation,
+	CollaborationUser,
+	Project,
+	ProjectBlob,
+	ProjectCollaborator,
+} from '@/lib/types';
 import { checkVersionHeader } from '@/lib/version-check';
 import { fetchFromAPI, OfflineError } from '../util';
 
@@ -6,6 +12,7 @@ const project = {
 	list: listProjects,
 	create: createProject,
 	delete: deleteProject,
+	duplicate: duplicateProject,
 	updateThumbnail: updateProjectThumbnail,
 	getImageStats: getImageStats,
 	optimizeImages: optimizeImages,
@@ -16,6 +23,13 @@ const project = {
 	listTemplates: listTemplates,
 	importTemplate: importTemplate,
 	importOpenBoard: importOpenBoard,
+	listInvitations,
+	respondToInvitation,
+	listCollaborators,
+	lookupCollaborator,
+	inviteCollaborator,
+	removeCollaborator,
+	leaveCollaboration,
 };
 
 export type OpenBoardImportResult = {
@@ -73,6 +87,13 @@ async function deleteProject(projectId: string) {
 		error?: string;
 	};
 	return response;
+}
+
+async function duplicateProject(projectId: string) {
+	return (await fetchFromAPI({
+		path: `/project/${projectId}/duplicate`,
+		method: 'POST',
+	})) as { success?: boolean; project?: { id: string; name: string }; error?: string };
 }
 
 export default project;
@@ -237,4 +258,61 @@ async function syncProjectBlob(projectId: string, blob: ProjectBlob, lastEditedA
 	};
 
 	return response;
+}
+
+async function listInvitations() {
+	return (await fetchFromAPI({
+		path: '/collaboration/invitations',
+		method: 'GET',
+	})) as { invitations: CollaborationInvitation[]; error?: string };
+}
+
+async function respondToInvitation(invitationId: string, action: 'accept' | 'decline') {
+	return (await fetchFromAPI({
+		path: '/collaboration/invitations',
+		method: 'POST',
+		body: { invitationId, action },
+	})) as { success?: boolean; error?: string };
+}
+
+async function listCollaborators(projectId: string) {
+	return (await fetchFromAPI({
+		path: `/project/${projectId}/collaborators`,
+		method: 'GET',
+	})) as {
+		project?: { id: string; name: string };
+		collaborators?: ProjectCollaborator[];
+		error?: string;
+	};
+}
+
+async function lookupCollaborator(projectId: string, email: string) {
+	return (await fetchFromAPI({
+		path: `/project/${projectId}/collaborators`,
+		method: 'POST',
+		body: { action: 'lookup', email },
+	})) as { candidate?: Required<CollaborationUser>; status?: 'pending' | 'accepted' | null; error?: string };
+}
+
+async function inviteCollaborator(projectId: string, userId: string) {
+	return (await fetchFromAPI({
+		path: `/project/${projectId}/collaborators`,
+		method: 'POST',
+		body: { action: 'invite', userId },
+	})) as { success?: boolean; error?: string };
+}
+
+async function removeCollaborator(projectId: string, userId: string) {
+	return (await fetchFromAPI({
+		path: `/project/${projectId}/collaborators`,
+		method: 'DELETE',
+		body: { userId },
+	})) as { success?: boolean; error?: string };
+}
+
+async function leaveCollaboration(projectId: string) {
+	return (await fetchFromAPI({
+		path: `/project/${projectId}/collaboration`,
+		method: 'DELETE',
+	})) as { success?: boolean; error?: string };
 }

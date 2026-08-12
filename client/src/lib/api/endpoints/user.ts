@@ -5,6 +5,7 @@ const user = {
 	update: updateUser,
 	getAccessControls,
 	updateAccessControls,
+	updateCollaboration,
 };
 
 export default user;
@@ -37,7 +38,7 @@ async function getAccessControls(): Promise<AccessControlSettings> {
 }
 
 async function updateAccessControls(
-	settings: Omit<AccessControlSettings, 'updatedAt'>,
+	settings: Pick<AccessControlSettings, 'enabled' | 'mode' | 'pinHash' | 'pinSalt'>,
 ): Promise<AccessControlSettings> {
 	const response = (await fetchFromAPI({
 		path: '/user/access-controls',
@@ -47,4 +48,15 @@ async function updateAccessControls(
 
 	if (!response.settings) throw new Error(response.error || 'Could not update access controls');
 	return response.settings;
+}
+
+async function updateCollaboration(enabled: boolean): Promise<boolean> {
+	const response = (await fetchFromAPI({
+		path: '/user/collaboration',
+		method: 'POST',
+		body: { enabled },
+	})) as { enabled?: boolean; error?: string };
+
+	if (typeof response.enabled !== 'boolean') throw new Error(response.error || 'Could not update collaboration');
+	return response.enabled;
 }

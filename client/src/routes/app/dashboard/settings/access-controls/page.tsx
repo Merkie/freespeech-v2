@@ -1,7 +1,7 @@
 import { type Component, createSignal, Show } from 'solid-js';
 import { globalIsOnline } from '@/hooks/useNetworkStatus';
 import { MODAL_ID } from '@/lib/constants';
-import { disablePinLock, enableMathLock } from '@/lib/pin';
+import { disablePinLock, enableMathLock, setBoardCollaborationEnabled } from '@/lib/pin';
 import { accessControlSettings, setActiveModalId } from '@/lib/state';
 import type { EditPinMode } from '@/lib/types';
 import OfflineSettingsNotice from '../_components/OfflineSettingsNotice';
@@ -21,6 +21,8 @@ const LOCK_MODE_OPTIONS: { value: EditPinMode; label: string }[] = [
 
 const AccessControlsPage: Component = () => {
 	const [saving, setSaving] = createSignal(false);
+	const [collaborationSaving, setCollaborationSaving] = createSignal(false);
+	const [collaborationError, setCollaborationError] = createSignal('');
 	const enabled = () => accessControlSettings().enabled;
 	const mode = () => accessControlSettings().mode;
 	const changesDisabled = () => !globalIsOnline() || saving();
@@ -50,13 +52,26 @@ const AccessControlsPage: Component = () => {
 		setActiveModalId(MODAL_ID.PIN_SETUP);
 	};
 
+	const handleCollaborationToggle = async (next: boolean) => {
+		if (!globalIsOnline() || collaborationSaving()) return;
+		setCollaborationSaving(true);
+		setCollaborationError('');
+		try {
+			await setBoardCollaborationEnabled(next);
+		} catch {
+			setCollaborationError('Could not update board collaboration. Check your connection and try again.');
+		} finally {
+			setCollaborationSaving(false);
+		}
+	};
+
 	return (
 		<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 pb-[200px] sm:p-6 lg:p-8">
 			<OfflineSettingsNotice />
 
 			<SettingsPageHeader
 				title="Access Controls"
-				description="Stop boards being edited by accident"
+				description="Control editing and shared board access"
 				icon="bi bi-lock-fill"
 				iconClass="bg-amber-100 text-amber-500"
 			/>
@@ -111,6 +126,32 @@ const AccessControlsPage: Component = () => {
 						Access controls are stored on your account and cached on this device so the current passcode keeps working
 						offline. A connection is required to enable, disable, change, or reset them. This remains a guard against
 						accidental taps rather than account security.
+					</p>
+				</div>
+			</SettingCard>
+
+			<SettingCard>
+				<SettingRow
+					title="Board collaboration"
+					description="Adds a Manage Collaborators option to boards you own. Invited people can accept a board, use it from their own account, and save edits back to the same board."
+				>
+					<Toggle
+						checked={accessControlSettings().collaborationEnabled}
+						onChange={handleCollaborationToggle}
+						label="Toggle board collaboration"
+						disabled={!globalIsOnline() || collaborationSaving()}
+					/>
+				</SettingRow>
+
+				<Show when={collaborationError()}>
+					<p class="border-t border-red-100 bg-red-50 px-5 py-3 text-sm text-red-700 sm:px-6">{collaborationError()}</p>
+				</Show>
+
+				<div class="flex items-start gap-3 border-t border-zinc-100 bg-zinc-50 p-5 sm:px-6">
+					<i class="bi bi-people-fill mt-0.5 text-lg text-sky-500" />
+					<p class="max-w-prose text-base text-zinc-500">
+						Turning this off pauses online collaborator access and pending invitations without deleting your
+						collaborator lists. Turn it back on whenever you want to resume sharing.
 					</p>
 				</div>
 			</SettingCard>

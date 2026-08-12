@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import prisma from '@/resources/prisma';
+import { projectAccessWhere } from '@/utils/project-access';
 
 /**
  * Lightweight endpoint for cache invalidation checks.
@@ -14,11 +15,7 @@ export const GET = [
 		const projectId = req.params.id;
 
 		const project = await prisma.project.findFirst({
-			where: {
-				id: projectId,
-				// Allow access if user owns the project or it's public
-				OR: [{ userId: req.userId }, { isPublic: true }],
-			},
+			where: projectAccessWhere(projectId, req.userId!),
 			select: {
 				id: true,
 				lastEditedAt: true,
