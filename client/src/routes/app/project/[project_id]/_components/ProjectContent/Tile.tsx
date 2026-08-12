@@ -79,10 +79,10 @@ export default function Tile(props: TileProps) {
 
 			<Show when={showFolderAddTarget()}>
 				{/* Sit behind the opaque folder rather than over it. The two pieces trace the body and
-				    navigation bump as one soft green target while leaving its label and picture readable. */}
+				    navigation bump as one flat green target while leaving its label and picture readable. */}
 				<div class="folder-add-target-in pointer-events-none absolute inset-0">
-					<div class="absolute -inset-1 rounded-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
-					<div class="absolute top-[-8px] left-[-4px] h-[12px] w-[calc(50%+8px)] rounded-t-[10px] bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.55)]" />
+					<div class="absolute -inset-1 rounded-[10px] bg-emerald-300" />
+					<div class="absolute top-[-8px] left-[-4px] h-[12px] w-[calc(50%+8px)] rounded-t-[10px] bg-emerald-300" />
 				</div>
 			</Show>
 
