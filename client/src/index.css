@@ -169,7 +169,7 @@ html {
 	}
 }
 .tile-drag-origin-pulse {
-	animation: tile-drag-origin-pulse 0.9s ease-in-out infinite;
+	animation: tile-drag-origin-pulse 1.5s ease-in-out infinite;
 	will-change: opacity;
 }
 
