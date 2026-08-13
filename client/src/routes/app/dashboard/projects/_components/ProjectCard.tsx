@@ -151,96 +151,102 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 	};
 
 	return (
-		<div ref={setCardRef} class="relative">
-			<A
-				href={projectUrl()}
-				class="relative flex h-fit w-full flex-col gap-4 rounded-lg border border-zinc-300 bg-zinc-200 p-2 shadow-sm"
-				classList={{
-					'border-blue-200 ring-4 ring-blue-200 ring-offset-2 ring-offset-zinc-100': selected(),
-				}}
-			>
-				{/*
-				  A blank project has no thumbnail until one is rendered, and imageUrl is null until then.
-				  Interpolating that into the src produces a request for ".../null", so the card would show
-				  a broken-image glyph rather than the empty placeholder it shows today.
-				*/}
-				<Show when={props.project.imageUrl} fallback={<div class="aspect-video w-full rounded-md bg-zinc-100" />}>
-					<img
-						src={`${import.meta.env.VITE_R2_URL}${props.project.imageUrl}`}
-						class="aspect-video w-full rounded-md bg-zinc-100 object-cover p-1 text-zinc-100"
-						alt="preview"
-					/>
-				</Show>
-
-				<div class="flex w-full items-center gap-2 text-lg">
-					{/* Grouped so the icons stay next to the name instead of drifting to the SELECTED chip. */}
-					<div class="flex min-w-0 flex-1 items-center gap-2">
-						<Show when={isFavorite()}>
-							<i class="bi bi-star-fill shrink-0 text-base leading-none text-amber-400" />
-						</Show>
-						<p class="truncate whitespace-nowrap">{props.project.name}</p>
-						<Show when={isShared()}>
-							<span
-								title={`Shared by ${props.project.owner?.name ?? 'another FreeSpeech user'}`}
-								class="flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700"
-							>
-								<i class="bi bi-people-fill leading-none" />
-								Shared
-							</span>
-						</Show>
-						<Show when={cached()}>
-							{/*
-							  An optical nudge, not a fix for a broken box. items-center already lands the glyph
-							  within 0.1px of the centre of the label's full ascender-to-baseline ink, but a
-							  mostly-lowercase name carries its visual weight in the x-height band, ~1.75px lower,
-							  so a truly centred icon reads high. 1px splits the difference between the two.
-							*/}
-							<i
-								class="bi bi-cloud-check-fill relative top-px shrink-0 text-sm leading-none text-zinc-600/40"
-								title="Saved on this device for offline use"
-							/>
-						</Show>
-					</div>
-					<Show when={selected()}>
-						<div class="rounded-md bg-blue-500 p-1 px-2 text-sm font-bold text-white shadow-md">SELECTED</div>
-					</Show>
-				</div>
-
-				<Show when={selected()}>
-					<div class="pointer-events-none absolute left-0 top-0 h-full w-full bg-blue-200/[20%]" />
-				</Show>
-			</A>
+		<div
+			ref={setCardRef}
+			class="relative flex h-fit w-full flex-col gap-4 rounded-lg border border-zinc-300 bg-zinc-200 p-2 shadow-sm"
+			classList={{
+				'border-blue-200 ring-4 ring-blue-200 ring-offset-2 ring-offset-zinc-100': selected(),
+			}}
+		>
+			{/*
+			  A stretched link behind the content rather than one big <A> around it: a button nested
+			  inside a link is invalid markup, and the footer now holds a real ⋯ button. Interactive
+			  children sit above the link on their own z layer.
+			*/}
+			<A href={projectUrl()} aria-label={`Open ${props.project.name}`} class="absolute inset-0 z-[1] rounded-lg" />
 
 			{/*
-			  A sibling of the anchor rather than a child of it: a button nested inside a link is invalid
-			  markup, and the wrapper is already positioned for exactly this. Inset from the card corner so
-			  it floats over the thumbnail instead of sitting on its edge.
-
-			  `leading-none` is what centres the glyph — a bootstrap icon is sized by its line box, not its
-			  glyph, so the default line height would push it off-centre inside the circle.
-
-			  Opaque with a border rather than a translucent white: board thumbnails are predominantly
-			  white, and a semi-transparent button disappears into them entirely.
+			  A blank project has no thumbnail until one is rendered, and imageUrl is null until then.
+			  Interpolating that into the src produces a request for ".../null", so the card would show
+			  a broken-image glyph rather than the empty placeholder it shows today.
 			*/}
-			<button
-				type="button"
-				onClick={handleMenuClick}
-				aria-label={`Options for ${props.project.name}`}
-				class="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-600 shadow-md transition-all hover:bg-zinc-100 hover:text-zinc-900"
-			>
-				<i class="bi bi-three-dots text-base leading-none" />
-			</button>
+			<Show when={props.project.imageUrl} fallback={<div class="aspect-video w-full rounded-md bg-zinc-100" />}>
+				<img
+					src={`${import.meta.env.VITE_R2_URL}${props.project.imageUrl}`}
+					class="aspect-video w-full rounded-md bg-zinc-100 object-cover p-1 text-zinc-100"
+					alt="preview"
+				/>
+			</Show>
 
-			{/* Context Menu */}
+			<div class="flex w-full items-center gap-2 text-lg">
+				<Show when={isFavorite()}>
+					<i class="bi bi-star-fill shrink-0 text-base leading-none text-amber-400" />
+				</Show>
+				<p class="min-w-0 truncate whitespace-nowrap">
+					{props.project.name}
+					<Show when={selected()}>
+						<span class="sr-only"> (selected)</span>
+					</Show>
+				</p>
+				{/*
+				  One badge recipe: every signal is the same 22px pill, filled with its hue at 12% so
+				  the tint composites over the zinc shell instead of clashing with it. Sharing one
+				  height is also what aligns the row geometrically — no optical nudges needed.
+				*/}
+				<div class="ml-auto flex shrink-0 items-center gap-1.5">
+					<Show when={isShared()}>
+						<span
+							title={`Shared by ${props.project.owner?.name ?? 'another FreeSpeech user'}`}
+							class="flex h-[22px] items-center gap-1 rounded-full bg-sky-500/[12%] px-2 text-xs font-semibold text-sky-700"
+						>
+							<i class="bi bi-people-fill leading-none" />
+							Shared
+						</span>
+					</Show>
+					<Show when={cached()}>
+						<span
+							title="Saved on this device for offline use"
+							class="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-zinc-500/[12%] text-zinc-500"
+						>
+							<i class="bi bi-cloud-check-fill text-xs leading-none" />
+						</span>
+					</Show>
+					<button
+						type="button"
+						onClick={handleMenuClick}
+						aria-label={`Options for ${props.project.name}`}
+						class="relative z-[2] flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-all hover:bg-zinc-500/[12%] hover:text-zinc-800"
+					>
+						<i class="bi bi-three-dots text-base leading-none" />
+					</button>
+				</div>
+			</div>
+
+			<Show when={selected()}>
+				{/*
+				  Selection lives on the frame: the ring is the signal and this corner check labels it,
+				  like a file picker. Its own zinc ring matches the dashboard ground so it reads as
+				  punched through the card corner. pointer-events-none keeps it from masking the link
+				  beneath; the sr-only text on the name carries the state for screen readers.
+				*/}
+				<div
+					aria-hidden="true"
+					class="pointer-events-none absolute -left-2 -top-2 z-[2] flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white ring-[3px] ring-zinc-100"
+				>
+					<i class="bi bi-check-lg text-sm leading-none" />
+				</div>
+			</Show>
+
+			{/* Context Menu — opens upward from the footer trigger */}
 			<div
 				style={{
 					'pointer-events': menuOpen() ? 'auto' : 'none',
 					opacity: menuOpen() ? 1 : 0,
 					'user-select': 'none',
-					// Clears the trigger, which ends at 48px: top-4 (16px) plus its own h-8 (32px).
-					top: menuOpen() ? '56px' : '50px',
+					// Clears the trigger, whose top sits 36px up: the card's p-2 (8px) plus its h-7 (28px).
+					bottom: menuOpen() ? '44px' : '38px',
 				}}
-				class="absolute right-4 z-10 flex w-fit flex-col whitespace-nowrap rounded-md border border-zinc-200 bg-white p-2 text-sm shadow-lg transition-all"
+				class="absolute right-2 z-10 flex w-fit flex-col whitespace-nowrap rounded-md border border-zinc-200 bg-white p-2 text-sm shadow-lg transition-all"
 			>
 				<button
 					type="button"
