@@ -7,6 +7,7 @@ const user = {
 	updateAccessControls,
 	updateCollaboration,
 	exportData,
+	getElevenLabsKey,
 	deleteAccount,
 };
 
@@ -83,4 +84,14 @@ async function deleteAccount(confirmation: { password?: string; email?: string }
 		body: confirmation,
 		options: { timeoutMs: 60000 },
 	})) as { success?: boolean; error?: string };
+}
+
+async function getElevenLabsKey(): Promise<string> {
+	const response = (await fetchFromAPI({
+		path: '/user/get-eleven-labs-key?sw-bypass=1',
+		method: 'GET',
+		options: { timeoutMs: 10000 },
+	})) as { key?: string; error?: string };
+	if (typeof response.key !== 'string') throw new Error(response.error || 'Could not load the key');
+	return response.key;
 }

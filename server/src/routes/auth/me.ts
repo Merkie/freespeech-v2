@@ -23,6 +23,8 @@ export const GET = [
 			...safeUser
 		} = user;
 		if (safeUser.password) safeUser.password = 'redacted';
+		// The encrypted key is only useful to the server. Settings fetch the plain key on request.
+		if (safeUser.elevenLabsApiKey) safeUser.elevenLabsApiKey = 'redacted';
 
 		res.json({ user: safeUser });
 	},

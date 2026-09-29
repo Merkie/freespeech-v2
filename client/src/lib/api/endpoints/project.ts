@@ -11,6 +11,7 @@ import { fetchFromAPI, OfflineError } from '../util';
 const project = {
 	list: listProjects,
 	create: createProject,
+	updateSettings: updateProjectSettings,
 	delete: deleteProject,
 	duplicate: duplicateProject,
 	updateThumbnail: updateProjectThumbnail,
@@ -144,6 +145,17 @@ async function listProjects(token?: string) {
 	};
 
 	return response;
+}
+
+export type ProjectSettings = { id: string; name: string; columns: number; rows: number; lastEditedAt: string };
+
+/** Owner-only name and grid size. The server refuses a size that would hide existing tiles. */
+async function updateProjectSettings(projectId: string, body: { name?: string; columns?: number; rows?: number }) {
+	return (await fetchFromAPI({
+		path: `/project/${projectId}/update`,
+		method: 'POST',
+		body,
+	})) as { success?: boolean; project?: ProjectSettings; error?: string };
 }
 
 async function createProject({ name, columns, rows }: { name: string; columns: number; rows: number }) {

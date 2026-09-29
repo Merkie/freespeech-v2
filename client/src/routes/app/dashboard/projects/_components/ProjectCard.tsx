@@ -10,6 +10,7 @@ import {
 	localSettings,
 	setActiveModalId,
 	setLocalSettings,
+	setProjectBeingEdited,
 	setProjectToCollaborate,
 	setProjectToOptimize,
 } from '@/lib/state';
@@ -77,7 +78,8 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 		e.preventDefault();
 		e.stopPropagation();
 		setMenuOpen(false);
-		// TODO: Implement rename functionality
+		setProjectBeingEdited(props.project);
+		setActiveModalId(MODAL_ID.EDIT_PROJECT);
 	};
 
 	const handleManageCollaborators = (e: MouseEvent) => {
@@ -263,7 +265,7 @@ const ProjectCard: Component<ProjectCardProps> = (props) => {
 						class="flex items-center gap-2 rounded-md p-1 px-2 text-left text-zinc-700 transition-all hover:bg-zinc-100"
 					>
 						<i class="bi bi-pencil text-base leading-none" />
-						Rename
+						Rename or Resize
 					</button>
 				</Show>
 				<button

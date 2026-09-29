@@ -9,6 +9,7 @@ export const MODAL_ID = {
 	PIN_ENTRY: 'pin-entry',
 	PIN_SETUP: 'pin-setup',
 	MANAGE_COLLABORATORS: 'manage-collaborators',
+	EDIT_PROJECT: 'edit-project',
 } as const;
 
 export type ModalIdType = (typeof MODAL_ID)[keyof typeof MODAL_ID];

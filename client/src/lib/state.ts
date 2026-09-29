@@ -78,6 +78,13 @@ export const [addingPage, setAddingPage] = createSignal(false);
 export const [editingProjects, setEditingProjects] = createSignal(false);
 export const [addingProject, setAddingProject] = createSignal(false);
 export const [projectBeingEdited, setProjectBeingEdited] = createSignal<Project | null>(null);
+// Last board settings saved from the dashboard, so the project list can update in place.
+export const [savedProjectSettings, setSavedProjectSettings] = createSignal<{
+	id: string;
+	name: string;
+	columns: number;
+	rows: number;
+} | null>(null);
 
 // Modal state
 export const [activeModalId, setActiveModalId] = createSignal<ModalIdType | ''>('');

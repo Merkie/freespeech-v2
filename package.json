@@ -19,7 +19,7 @@
 		"test:client": "bun test client/tests",
 		"test:e2e": "VITE_API_URL=http://127.0.0.1:5188 bun run --cwd client build --outDir dist-e2e && playwright test",
 		"test:server": "bun test server/src server/tests/safe-fetch.test.ts server/tests/rate-limit.test.ts",
-		"test:integration": "bun test server/tests/project-sync.integration.test.ts server/tests/account.integration.test.ts"
+		"test:integration": "bun test server/tests/*.integration.test.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.4",

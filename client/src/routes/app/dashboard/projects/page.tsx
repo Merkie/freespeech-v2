@@ -6,7 +6,7 @@ import api from '@/lib/api';
 import { getCachedProjects } from '@/lib/cache/blob-cache';
 import { MODAL_ID } from '@/lib/constants';
 import { lastVisitedProjectId } from '@/lib/page-actions';
-import { setActiveModalId } from '@/lib/state';
+import { savedProjectSettings, setActiveModalId } from '@/lib/state';
 import CollaborationInvitations from '@/routes/app/dashboard/projects/_components/CollaborationInvitations';
 import ProjectCard from '@/routes/app/dashboard/projects/_components/ProjectCard';
 import SearchBar from '@/routes/app/dashboard/projects/_components/SearchBar';
@@ -44,6 +44,14 @@ const ProjectsPage: Component = () => {
 	const handleDelete = (projectId: string) => {
 		mutateProjects((prev) => prev?.filter((p) => p.id !== projectId));
 	};
+
+	createEffect(() => {
+		const saved = savedProjectSettings();
+		if (!saved) return;
+		mutateProjects((prev) =>
+			prev?.map((p) => (p.id === saved.id ? { ...p, name: saved.name, columns: saved.columns, rows: saved.rows } : p)),
+		);
+	});
 
 	const searchedProjects = createMemo(() => {
 		const query = searchQuery();

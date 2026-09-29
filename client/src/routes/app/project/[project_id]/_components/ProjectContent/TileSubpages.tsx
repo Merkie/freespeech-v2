@@ -68,7 +68,9 @@ export default function TileSubpages({ containerHeight }: { containerHeight: () 
 		if (isTileBusy()) return;
 
 		if (tile.navigation) {
-			// Navigation tile - update state to load linked page
+			// Navigation tile: say the folder name when speak-on-tap is on (as the original app did),
+			// then open the linked page. Folder names never join the sentence.
+			if (localSettings().speakOnTap && tile.text.trim()) speakText(tile.text, tileKey);
 			navigateToPageInProject(tile.navigation);
 		} else {
 			// Non-navigation tile - speak and/or add to sentence

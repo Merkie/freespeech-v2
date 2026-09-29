@@ -4,6 +4,7 @@ import { MODAL_ID, type ModalIdType } from '@/lib/constants';
 const CreatePage = lazy(() => import('./_modal_inners/CreatePage'));
 const CreateProject = lazy(() => import('./_modal_inners/CreateProject'));
 const EditPage = lazy(() => import('./_modal_inners/EditPage'));
+const EditProject = lazy(() => import('./_modal_inners/EditProject'));
 const ManageCollaborators = lazy(() => import('./_modal_inners/ManageCollaborators'));
 const ManagePages = lazy(() => import('./_modal_inners/ManagePages'));
 const OptimizeImages = lazy(() => import('./_modal_inners/OptimizeImages'));
@@ -55,6 +56,10 @@ export const MODAL_REGISTRY: Record<ModalIdType, ModalConfig> = {
 	[MODAL_ID.PIN_SETUP]: {
 		title: 'Set Passcode',
 		innerElement: PinSetup,
+	},
+	[MODAL_ID.EDIT_PROJECT]: {
+		title: 'Edit Project',
+		innerElement: EditProject,
 	},
 	[MODAL_ID.MANAGE_COLLABORATORS]: {
 		title: 'Manage Collaborators',

@@ -144,6 +144,7 @@ const ProfilePage: Component = () => {
 					</div>
 
 					<button
+						type="button"
 						onClick={logout}
 						class="mt-2 w-[200px] rounded-md border border-red-500 bg-red-600 p-1 text-sm text-red-50 sm:w-full"
 					>

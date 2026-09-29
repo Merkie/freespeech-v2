@@ -36,6 +36,18 @@ Bun.serve({
 				{ error: 'Too many attempts. Please wait 15 minutes and try again.' },
 				{ status: 429, headers: { ...headers, 'Retry-After': '900' } },
 			);
+		if (url.pathname.endsWith('/update')) {
+			const body = await req.json();
+			if (body.columns < 2)
+				return Response.json(
+					{ error: '2 tiles are outside a 1 × 2 grid. Move or delete them first.' },
+					{ status: 409, headers },
+				);
+			return Response.json(
+				{ success: true, project: { id: board.id, ...body, lastEditedAt: new Date().toISOString() } },
+				{ headers },
+			);
+		}
 		if (url.pathname === '/user/export')
 			return Response.json(
 				{ account, projects: [{ id: board.id, blob: board }] },

@@ -11,7 +11,11 @@ interface ElevenLabsPersonalKeyProps {
 
 const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => {
 	const [usePersonalKey, setUsePersonalKey] = createSignal(props.usePersonalElevenLabsKey);
-	const [elevenLabsApiKey, setElevenLabsApiKey] = createSignal(props.apiKey);
+	// The account reports only whether a key is saved ('redacted'); the plain key loads on reveal.
+	const [hasSavedKey, setHasSavedKey] = createSignal(!!props.apiKey);
+	const [keyLoaded, setKeyLoaded] = createSignal(!props.apiKey);
+	const [elevenLabsApiKey, setElevenLabsApiKey] = createSignal('');
+	const [keyError, setKeyError] = createSignal('');
 	const [showKey, setShowKey] = createSignal(false);
 	let inputRef: HTMLInputElement | undefined;
 	let saveTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -32,7 +36,8 @@ const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => 
 		clearTimeout(saveTimeout);
 		saveTimeout = setTimeout(async () => {
 			await api.user.update({ elevenLabsApiKey: value });
-			syncUser({ elevenLabsApiKey: value });
+			setHasSavedKey(!!value);
+			syncUser({ elevenLabsApiKey: value ? 'redacted' : null });
 		}, 600);
 	};
 
@@ -41,12 +46,22 @@ const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => 
 		clearTimeout(saveTimeout);
 		saveTimeout = undefined;
 		const value = elevenLabsApiKey();
-		api.user.update({ elevenLabsApiKey: value }).then(() => syncUser({ elevenLabsApiKey: value }));
+		api.user.update({ elevenLabsApiKey: value }).then(() => syncUser({ elevenLabsApiKey: value ? 'redacted' : null }));
 	};
 
 	onCleanup(() => flushSave());
 
 	const revealKey = async () => {
+		if (!keyLoaded()) {
+			setKeyError('');
+			try {
+				setElevenLabsApiKey(await api.user.getElevenLabsKey());
+				setKeyLoaded(true);
+			} catch {
+				setKeyError('Connect to the internet to view or change your key.');
+				return;
+			}
+		}
 		setShowKey(true);
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		if (inputRef) {
@@ -98,10 +113,10 @@ const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => 
 									onClick={revealKey}
 									class={cn(
 										'min-w-0 flex-1 truncate p-4 text-left font-mono text-lg',
-										elevenLabsApiKey() ? 'text-zinc-500' : 'text-zinc-400',
+										hasSavedKey() ? 'text-zinc-500' : 'text-zinc-400',
 									)}
 								>
-									{elevenLabsApiKey() ? '•'.repeat(Math.min(elevenLabsApiKey().length, 40)) : 'Add your key here'}
+									{hasSavedKey() ? '•'.repeat(24) : 'Add your key here'}
 								</button>
 							}
 						>
@@ -129,6 +144,9 @@ const ElevenLabsPersonalKey: Component<ElevenLabsPersonalKeyProps> = (props) => 
 							<i class={showKey() ? 'bi bi-eye-slash' : 'bi bi-eye'} />
 						</button>
 					</div>
+					<Show when={keyError()}>
+						<p class="text-base text-red-500">{keyError()}</p>
+					</Show>
 					<p class="flex items-center gap-2 text-base text-zinc-500">
 						<i class="bi bi-lock-fill" />
 						<span>Encrypted and stored securely.</span>

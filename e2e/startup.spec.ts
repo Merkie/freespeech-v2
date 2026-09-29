@@ -282,3 +282,17 @@ test('deleting the account signs out and removes its data from the device', asyn
 	});
 	expect(left).toEqual({ boards: 0, meta: 0, token: null, resume: null, imageCaches: 0 });
 });
+
+test('a project can be renamed and resized from the dashboard', async ({ page }) => {
+	await seed(page);
+	await page.goto('/app/dashboard/projects');
+	await page.getByRole('button', { name: 'Options for Fixture board' }).click();
+	await page.getByRole('button', { name: 'Rename or Resize' }).click();
+	await page.getByLabel('Columns').fill('1');
+	await page.getByRole('button', { name: 'Save Changes' }).click();
+	await expect(page.getByText('2 tiles are outside a 1 × 2 grid. Move or delete them first.')).toBeVisible();
+	await page.getByLabel('Columns').fill('3');
+	await page.getByLabel('Name').fill('Renamed board');
+	await page.getByRole('button', { name: 'Save Changes' }).click();
+	await expect(page.getByRole('link', { name: 'Open Renamed board' })).toBeVisible();
+});
