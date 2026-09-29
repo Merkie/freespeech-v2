@@ -399,6 +399,9 @@ sudo -u postgres pg_dump --data-only --column-inserts --no-owner --no-privileges
 	--table='public."User"' "$STAGING_DB" > "$data_dump"
 sudo -u postgres pg_dump --data-only --column-inserts --no-owner --no-privileges \
 	--table='public."Project"' "$STAGING_DB" >> "$data_dump"
+# The copy shares its R2 media keys with the live original account. The marker makes v2 account
+# deletion keep that media. stage_user_id was validated against a strict pattern above.
+printf 'UPDATE "User" SET "importedFromV1At" = now() WHERE id = '"'"'%s'"'"';\n' "$stage_user_id" >> "$data_dump"
 
 printf 'Importing account into freespeech_v2 in one transaction...\n'
 # The dump stays root-only in its 0700 temporary directory. Open it in this

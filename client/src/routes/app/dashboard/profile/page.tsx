@@ -5,7 +5,7 @@ import { getDB } from '@/lib/cache/db';
 import { uploadFile } from '@/lib/presigned-uploads';
 import { resolveProfileImageUrl } from '@/lib/profile-image';
 import { endSession } from '@/lib/session';
-import { setUser, user } from '@/lib/state';
+import { sessionStatus, setUser, user } from '@/lib/state';
 
 const ProfilePage: Component = () => {
 	const navigate = useNavigate();
@@ -51,6 +51,55 @@ const ProfilePage: Component = () => {
 			return;
 		await endSession();
 		navigate('/', { replace: true });
+	};
+
+	const online = () => sessionStatus() === 'authenticated';
+	const [isExporting, setIsExporting] = createSignal(false);
+	const [exportError, setExportError] = createSignal('');
+	const [deleting, setDeleting] = createSignal(false);
+	const [confirmation, setConfirmation] = createSignal('');
+	const [deleteError, setDeleteError] = createSignal('');
+	const [isDeleting, setIsDeleting] = createSignal(false);
+	// /auth/me reports a password as 'redacted'; Google-only accounts have none.
+	const hasPassword = () => !!user()?.password;
+
+	const downloadData = async () => {
+		setExportError('');
+		setIsExporting(true);
+		try {
+			const file = await api.user.exportData();
+			const url = URL.createObjectURL(file);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = `freespeech-data-${new Date().toISOString().slice(0, 10)}.json`;
+			link.click();
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		} catch {
+			setExportError('Your data could not be downloaded. Check your connection and try again.');
+		} finally {
+			setIsExporting(false);
+		}
+	};
+
+	const deleteAccount = async () => {
+		if (!confirmation().trim() || isDeleting()) return;
+		setDeleteError('');
+		setIsDeleting(true);
+		try {
+			const result = await api.user.deleteAccount(
+				hasPassword() ? { password: confirmation() } : { email: confirmation().trim() },
+			);
+			if (!result.success) {
+				setDeleteError(result.error || 'Your account could not be deleted.');
+				return;
+			}
+			await endSession();
+			navigate('/', { replace: true });
+		} catch {
+			setDeleteError('Your account could not be deleted. Check your connection and try again.');
+		} finally {
+			setIsDeleting(false);
+		}
 	};
 
 	const getUserInitials = () => {
@@ -150,13 +199,88 @@ const ProfilePage: Component = () => {
 						</button>
 						<input ref={pictureInput} type="file" accept="image/*" onChange={onPictureChosen} class="hidden" />
 
-						<p class="flex gap-4 text-sm text-blue-500">
-							<A href="/privacy">Privacy</A>
-							<A href="/tos">Terms</A>
-						</p>
 						<Show when={pictureError()}>
 							<p class="text-sm text-red-500">{pictureError()}</p>
 						</Show>
+
+						<p class="mt-4 text-lg">Your Data</p>
+						<button
+							type="button"
+							onClick={downloadData}
+							disabled={!online() || isExporting()}
+							class="rounded-md border border-zinc-300 bg-zinc-200 p-2 px-4 text-zinc-600 transition-all hover:bg-zinc-300 disabled:opacity-60"
+						>
+							<i class="bi bi-download mr-2" />
+							{isExporting() ? 'Preparing download...' : 'Download my data'}
+						</button>
+						<Show when={exportError()}>
+							<p class="text-sm text-red-500">{exportError()}</p>
+						</Show>
+
+						<p class="mt-4 text-lg text-red-600">Delete Account</p>
+						<Show
+							when={deleting()}
+							fallback={
+								<button
+									type="button"
+									onClick={() => setDeleting(true)}
+									disabled={!online()}
+									class="rounded-md border border-red-300 p-2 px-4 text-red-600 transition-all hover:bg-red-50 disabled:opacity-60"
+								>
+									Delete account
+								</button>
+							}
+						>
+							<div class="flex flex-col gap-2 rounded-md border border-red-300 p-4">
+								<p class="text-sm text-zinc-700">
+									This permanently deletes your account, your boards, and your board sharing. It cannot be undone.
+								</p>
+								<label class="text-sm text-zinc-700" for="delete-confirmation">
+									{hasPassword() ? 'Enter your password to confirm' : `Type ${user()?.email} to confirm`}
+								</label>
+								<input
+									id="delete-confirmation"
+									type={hasPassword() ? 'password' : 'email'}
+									autocomplete={hasPassword() ? 'current-password' : 'off'}
+									value={confirmation()}
+									onInput={(e) => setConfirmation(e.currentTarget.value)}
+									onKeyDown={(e) => e.key === 'Enter' && deleteAccount()}
+									class="rounded-md border border-zinc-300 p-2 px-4 text-zinc-800"
+								/>
+								<Show when={deleteError()}>
+									<p class="text-sm text-red-600">{deleteError()}</p>
+								</Show>
+								<div class="flex gap-2">
+									<button
+										type="button"
+										onClick={deleteAccount}
+										disabled={!confirmation().trim() || isDeleting() || !online()}
+										class="rounded-md bg-red-600 p-2 px-4 text-red-50 disabled:opacity-60"
+									>
+										{isDeleting() ? 'Deleting...' : 'Delete permanently'}
+									</button>
+									<button
+										type="button"
+										onClick={() => {
+											setDeleting(false);
+											setConfirmation('');
+											setDeleteError('');
+										}}
+										class="rounded-md border border-zinc-300 p-2 px-4 text-zinc-700"
+									>
+										Cancel
+									</button>
+								</div>
+							</div>
+						</Show>
+						<Show when={!online()}>
+							<p class="text-sm text-zinc-500">Connect to the internet to download or delete your data.</p>
+						</Show>
+
+						<p class="mt-4 flex gap-4 text-sm text-blue-500">
+							<A href="/privacy">Privacy</A>
+							<A href="/tos">Terms</A>
+						</p>
 					</div>
 				</div>
 			</div>

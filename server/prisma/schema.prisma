@@ -32,6 +32,10 @@ model User {
   // collaborator's access without deleting the per-board collaborator list.
   collaborationEnabled Boolean @default(false)
 
+  // Set when the account was copied from the original FreeSpeech database. Its media keys are
+  // shared with the live original account, so account deletion here must leave R2 untouched.
+  importedFromV1At DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

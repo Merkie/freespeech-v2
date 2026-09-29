@@ -231,3 +231,54 @@ test('normal navigation becomes the next cold-launch page', async ({ page }) => 
 	await page.reload();
 	await expect(page.getByText('Tile 10', { exact: true })).toBeVisible();
 });
+
+test('the rate-limit message is shown on sign-in', async ({ page }) => {
+	await page.goto('/login/email?email=limited@example.invalid');
+	await page.getByPlaceholder('Your password').fill('whatever');
+	await page.getByRole('button', { name: 'Continue' }).click();
+	await expect(page.getByText('Too many attempts. Please wait 15 minutes and try again.')).toBeVisible();
+});
+
+test('account data downloads as JSON', async ({ page }) => {
+	await seed(page);
+	await page.goto('/app/dashboard/profile');
+	const download = page.waitForEvent('download');
+	await page.getByRole('button', { name: 'Download my data' }).click();
+	expect((await download).suggestedFilename()).toMatch(/^freespeech-data-\d{4}-\d{2}-\d{2}\.json$/);
+});
+
+test('deleting the account signs out and removes its data from the device', async ({ page }) => {
+	await seed(page);
+	await page.goto('/app');
+	await expect(page.getByText('Tile 9', { exact: true })).toBeVisible();
+	await page.goto('/app/dashboard/profile');
+	await page.getByRole('button', { name: 'Delete account' }).click();
+	await page.getByLabel(`Type ${account.email} to confirm`).fill('someone@else.invalid');
+	await page.getByRole('button', { name: 'Delete permanently' }).click();
+	await expect(page.getByText('That email does not match this account.')).toBeVisible();
+	await page.getByLabel(`Type ${account.email} to confirm`).fill(account.email);
+	await page.getByRole('button', { name: 'Delete permanently' }).click();
+	await expect(page).toHaveURL(/\/$/);
+	const left = await page.evaluate(async () => {
+		const db = await new Promise<IDBDatabase>((resolve, reject) => {
+			const req = indexedDB.open('freespeech-cache', 4);
+			req.onsuccess = () => resolve(req.result);
+			req.onerror = () => reject(req.error);
+		});
+		const count = (store: string) =>
+			new Promise<number>((resolve) => {
+				const req = db.transaction(store).objectStore(store).count();
+				req.onsuccess = () => resolve(req.result);
+			});
+		const result = {
+			boards: await count('projectBlobs'),
+			meta: await count('meta'),
+			token: localStorage.getItem('token'),
+			resume: localStorage.getItem('freespeech-resume'),
+			imageCaches: (await caches.keys()).filter((key) => key.startsWith('freespeech-board-images-')).length,
+		};
+		db.close();
+		return result;
+	});
+	expect(left).toEqual({ boards: 0, meta: 0, token: null, resume: null, imageCaches: 0 });
+});

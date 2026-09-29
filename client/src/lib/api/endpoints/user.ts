@@ -6,6 +6,8 @@ const user = {
 	getAccessControls,
 	updateAccessControls,
 	updateCollaboration,
+	exportData,
+	deleteAccount,
 };
 
 export default user;
@@ -60,4 +62,25 @@ async function updateCollaboration(enabled: boolean): Promise<boolean> {
 
 	if (typeof response.enabled !== 'boolean') throw new Error(response.error || 'Could not update collaboration');
 	return response.enabled;
+}
+
+/** Downloads the account export as a JSON file. */
+async function exportData(): Promise<Blob> {
+	const response = (await fetchFromAPI({
+		path: '/user/export?sw-bypass=1',
+		method: 'GET',
+		options: { parseResponseJson: false, timeoutMs: 60000 },
+	})) as Response;
+	if (!response.ok) throw new Error('Could not download your data');
+	return response.blob();
+}
+
+/** Password accounts confirm with the password; Google-only accounts with their email address. */
+async function deleteAccount(confirmation: { password?: string; email?: string }) {
+	return (await fetchFromAPI({
+		path: '/user/delete-account',
+		method: 'POST',
+		body: confirmation,
+		options: { timeoutMs: 60000 },
+	})) as { success?: boolean; error?: string };
 }

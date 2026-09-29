@@ -31,6 +31,22 @@ Bun.serve({
 		if (url.pathname.endsWith('/sync'))
 			return Response.json({ success: true, lastEditedAt: new Date().toISOString() }, { headers });
 		if (url.pathname.endsWith('/list')) return Response.json({ projects: [board] }, { headers });
+		if (url.pathname === '/auth/login')
+			return Response.json(
+				{ error: 'Too many attempts. Please wait 15 minutes and try again.' },
+				{ status: 429, headers: { ...headers, 'Retry-After': '900' } },
+			);
+		if (url.pathname === '/user/export')
+			return Response.json(
+				{ account, projects: [{ id: board.id, blob: board }] },
+				{ headers: { ...headers, 'Content-Disposition': 'attachment; filename="freespeech-data.json"' } },
+			);
+		if (url.pathname === '/user/delete-account') {
+			const body = await req.json();
+			if (body.email?.trim().toLowerCase() !== account.email)
+				return Response.json({ error: 'That email does not match this account.' }, { status: 403, headers });
+			return Response.json({ success: true }, { headers });
+		}
 		return Response.json({}, { headers });
 	},
 });
