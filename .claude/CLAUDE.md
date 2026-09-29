@@ -249,9 +249,11 @@ check before release. Use Bun; `test:e2e` builds against a local synthetic API.
   sign-in attempts per 15 minutes, cleared on success). `trust proxy` accepts X-Forwarded-For
   hops only from loopback nginx and Cloudflare (`utils/ip.ts`), so `req.ip` is the visitor.
 - **Outbound fetches of user-supplied URLs** must use `safeFetch` (`utils/safe-fetch.ts`):
-  http/https only, public addresses checked in the socket lookup and on every redirect, a
-  deadline, and a 10 MB limit. Do not use `net.BlockList` in Bun (it misclassifies public
-  addresses). The thumbnail browser aborts requests to non-public hosts.
+  http/https only; every resolved address must be public, and the request is sent to that checked
+  address with the original Host and TLS server name (no DNS rebinding), re-checked on every
+  redirect, with a deadline and a 10 MB limit. In Bun, do not use `net.BlockList` (it misclassifies
+  public addresses) or `node:http`'s `lookup` option (Bun 1.3.10 drops TLS SNI with it and an
+  unhandled second error kills the API). The thumbnail browser aborts requests to non-public hosts.
 - **PIN verifier**: still sent to the owner's devices for offline entry. A 4-digit PIN cannot be
   protected from brute force by any locally checkable verifier, and the same device already holds
   the API token; the gate remains a soft UI control.
