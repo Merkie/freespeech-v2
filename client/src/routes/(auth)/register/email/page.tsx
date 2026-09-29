@@ -46,7 +46,11 @@ function Page() {
 				if (!userData.user) throw new Error('Could not load account');
 				navigate('/app/dashboard/projects', { replace: true });
 			} else if (data.error) {
-				setError(data.error);
+				setError(
+					data.error === 'zodError'
+						? 'Check your email, name (2+ characters), and password (8+ characters).'
+						: data.error,
+				);
 			} else {
 				setError('An unknown error occurred');
 			}

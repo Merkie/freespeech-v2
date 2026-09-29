@@ -14,7 +14,11 @@ function Page() {
 		setIsSubmitting(true);
 
 		try {
-			await api.auth.forgotPassword({ email: email().trim() });
+			const response = await api.auth.forgotPassword({ email: email().trim() });
+			if (response.error) {
+				setError(response.error === 'zodError' ? 'Enter a valid email address.' : response.error);
+				return;
+			}
 			// The server answers the same way whether or not the address is registered, so the
 			// confirmation here has to be worded to match — it must not imply an account exists.
 			setSent(true);

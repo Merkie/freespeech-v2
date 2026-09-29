@@ -4,6 +4,7 @@ import { validateSchema } from '@/middleware/validate-schema';
 import { sendPasswordResetEmail } from '@/resources/email';
 import prisma from '@/resources/prisma';
 import { CLIENT_HOST } from '@/utils/env';
+import { authLimits, emailKey, limitByIp, tooManyAttempts } from '@/utils/rate-limit';
 import { generatePasswordResetToken } from '@/utils/token';
 
 const schema = z.object({
@@ -11,9 +12,13 @@ const schema = z.object({
 });
 
 export const POST = [
+	limitByIp(authLimits.forgotPerIp),
 	validateSchema(schema),
 	async (req: Request, res: Response) => {
 		const body = req.body as z.infer<typeof schema>;
+		// Applies whether or not the address has an account, so a 429 reveals nothing.
+		const wait = authLimits.forgotPerEmail.consume(emailKey(body.email));
+		if (wait) return tooManyAttempts(res, wait);
 
 		const user = await prisma.user.findFirst({
 			where: {

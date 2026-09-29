@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
+import { authLimits, emailKey, limitByIp, tooManyAttempts } from '@/utils/rate-limit';
 import { generateToken } from '@/utils/token';
 
 const schema = z.object({
@@ -12,9 +13,12 @@ const schema = z.object({
 });
 
 export const POST = [
+	limitByIp(authLimits.registerPerIp),
 	validateSchema(schema),
 	async (req: Request, res: Response) => {
 		const body = req.body as z.infer<typeof schema>;
+		const wait = authLimits.registerPerEmail.consume(emailKey(body.email));
+		if (wait) return tooManyAttempts(res, wait);
 
 		const existingUser = await prisma.user.findFirst({
 			where: {

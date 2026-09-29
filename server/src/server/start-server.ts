@@ -10,6 +10,7 @@ import HandleErrorMiddleware from '@/middleware/handle-error';
 import LogRequestMiddleware from '@/middleware/log-request';
 // import { WebsocketServer } from "./websocket/websocket-server";
 import { PORT } from '@/utils/env';
+import { isTrustedProxy } from '@/utils/ip';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +18,11 @@ const __dirname = path.dirname(__filename);
 export default async function StartServer() {
 	const app: Express = express();
 	const port = parseInt(PORT, 10);
+
+	// nginx (loopback) and Cloudflare append the real client to X-Forwarded-For. Trusting only those
+	// hops makes req.ip the visitor's address, while a request that bypasses Cloudflare cannot
+	// choose its own rate-limit key with a forged header.
+	app.set('trust proxy', (address: string) => isTrustedProxy(address));
 
 	app.use(cors({ exposedHeaders: ['x-app-version', 'ETag'] }));
 	app.options('*', cors({ exposedHeaders: ['x-app-version', 'ETag'] }));
