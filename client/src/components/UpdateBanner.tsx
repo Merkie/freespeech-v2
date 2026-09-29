@@ -1,7 +1,7 @@
 import { createSignal, Show } from 'solid-js';
-import { setPendingEditModeAction } from '@/components/Modal/_modal_inners/SaveEditMode';
 import { hasUnsavedEditChanges, prepareForAppReload } from '@/lib/blob-sync';
 import { MODAL_ID } from '@/lib/constants';
+import { setPendingEditModeAction } from '@/lib/edit-mode-action';
 import { setActiveModalId } from '@/lib/state';
 import {
 	applySwUpdate,

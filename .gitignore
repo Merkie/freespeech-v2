@@ -19,3 +19,9 @@ dist
 
 # Misc
 repo.txt
+
+# Browser verification artifacts
+/test-results/
+/playwright-report/
+
+/client/dist-e2e/

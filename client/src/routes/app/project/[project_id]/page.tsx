@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from '@solidjs/router';
+import { useNavigate, useParams, useSearchParams } from '@solidjs/router';
 import { type Component, createEffect, on, onCleanup, onMount, Show } from 'solid-js';
 import {
 	checkAndRevalidate,
@@ -6,14 +6,24 @@ import {
 	flushDirtyBlobs,
 	hasUnsavedEditChanges,
 } from '@/lib/blob-sync';
-import { clearLastVisitedProject, lastVisitedProjectId, loadProject, navigateHomeInProject } from '@/lib/page-actions';
+import { saveBoardImages } from '@/lib/board-images';
+import { saveBoardResume } from '@/lib/board-resume';
 import {
+	cancelProjectLoad,
+	clearLastVisitedProject,
+	lastVisitedProjectId,
+	loadProject,
+	navigateHomeInProject,
+} from '@/lib/page-actions';
+import {
+	boardScrollPosition,
 	currentPageId,
 	editingTiles,
 	localSettings,
 	projectBlob,
 	projectLoading,
 	resetProjectState,
+	sentence,
 	setEditingTilePositions,
 	setEditingTiles,
 	setMultiSelectMode,
@@ -27,8 +37,10 @@ import SentenceBuilder from './_components/SentenceBuilder';
 
 const AppProjectPage: Component = () => {
 	const params = useParams();
+	const [searchParams, setSearchParams] = useSearchParams();
 	const navigate = useNavigate();
 	let refreshInFlight = false;
+	let disposed = false;
 
 	const refreshBoard = async () => {
 		const projectId = params.project_id;
@@ -86,6 +98,8 @@ const AppProjectPage: Component = () => {
 	});
 
 	onCleanup(() => {
+		disposed = true;
+		cancelProjectLoad();
 		window.removeEventListener('online', handleOnline);
 		window.removeEventListener('offline', handleOffline);
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -105,7 +119,10 @@ const AppProjectPage: Component = () => {
 					resetProjectState();
 				}
 
-				const success = await loadProject(projectId, { setHomePage: true });
+				const explicit = typeof searchParams.page === 'string' ? searchParams.page : undefined;
+				const success = await loadProject(projectId, { setHomePage: true, pageId: explicit });
+				if (disposed || params.project_id !== projectId) return;
+				if (explicit) setSearchParams({ page: undefined }, { replace: true });
 				if (!success) {
 					// A stored board that no longer loads would keep hijacking Home, so forget it and let
 					// the next start fall back to one that still exists.
@@ -113,10 +130,30 @@ const AppProjectPage: Component = () => {
 					navigate('/app/dashboard/projects');
 					return;
 				}
+				// Let the saved board paint before background network work starts.
+				requestAnimationFrame(() => {
+					void refreshBoard();
+				});
 			},
 			{ defer: false },
 		),
 	);
+
+	createEffect(() => {
+		const blob = projectBlob();
+		if (blob && !projectLoading() && !editingTiles()) {
+			const timer = setTimeout(() => void saveBoardImages(blob), 250);
+			onCleanup(() => clearTimeout(timer));
+		}
+	});
+
+	createEffect(() => {
+		const blob = projectBlob();
+		const pageId = currentPageId();
+		if (!projectLoading() && blob && blob.id === params.project_id && pageId && !editingTiles()) {
+			saveBoardResume({ projectId: blob.id, pageId, sentence: sentence(), scroll: boardScrollPosition() });
+		}
+	});
 
 	// Show skeleton while loading or when no blob/page is loaded
 	const isLoading = () => projectLoading() || !projectBlob() || !currentPageId();

@@ -97,7 +97,7 @@ export async function handleImage(
 	event?: { waitUntil(promise: Promise<unknown>): void },
 ): Promise<Response> {
 	const cached = await safeCacheMatch(cacheName, request);
-	if (cached) return cached;
+	if (cached && (request.mode !== 'cors' || cached.type !== 'opaque')) return cached;
 
 	const response = await fetch(request);
 	if (isWorthCaching(response)) {

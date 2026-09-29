@@ -1,4 +1,5 @@
 import { mutateBlob } from './blob-sync';
+import { getHomePageId } from './board-resume';
 import { projectBlob, tilePositionKey } from './state';
 import type { TileBlob, TilePosition } from './types';
 
@@ -156,10 +157,14 @@ export function blobDeletePage(pageId: string): boolean {
 	if (!blob) return false;
 
 	// Don't delete the home page
-	if (blob.homePageId === pageId) return false;
+	if (getHomePageId(blob) === pageId) return false;
 
 	mutateBlob((b) => {
 		b.pages = b.pages.filter((p) => p.id !== pageId);
+		for (const page of b.pages)
+			for (const tile of page.tiles) {
+				if (tile.navigation === pageId) delete tile.navigation;
+			}
 	});
 	return true;
 }

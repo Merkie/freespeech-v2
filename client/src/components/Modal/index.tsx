@@ -1,4 +1,4 @@
-import { createEffect, createSignal, on } from 'solid-js';
+import { createEffect, createSignal, on, onCleanup, Suspense } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { cn } from '@/lib/cn';
 import type { ModalIdType } from '@/lib/constants';
@@ -10,23 +10,26 @@ const TRANSITION_DURATION = 200;
 export default function Modal() {
 	const [isVisible, setIsVisible] = createSignal(false);
 	const [renderedModalId, setRenderedModalId] = createSignal<ModalIdType | ''>('');
+	let closeTimer: ReturnType<typeof setTimeout> | undefined;
+	onCleanup(() => clearTimeout(closeTimer));
 
 	// Handle modal open/close with animation timing
 	createEffect(
 		on(activeModalId, (modalId) => {
+			clearTimeout(closeTimer);
 			if (modalId) {
 				// Opening: set the modal content first, then animate in
 				setRenderedModalId(modalId);
 				requestAnimationFrame(() => {
 					requestAnimationFrame(() => {
-						setIsVisible(true);
+						if (activeModalId() === modalId) setIsVisible(true);
 					});
 				});
 			} else {
 				// Closing: animate out first, then clear content
 				setIsVisible(false);
-				setTimeout(() => {
-					setRenderedModalId('');
+				closeTimer = setTimeout(() => {
+					if (!activeModalId()) setRenderedModalId('');
 				}, TRANSITION_DURATION);
 			}
 		}),
@@ -70,16 +73,19 @@ export default function Modal() {
 				<div class="flex items-center justify-between border-b border-zinc-700 px-5 py-4">
 					<h2 class="text-lg font-bold text-white">{modalTitle() || ''}</h2>
 					<button
+						type="button"
 						onClick={() => setActiveModalId('')}
 						class="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
 					>
-						<i class="bi bi-x-lg" />
+						<i aria-hidden="true" class="bi bi-x-lg" />
 					</button>
 				</div>
 
 				{/* Content */}
 				<div class="p-5">
-					<Dynamic component={modalConfig()?.innerElement} />
+					<Suspense fallback={<p>Loading…</p>}>
+						<Dynamic component={modalConfig()?.innerElement} />
+					</Suspense>
 				</div>
 			</div>
 		</div>

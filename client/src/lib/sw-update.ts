@@ -36,10 +36,15 @@ const RELOAD_STATE_KEY = 'freespeech-update-reload-state';
 //
 // A check costs one conditional GET of sw.js, which nginx already serves no-cache, so this is
 // cheap enough to run all day and still far above the rate at which deploys happen.
+declare const __APP_VERSION__: string;
+
 const UPDATE_POLL_MS = 15 * 60 * 1000;
 
 export function registerServiceWorker() {
 	if (!('serviceWorker' in navigator) || registrationPromise) return;
+	navigator.serviceWorker.addEventListener('message', (event) => {
+		if (event.data?.type === 'GET_APP_VERSION') event.ports[0]?.postMessage({ version: __APP_VERSION__ });
+	});
 
 	workbox = new Workbox('/sw.js');
 

@@ -1,6 +1,5 @@
 import { useNavigate, useParams } from '@solidjs/router';
 import { type Component, onMount } from 'solid-js';
-import { navigateToPageInProject } from '@/lib/page-actions';
 
 // Legacy route handler - redirects old URLs with page_id to new format
 // Old: /app/project/:project_id/:page_id
@@ -10,12 +9,8 @@ const LegacyPageRedirect: Component = () => {
 	const navigate = useNavigate();
 
 	onMount(() => {
-		// Set the page ID in state before redirecting
-		if (params.page_id) {
-			navigateToPageInProject(params.page_id);
-		}
-		// Redirect to the new URL format
-		navigate(`/app/project/${params.project_id}`, { replace: true });
+		// Preserve the explicit target in the URL until the new route has loaded the board.
+		navigate(`/app/project/${params.project_id}?page=${encodeURIComponent(params.page_id ?? '')}`, { replace: true });
 	});
 
 	return null;

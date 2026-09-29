@@ -220,6 +220,29 @@ Cold offline launches keep a stored session unless `/auth/me` returns a definiti
 
 A dirty IndexedDB board always wins on cold start, including when connectivity has returned. It is synced through the normal timestamp/conflict path before any server GET may replace it. Cache records carry a local revision number so an older foreground or Background Sync response can never mark a newer edit clean.
 
+### Cached startup and recoverable editing (September 2026)
+
+Saved account, access controls, and board data render before network checks. `board-resume.ts`
+restores the last page, sentence, and scroll; editing never unlocks automatically. Missing cached
+access settings disable editor/dashboard entry until refreshed. `session.ts` owns account changes
+and device-data cleanup.
+
+`CachedProjectBlob.draft` is an unpublished recovery copy. Sync reads the committed `blob` only;
+Save commits and clears the draft, Discard removes it, and entering the gated editor recovers it.
+Serialize durable writes and retain revision reconciliation when modifying these paths.
+
+Board GETs use ETags and `sw-bypass`, with authenticated metadata checks before 304 responses.
+`withLockedProject` serializes the server version check and write; all content writers must preserve
+that protection. The image optimizer merges URL replacements into the current locked blob.
+
+`board-images.ts` pins all board images separately from the worker's opportunistic 200-entry cache.
+Report incomplete downloads honestly when quota or a host's CORS policy prevents storage. Worker
+release caches keep deferred chunks for live older windows; do not replace this with unconditional
+cleanup or older editors will break after worker takeover.
+
+See `docs/v2-release-fixes.md` for tests, deployment state, server backup verification, and the iPad
+check before release. Use Bun; `test:e2e` builds against a local synthetic API.
+
 ### Board collaboration
 
 Collaboration is an account-level opt-in under Access Controls. An owner can find an existing
@@ -231,7 +254,7 @@ shared access and invitations without deleting the collaborator list.
 
 Shared edits use the existing full-blob revision/conflict protocol. An open board checks for a newer
 server revision every five seconds while visible and clean, so saved edits from another account replace
-the local clean copy and close a clean edit session. No WebSocket service is required. Concurrent dirty
+the local clean copy when the editor is closed. No WebSocket service is required. Concurrent dirty
 edits continue through the existing explicit conflict flow rather than silently overwriting one another.
 
 ### File-based routing (server)

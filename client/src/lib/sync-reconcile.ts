@@ -23,6 +23,11 @@ export function reconcileSuccessfulSync(
 	return {
 		entry: {
 			...entry,
+			etag: undefined,
+			draft:
+				entry.draft && entry.draft.lastEditedAt === entry.blob.lastEditedAt
+					? { ...entry.draft, lastEditedAt: serverLastEditedAt }
+					: entry.draft,
 			blob: { ...entry.blob, lastEditedAt: serverLastEditedAt },
 			dirty: needsAnotherSync,
 			revision: currentRevision,

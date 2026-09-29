@@ -1,20 +1,14 @@
 import type { RouteSectionProps } from '@solidjs/router';
-import { type Component, createEffect, createSignal, Show } from 'solid-js';
+import { type Component, Show } from 'solid-js';
 import InstallPrompt from '@/components/InstallPrompt';
 import Modal from '@/components/Modal';
 import OfflineBanner from '@/components/OfflineBanner';
 import UpdateBanner from '@/components/UpdateBanner';
-import { accessControlSettingsLoaded, sessionStatus, user } from '@/lib/state';
+import { sessionStatus, user } from '@/lib/state';
 import BottomNavigation from '@/routes/app/_components/BottomNavigation';
 
 const Layout: Component<RouteSectionProps<unknown>> = (props) => {
-	const [show, setShow] = createSignal(false);
-
-	createEffect(() => {
-		// A cached token is enough to enter the offline shell. The user profile may not have been
-		// cached yet on an upgraded installation, but the board blobs are still independently usable.
-		if (accessControlSettingsLoaded() && (user() || sessionStatus() === 'offline')) setShow(true);
-	});
+	const show = () => !!user() || sessionStatus() === 'offline';
 
 	return (
 		<Show
@@ -26,17 +20,14 @@ const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 				</div>
 			}
 		>
-			<div
-				class="fixed top-0 left-0 right-0 z-50 flex flex-col"
-				style={{ 'padding-top': 'env(safe-area-inset-top, 0px)' }}
-			>
-				<UpdateBanner />
-				<OfflineBanner />
-			</div>
 			<main
 				class="fixed inset-0 flex overflow-hidden flex-col bg-zinc-900"
 				style={{ 'padding-top': 'env(safe-area-inset-top, 0px)' }}
 			>
+				<div class="z-40 flex shrink-0 flex-col">
+					<UpdateBanner />
+					<OfflineBanner />
+				</div>
 				<div class="relative min-h-0 flex-1 overflow-hidden">
 					<div class="absolute inset-0 flex min-h-0 w-full flex-col overflow-hidden">{props.children}</div>
 				</div>

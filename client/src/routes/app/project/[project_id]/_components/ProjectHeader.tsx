@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js';
 import useOutsideClick from '@/hooks/useOutsideClick';
-import { editModeHasChanges } from '@/lib/blob-sync';
+import { draftRecovered, editModeHasChanges, storageError } from '@/lib/blob-sync';
+import { boardImageStatus, saveBoardImages } from '@/lib/board-images';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import { navigateBackInProject } from '@/lib/page-actions';
@@ -10,6 +11,7 @@ import {
 	getPageFromBlob,
 	multiSelectMode,
 	pageHistory,
+	projectBlob,
 	setActiveModalId,
 	setMultiSelectMode,
 	syncStatus,
@@ -62,21 +64,23 @@ export default function ProjectHeader() {
 			<div class="flex flex-1 gap-2">
 				<Show when={!editingTiles() && previousPage()}>
 					<button
+						type="button"
 						onClick={() => navigateBackInProject()}
 						aria-label="Go back to previous page"
 						class="flex items-center rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-700"
 					>
-						<i class="bi bi-chevron-left" />
+						<i aria-hidden="true" class="bi bi-chevron-left" />
 					</button>
 				</Show>
 				<Show when={editingTiles()}>
 					{/* Page Actions dropdown */}
 					<div class="relative" ref={setPageDropdownRef}>
 						<button
+							type="button"
 							onClick={() => setIsPageDropdownOpen(!isPageDropdownOpen())}
 							class="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm transition-colors hover:bg-zinc-700"
 						>
-							<i class="bi bi-grid-fill" />
+							<i aria-hidden="true" class="bi bi-grid-fill" />
 							<span>Page Actions</span>
 						</button>
 
@@ -89,29 +93,32 @@ export default function ProjectHeader() {
 								},
 							)}
 						>
-							<Show when={pageName() !== 'Home'}>
+							<Show when={true}>
 								<button
+									type="button"
 									onClick={handleEditPage}
 									class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
 								>
-									<i class="bi bi-pencil" />
+									<i aria-hidden="true" class="bi bi-pencil" />
 									<span>Edit "{pageName()}"</span>
 								</button>
 								<div class="mx-2 h-px bg-zinc-700" />
 							</Show>
 							<button
+								type="button"
 								onClick={handleAddPage}
 								class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
 							>
-								<i class="bi bi-plus-lg" />
+								<i aria-hidden="true" class="bi bi-plus-lg" />
 								<span>Add New Page</span>
 							</button>
 							<div class="mx-2 h-px bg-zinc-700" />
 							<button
+								type="button"
 								onClick={handleManagePages}
 								class="flex items-center gap-2 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors hover:bg-zinc-700"
 							>
-								<i class="bi bi-grid" />
+								<i aria-hidden="true" class="bi bi-grid" />
 								<span>Manage Pages</span>
 							</button>
 						</div>
@@ -124,15 +131,42 @@ export default function ProjectHeader() {
 
 			{/* Right side - Sync status + Unsaved badge + Multi-select toggle */}
 			<div class="flex flex-1 items-center justify-end gap-2">
+				<Show when={storageError()}>
+					<p role="alert" class="max-w-56 text-xs text-red-400">
+						Device storage failed. Keep the app open and save your changes again.
+					</p>
+				</Show>
 				<SyncStatusIndicator />
+				<Show when={boardImageStatus()?.id === projectBlob()?.id && boardImageStatus()}>
+					{(status) => (
+						<button
+							type="button"
+							class="text-xs text-zinc-400"
+							title={
+								status().saved === status().total
+									? 'All board images saved on this device'
+									: 'Some images are not available offline. Tap to retry.'
+							}
+							onClick={() => {
+								const blob = projectBlob();
+								if (blob && !status().downloading) void saveBoardImages(blob);
+							}}
+						>
+							{status().saved === status().total
+								? 'Images saved'
+								: `${status().downloading ? 'Saving images' : 'Offline images'} ${status().saved}/${status().total}`}
+						</button>
+					)}
+				</Show>
 				<Show when={editingTiles() && editModeHasChanges()}>
 					<div class="flex items-center gap-1.5 rounded-md bg-yellow-500/10 px-2 py-1 text-xs text-yellow-400">
-						<i class="bi bi-circle-fill text-[6px]" />
-						<span>Unsaved changes</span>
+						<i aria-hidden="true" class="bi bi-circle-fill text-[6px]" />
+						<span>{draftRecovered() ? 'Recovered draft' : 'Unsaved changes'}</span>
 					</div>
 				</Show>
 				<Show when={editingTiles()}>
 					<button
+						type="button"
 						onClick={() => setMultiSelectMode(!multiSelectMode())}
 						class={cn(
 							'flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors',
@@ -141,7 +175,7 @@ export default function ProjectHeader() {
 								: 'border-zinc-700 bg-zinc-800 hover:bg-zinc-700',
 						)}
 					>
-						<i class={cn('bi', multiSelectMode() ? 'bi-check2-square' : 'bi-ui-checks')} />
+						<i aria-hidden="true" class={cn('bi', multiSelectMode() ? 'bi-check2-square' : 'bi-ui-checks')} />
 						<span>{multiSelectMode() ? 'Multi-Select On' : 'Multi-Select'}</span>
 					</button>
 				</Show>
@@ -164,25 +198,30 @@ function SyncStatusIndicator() {
 				})}
 			>
 				<Show when={status() === 'syncing'}>
-					<i class="bi bi-arrow-repeat animate-spin" />
+					<i aria-hidden="true" class="bi bi-arrow-repeat animate-spin" />
 					<span>Saving...</span>
 				</Show>
 				<Show when={status() === 'dirty'}>
-					<i class="bi bi-circle-fill text-[6px]" />
-					<span>Unsaved</span>
+					<i aria-hidden="true" class="bi bi-circle-fill text-[6px]" />
+					<span>Waiting to sync</span>
 				</Show>
 				<Show when={status() === 'offline'}>
-					<i class="bi bi-wifi-off" />
+					<i aria-hidden="true" class="bi bi-wifi-off" />
 					<span>Offline — saved locally</span>
 				</Show>
 				<Show when={status() === 'conflict'}>
-					<button onClick={() => setActiveModalId(MODAL_ID.SYNC_CONFLICT)} class="flex items-center gap-1.5">
-						<i class="bi bi-exclamation-triangle" />
+					<button
+						type="button"
+						disabled={editingTiles()}
+						onClick={() => setActiveModalId(MODAL_ID.SYNC_CONFLICT)}
+						class="flex items-center gap-1.5"
+					>
+						<i aria-hidden="true" class="bi bi-exclamation-triangle" />
 						<span class="underline">Sync conflict</span>
 					</button>
 				</Show>
 				<Show when={status() === 'error'}>
-					<i class="bi bi-exclamation-circle" />
+					<i aria-hidden="true" class="bi bi-exclamation-circle" />
 					<span>Sync error</span>
 				</Show>
 			</div>

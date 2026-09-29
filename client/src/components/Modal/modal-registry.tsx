@@ -1,14 +1,18 @@
+import { lazy } from 'solid-js';
 import { MODAL_ID, type ModalIdType } from '@/lib/constants';
-import CreatePage from './_modal_inners/CreatePage';
-import CreateProject from './_modal_inners/CreateProject';
-import EditPage from './_modal_inners/EditPage';
-import ManageCollaborators from './_modal_inners/ManageCollaborators';
-import ManagePages from './_modal_inners/ManagePages';
-import OptimizeImages from './_modal_inners/OptimizeImages';
+
+const CreatePage = lazy(() => import('./_modal_inners/CreatePage'));
+const CreateProject = lazy(() => import('./_modal_inners/CreateProject'));
+const EditPage = lazy(() => import('./_modal_inners/EditPage'));
+const ManageCollaborators = lazy(() => import('./_modal_inners/ManageCollaborators'));
+const ManagePages = lazy(() => import('./_modal_inners/ManagePages'));
+const OptimizeImages = lazy(() => import('./_modal_inners/OptimizeImages'));
+
 import PinEntry, { pinEntryTitle } from './_modal_inners/PinEntry';
-import PinSetup from './_modal_inners/PinSetup';
-import SaveEditMode from './_modal_inners/SaveEditMode';
-import SyncConflict from './_modal_inners/SyncConflict';
+
+const PinSetup = lazy(() => import('./_modal_inners/PinSetup'));
+const SaveEditMode = lazy(() => import('./_modal_inners/SaveEditMode'));
+const SyncConflict = lazy(() => import('./_modal_inners/SyncConflict'));
 
 type ModalConfig = {
 	title: string | (() => string);

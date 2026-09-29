@@ -104,7 +104,7 @@ const BehaviorSettingsPage: Component = () => {
 				<SettingRow
 					layout="stacked"
 					title="Offline cache"
-					description="Project data is cached on this device for offline use and faster loading."
+					description="Boards and images are saved on this device for offline use. Clearing the cache keeps editor drafts and changes that have not synced."
 				>
 					<div class="flex flex-col gap-5">
 						<div class="flex flex-col gap-3">

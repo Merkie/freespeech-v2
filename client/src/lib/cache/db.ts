@@ -50,10 +50,23 @@ export function getDB(): Promise<IDBPDatabase<FreeSpeechDB>> {
 }
 
 // Clear all cached data
-export async function clearCache(): Promise<void> {
+export async function clearCache(preserveUnsynced = true): Promise<void> {
 	const db = await getDB();
 	const tx = db.transaction(['projectBlobs'], 'readwrite');
-	await Promise.all([tx.objectStore('projectBlobs').clear(), tx.done]);
+	const store = tx.objectStore('projectBlobs');
+	const removed: string[] = [];
+	if (preserveUnsynced) {
+		for (const entry of await store.getAll())
+			if (!entry.dirty && !entry.draft) {
+				await store.delete(entry.id);
+				removed.push(entry.id);
+			}
+	} else await store.clear();
+	await tx.done;
+	if (removed.length) {
+		const { removeBoardImages } = await import('../board-images');
+		await Promise.all(removed.map(removeBoardImages));
+	}
 }
 
 // Estimate size of a cached entry in bytes
@@ -86,7 +99,7 @@ export async function evictLRUIfNeeded(): Promise<{ evictedBlobs: number }> {
 			id: entry.id,
 			size,
 			cachedAt: entry.cachedAt,
-			dirty: entry.dirty,
+			dirty: entry.dirty || !!entry.draft,
 		});
 		totalSize += size;
 	}

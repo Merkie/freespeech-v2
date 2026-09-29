@@ -67,3 +67,27 @@ export async function clearCachedAuth(): Promise<void> {
 		transaction.done,
 	]);
 }
+
+/** Keep the token and safe profile in the same IndexedDB transaction. */
+export async function cacheAuthSession(token: string, user: User): Promise<void> {
+	const { id, email, name, profileImgUrl, usePersonalElevenLabsKey, createdAt, updatedAt } = user;
+	const db = await getDB();
+	const tx = db.transaction('meta', 'readwrite');
+	await tx.store.put({ key: AUTH_TOKEN_KEY, value: token });
+	await tx.store.put({
+		key: AUTH_USER_KEY,
+		value: JSON.stringify({ id, email, name, profileImgUrl, usePersonalElevenLabsKey, createdAt, updatedAt }),
+	});
+	await tx.done;
+}
+
+/** This only binds a cached profile to its saved token; server verification remains authoritative. */
+export function cachedSessionMatches(token: string, savedToken: string | null, user: User): boolean {
+	if (token !== savedToken) return false;
+	try {
+		const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+		return JSON.parse(atob(payload)).id === user.id;
+	} catch {
+		return false;
+	}
+}

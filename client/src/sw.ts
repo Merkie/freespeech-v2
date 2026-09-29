@@ -1,11 +1,15 @@
 /// <reference lib="webworker" />
 
-import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
+import { setCacheNameDetails } from 'workbox-core';
+import { createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { handleApi, handleImage } from '@/lib/sw-cache';
 import { reconcileSuccessfulSync } from '@/lib/sync-reconcile';
 
 declare let self: ServiceWorkerGlobalScope;
+declare const __APP_VERSION__: string;
+const STATIC_CACHE_PREFIX = 'freespeech-static-';
+setCacheNameDetails({ prefix: 'freespeech', precache: 'static', suffix: __APP_VERSION__ });
 
 // Precache all static assets.
 //
@@ -17,7 +21,41 @@ precacheAndRoute(self.__WB_MANIFEST, {
 	ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^[0-9a-f]{32}$/],
 });
 
-cleanupOutdatedCaches();
+// A live page can still import an older editor chunk after a worker update. Retain that
+// page's release cache, and serve its hashed assets until it has been safely reloaded.
+registerRoute(
+	({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/assets/'),
+	async ({ request }) => {
+		return (await caches.match(request)) ?? fetch(request);
+	},
+);
+
+async function cleanUnusedReleases() {
+	const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+	const versions = await Promise.all(
+		clients.map(
+			(client) =>
+				new Promise<string | null>((resolve) => {
+					const channel = new MessageChannel();
+					const timer = setTimeout(() => {
+						channel.port1.close();
+						resolve(null);
+					}, 1000);
+					channel.port1.onmessage = (event) => {
+						clearTimeout(timer);
+						channel.port1.close();
+						resolve(typeof event.data?.version === 'string' ? event.data.version : null);
+					};
+					client.postMessage({ type: 'GET_APP_VERSION' }, [channel.port2]);
+				}),
+		),
+	);
+	// Suspended/older clients might not answer. Keep their assets until a later activation.
+	if (versions.includes(null)) return;
+	const keep = new Set([__APP_VERSION__, ...versions].map((version) => STATIC_CACHE_PREFIX + version));
+	for (const name of await caches.keys())
+		if (name.startsWith(STATIC_CACHE_PREFIX) && !keep.has(name)) await caches.delete(name);
+}
 
 // The API this build talks to. Deployments differ (api.freespeechaac.com in production,
 // api-v2.freespeechaac.com for the v2 preview), so routes match on it instead of a literal.
@@ -51,10 +89,22 @@ function isImageRequest({ request, url }: { request: Request; url: URL }): boole
 	return IMAGE_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
 }
 
-registerRoute(isImageRequest, ({ request, event }) => handleImage(request, IMAGE_CACHE, MAX_IMAGE_ENTRIES, event));
+registerRoute(isImageRequest, async ({ request, event }) => {
+	try {
+		for (const name of await caches.keys()) {
+			if (!name.startsWith('freespeech-board-images-')) continue;
+			const pinned = await caches.match(request, { cacheName: name, ignoreVary: true });
+			if (pinned) return pinned;
+		}
+	} catch {
+		/* Storage failures must not break successful online image loads. */
+	}
+	return handleImage(request, IMAGE_CACHE, MAX_IMAGE_ENTRIES, event);
+});
 
 registerRoute(
-	({ url }) => url.origin === API_ORIGIN && !url.searchParams.has('sw-bypass'),
+	({ url, request }) =>
+		url.origin === API_ORIGIN && !url.searchParams.has('sw-bypass') && !request.headers.has('Authorization'),
 	({ request, event }) => handleApi(request, API_CACHE, MAX_API_ENTRIES, event),
 );
 
@@ -80,6 +130,7 @@ self.addEventListener('activate', (event) => {
 		(async () => {
 			await Promise.all(RETIRED_CACHES.map((name) => caches.delete(name)));
 			await self.clients.claim();
+			await cleanUnusedReleases();
 		})(),
 	);
 });

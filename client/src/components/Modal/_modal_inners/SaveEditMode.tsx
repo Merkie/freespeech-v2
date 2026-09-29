@@ -1,5 +1,6 @@
 import { createSignal, Show } from 'solid-js';
 import { discardEditMode, saveEditMode } from '@/lib/blob-sync';
+import { pendingAction, setPendingEditModeAction } from '@/lib/edit-mode-action';
 import {
 	setActiveModalId,
 	setEditingTilePositions,
@@ -7,13 +8,6 @@ import {
 	setMultiSelectMode,
 	setUsingOnlineSearch,
 } from '@/lib/state';
-
-// Pending action to execute after save/discard (e.g., navigate home)
-let pendingAction: (() => void | Promise<void>) | null = null;
-
-export function setPendingEditModeAction(action: (() => void | Promise<void>) | null) {
-	pendingAction = action;
-}
 
 function exitEditMode() {
 	setEditingTiles(false);
@@ -34,7 +28,7 @@ export default function SaveEditMode() {
 			exitEditMode();
 			setActiveModalId('');
 			const action = pendingAction;
-			pendingAction = null;
+			setPendingEditModeAction(null);
 			await action?.();
 		} catch {
 			setSaveFailed(true);
@@ -45,18 +39,23 @@ export default function SaveEditMode() {
 
 	const handleDiscard = async () => {
 		if (saving()) return;
-		discardEditMode();
+		try {
+			await discardEditMode();
+		} catch {
+			setSaveFailed(true);
+			return;
+		}
 		exitEditMode();
 		setActiveModalId('');
 		const action = pendingAction;
-		pendingAction = null;
+		setPendingEditModeAction(null);
 		await action?.();
 	};
 
 	const handleCancel = () => {
 		if (saving()) return;
 		setActiveModalId('');
-		pendingAction = null;
+		setPendingEditModeAction(null);
 	};
 
 	return (
@@ -72,7 +71,7 @@ export default function SaveEditMode() {
 				disabled={saving()}
 				class="flex items-center justify-center gap-2 rounded-md border border-blue-500 bg-blue-600 p-2 text-white transition-colors hover:bg-blue-500 disabled:opacity-60"
 			>
-				<i class={saving() ? 'bi bi-arrow-repeat animate-spin' : 'bi bi-check-lg'} />
+				<i aria-hidden="true" class={saving() ? 'bi bi-arrow-repeat animate-spin' : 'bi bi-check-lg'} />
 				<span>{saving() ? 'Saving…' : 'Save Changes'}</span>
 			</button>
 
@@ -82,7 +81,7 @@ export default function SaveEditMode() {
 				disabled={saving()}
 				class="flex items-center justify-center gap-2 rounded-md border border-red-500 bg-red-600 p-2 text-white transition-colors hover:bg-red-500 disabled:opacity-60"
 			>
-				<i class="bi bi-trash" />
+				<i aria-hidden="true" class="bi bi-trash" />
 				<span>Discard Changes</span>
 			</button>
 

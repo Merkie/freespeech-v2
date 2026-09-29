@@ -1,5 +1,5 @@
 import { useNavigate } from '@solidjs/router';
-import { type Component, onMount } from 'solid-js';
+import { type Component, onCleanup, onMount } from 'solid-js';
 import { resolveStartProjectId } from '@/lib/page-actions';
 
 /**
@@ -17,9 +17,14 @@ import { resolveStartProjectId } from '@/lib/page-actions';
  */
 const AppEntryPage: Component = () => {
 	const navigate = useNavigate();
+	let disposed = false;
+	onCleanup(() => {
+		disposed = true;
+	});
 
 	onMount(async () => {
 		const projectId = await resolveStartProjectId();
+		if (disposed) return;
 		navigate(projectId ? `/app/project/${projectId}` : '/app/dashboard/projects', { replace: true });
 	});
 

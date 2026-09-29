@@ -84,22 +84,36 @@ function replaceSettings(settings: AccessControlSettings): void {
 	setAccessControlSettings({ ...DEFAULT_ACCESS_CONTROL_SETTINGS, ...settings });
 }
 
-/** Prefer the account record, falling back to this account's last IndexedDB copy when offline. */
-export async function hydrateAccessControlSettings(userId: string): Promise<void> {
-	setAccessControlSettingsLoaded(false);
-	try {
-		const settings = await api.user.getAccessControls();
-		replaceSettings(settings);
-		await cacheAccessControlSettings(userId, settings).catch(() => undefined);
-	} catch {
-		const cached = await getCachedAccessControlSettings(userId);
-		replaceSettings(cached ?? DEFAULT_ACCESS_CONTROL_SETTINGS);
-	} finally {
+let controlsGeneration = 0;
+
+export async function restoreAccessControlSettings(userId: string): Promise<void> {
+	const epoch = controlsGeneration;
+	const cached = await getCachedAccessControlSettings(userId);
+	if (epoch !== controlsGeneration) return;
+	if (cached) {
+		replaceSettings(cached);
 		setAccessControlSettingsLoaded(true);
 	}
 }
 
+/** Refresh after the saved settings are usable; missing settings keep editor entry disabled. */
+export async function hydrateAccessControlSettings(userId: string): Promise<void> {
+	const epoch = controlsGeneration;
+	const token = localStorage.getItem('token');
+	await restoreAccessControlSettings(userId);
+	try {
+		const settings = await api.user.getAccessControls();
+		if (epoch !== controlsGeneration || token !== localStorage.getItem('token')) return;
+		replaceSettings(settings);
+		setAccessControlSettingsLoaded(true);
+		await cacheAccessControlSettings(userId, settings);
+	} catch {
+		/* Keep the cached gate, or leave editing disabled until settings are available. */
+	}
+}
+
 export function resetAccessControlSettings(): void {
+	controlsGeneration++;
 	const key = runtimeKey();
 	if (key) localStorage.removeItem(key);
 	replaceSettings(DEFAULT_ACCESS_CONTROL_SETTINGS);

@@ -220,16 +220,23 @@ async function syncCheckProject(projectId: string) {
 }
 
 // Fetch entire project as a single blob
-async function fetchProjectBlob(projectId: string) {
+async function fetchProjectBlob(
+	projectId: string,
+	etag?: string,
+): Promise<{
+	blob?: ProjectBlob;
+	error?: string;
+	etag?: string;
+	notModified?: boolean;
+	status: number;
+}> {
 	const response = (await fetchFromAPI({
-		path: `/project/${projectId}/blob`,
+		path: `/project/${projectId}/blob?sw-bypass=1`,
 		method: 'GET',
-	})) as {
-		blob: ProjectBlob;
-		error?: string;
-	};
-
-	return response;
+		options: { parseResponseJson: false, timeoutMs: 10000, headers: etag ? { 'If-None-Match': etag } : undefined },
+	})) as Response;
+	if (response.status === 304) return { notModified: true, status: 304 };
+	return { ...(await response.json()), etag: response.headers.get('etag') ?? undefined, status: response.status };
 }
 
 async function toggleFavorite(projectId: string) {

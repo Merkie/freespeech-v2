@@ -1,15 +1,10 @@
 import { createSignal, For, Show } from 'solid-js';
 import { tooltip } from '@/hooks/useTooltip';
-import { blobDeletePage, blobRenamePage } from '@/lib/blob-actions';
+import { blobDeletePage, blobRenamePage, blobUpdateProject } from '@/lib/blob-actions';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
 import { navigateToPageInProject } from '@/lib/page-actions';
-import {
-	currentPageId,
-	getProjectPagesFromBlob,
-	projectHomePageId,
-	setActiveModalId,
-} from '@/lib/state';
+import { currentPageId, getProjectPagesFromBlob, projectHomePageId, setActiveModalId } from '@/lib/state';
 
 export default function ManagePages() {
 	const [renamingId, setRenamingId] = createSignal<string | null>(null);
@@ -114,6 +109,16 @@ export default function ManagePages() {
 									fallback={
 										<div class="flex items-center gap-1">
 											<button
+												type="button"
+												title={page.id === projectHomePageId() ? 'Home page' : 'Set as Home'}
+												aria-label={page.id === projectHomePageId() ? 'Home page' : 'Set as Home'}
+												disabled={page.id === projectHomePageId()}
+												onClick={() => blobUpdateProject({ homePageId: page.id })}
+												class="grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-green-500/10 hover:text-green-400 disabled:cursor-default disabled:text-green-400 disabled:hover:bg-transparent"
+											>
+												<i class="bi bi-house-fill" />
+											</button>
+											<button
 												ref={tooltip('View/Edit')}
 												onClick={() => handleView(page.id)}
 												class="grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-blue-500/10 hover:text-blue-400"
@@ -122,20 +127,17 @@ export default function ManagePages() {
 											</button>
 											<button
 												ref={tooltip('Rename')}
-												onClick={() => page.name !== 'Home' && startRenaming(page)}
-												class={cn(
-													'grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-yellow-500/10 hover:text-yellow-400',
-													{ 'pointer-events-none select-none opacity-50': page.name === 'Home' },
-												)}
+												onClick={() => startRenaming(page)}
+												class="grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-yellow-500/10 hover:text-yellow-400"
 											>
 												<i class="bi bi-input-cursor-text" />
 											</button>
 											<button
 												ref={tooltip('Delete')}
-												onClick={() => page.name !== 'Home' && setDeletingId(page.id)}
+												onClick={() => page.id !== projectHomePageId() && setDeletingId(page.id)}
 												class={cn(
 													'grid h-8 w-8 cursor-pointer place-items-center rounded text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-400',
-													{ 'pointer-events-none select-none opacity-50': page.name === 'Home' },
+													{ 'pointer-events-none select-none opacity-50': page.id === projectHomePageId() },
 												)}
 											>
 												<i class="bi bi-trash" />

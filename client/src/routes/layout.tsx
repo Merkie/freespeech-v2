@@ -1,92 +1,73 @@
 import { type RouteSectionProps, useLocation, useNavigate } from '@solidjs/router';
 import { type Component, onCleanup, onMount } from 'solid-js';
 import api from '@/lib/api';
-import { cacheAuthToken, cacheAuthUser, clearCachedAuth, getCachedAuthUser } from '@/lib/cache/meta-cache';
-import { hydrateAccessControlSettings, resetAccessControlSettings, useDefaultAccessControlSettings } from '@/lib/pin';
-import { setSessionStatus, setUser, user } from '@/lib/state';
-
-// Check if running as installed PWA (standalone mode)
-function isStandalone(): boolean {
-	return (
-		window.matchMedia('(display-mode: standalone)').matches ||
-		(window.navigator as Navigator & { standalone?: boolean }).standalone === true
-	);
-}
+import { cacheAuthSession, cachedSessionMatches, getCachedAuthToken, getCachedAuthUser } from '@/lib/cache/meta-cache';
+import { hydrateAccessControlSettings, resetAccessControlSettings, restoreAccessControlSettings } from '@/lib/pin';
+import { clearDeviceBoards, endSession } from '@/lib/session';
+import { setSessionStatus, setUser } from '@/lib/state';
 
 const Layout: Component<RouteSectionProps<unknown>> = (props) => {
 	const location = useLocation();
 	const navigate = useNavigate();
+	let refreshing = false;
 
-	const refreshAccessControls = () => {
-		const currentUser = user();
-		if (currentUser) void hydrateAccessControlSettings(currentUser.id);
+	const redirect = () => {
+		if (location.pathname.startsWith('/app')) navigate('/login', { replace: true });
 	};
-
-	window.addEventListener('online', refreshAccessControls);
-	onCleanup(() => window.removeEventListener('online', refreshAccessControls));
+	const refreshSession = async () => {
+		const token = localStorage.getItem('token');
+		if (!token || refreshing) return;
+		refreshing = true;
+		try {
+			const data = await api.auth.me(token);
+			if (localStorage.getItem('token') !== token) return;
+			if (data.user) {
+				const previous = await getCachedAuthUser();
+				if (previous && previous.id !== data.user.id) await clearDeviceBoards();
+				if (localStorage.getItem('token') !== token) return;
+				setUser(data.user);
+				setSessionStatus('authenticated');
+				void hydrateAccessControlSettings(data.user.id);
+				await cacheAuthSession(token, data.user).catch(() => undefined);
+			} else if ([401, 403, 404].includes(data.status)) {
+				// Retain this account's offline edits for reauthentication; a different login clears them.
+				await endSession(false);
+				redirect();
+			} else setSessionStatus('offline');
+		} catch {
+			if (localStorage.getItem('token') === token) setSessionStatus('offline');
+		} finally {
+			refreshing = false;
+		}
+	};
+	window.addEventListener('online', refreshSession);
+	onCleanup(() => window.removeEventListener('online', refreshSession));
 
 	onMount(async () => {
 		const token = localStorage.getItem('token');
-
-		// PWA standalone mode: never show landing page. /app works out which board to open, so
-		// that decision lives in one place rather than being repeated here. Keep checking the
-		// session after navigating: returning here left the app shell waiting forever for user().
-		if (isStandalone() && location.pathname === '/') {
-			navigate(token ? '/app' : '/login', { replace: true });
-			if (!token) {
-				setSessionStatus('unauthenticated');
-				return;
-			}
-		}
-
+		const standalone =
+			window.matchMedia('(display-mode: standalone)').matches ||
+			(navigator as Navigator & { standalone?: boolean }).standalone;
+		if (standalone && location.pathname === '/') navigate(token ? '/app' : '/login', { replace: true });
 		if (!token) {
 			resetAccessControlSettings();
 			setSessionStatus('unauthenticated');
-			return handleAppRedirect();
+			redirect();
+			return;
 		}
-
-		try {
-			const data = await api.auth.me(token);
-
-			if (data.user) {
-				await hydrateAccessControlSettings(data.user.id);
-				setUser(data.user);
-				setSessionStatus('authenticated');
-				await Promise.all([cacheAuthToken(token), cacheAuthUser(data.user)]).catch(() => undefined);
-			} else if ([401, 403, 404].includes(data.status)) {
-				// Only a definitive server rejection signs the device out. A timeout, offline launch,
-				// or temporary 5xx must never destroy a session that still has usable cached boards.
-				localStorage.removeItem('token');
-				await clearCachedAuth().catch(() => undefined);
-				resetAccessControlSettings();
-				setUser(null);
-				setSessionStatus('unauthenticated');
-				handleAppRedirect();
-			} else {
-				throw new Error(data.error || `Session check failed with status ${data.status}`);
-			}
-		} catch {
-			// Offline access is possession-based on this unlocked device: the saved token proves a
-			// prior login, and the cached profile only supplies shell/header display fields. Server
-			// validation resumes automatically on the next cold start with connectivity.
-			const cachedUser = await getCachedAuthUser();
-			if (cachedUser) {
-				await hydrateAccessControlSettings(cachedUser.id);
-				setUser(cachedUser);
-			} else {
-				useDefaultAccessControlSettings();
-			}
+		// Device reads only. No auth, PIN, or board request is allowed to delay the saved board.
+		const [cached, savedToken] = await Promise.all([getCachedAuthUser(), getCachedAuthToken().catch(() => null)]);
+		if (localStorage.getItem('token') !== token) return;
+		if (cached && cachedSessionMatches(token, savedToken, cached)) {
+			await restoreAccessControlSettings(cached.id);
+			setUser(cached);
+		} else if (!cached) {
+			// Older installations may have a saved board without a cached profile. Communication
+			// still works; editing stays disabled until this account's settings are known.
 			setSessionStatus('offline');
 		}
+		void refreshSession();
 	});
-
-	function handleAppRedirect() {
-		if (location.pathname.startsWith('/app')) {
-			navigate('/login', { replace: true });
-		}
-	}
-
 	return props.children;
 };
-
 export default Layout;

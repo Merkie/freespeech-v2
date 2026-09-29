@@ -1,16 +1,19 @@
 import { A, useLocation, useNavigate } from '@solidjs/router';
-import type { Component } from 'solid-js';
-import { setPendingEditModeAction } from '@/components/Modal/_modal_inners/SaveEditMode';
+import { type Component, createSignal } from 'solid-js';
 import { discardEditMode, editModeHasChanges, enterEditMode } from '@/lib/blob-sync';
 import { cn } from '@/lib/cn';
 import { MODAL_ID } from '@/lib/constants';
+import { setPendingEditModeAction } from '@/lib/edit-mode-action';
 import { lastVisitedProjectId, navigateHomeInProject } from '@/lib/page-actions';
 import { pinLockActive } from '@/lib/pin';
 import {
+	accessControlSettingsLoaded,
 	editingTiles,
 	project,
+	projectLoading,
 	requestPinUnlock,
 	setActiveModalId,
+	setDashboardUnlocked,
 	setEditingTilePositions,
 	setEditingTiles,
 	setMultiSelectMode,
@@ -26,6 +29,7 @@ function exitEditModeClean() {
 
 const BottomNavigation: Component = () => {
 	const location = useLocation();
+	const [entering, setEntering] = createSignal(false);
 	const navigate = useNavigate();
 
 	const inDashboard = () => location.pathname.startsWith('/app/dashboard');
@@ -34,6 +38,7 @@ const BottomNavigation: Component = () => {
 	// shown on every gated attempt rather than unlocking for the rest of the visit: otherwise a
 	// carer who unlocked edit mode would leave the dashboard open behind them.
 	const gate = (prompt: string, action: () => void) => {
+		if (!accessControlSettingsLoaded()) return;
 		if (!pinLockActive()) {
 			action();
 			return;
@@ -42,7 +47,7 @@ const BottomNavigation: Component = () => {
 		setActiveModalId(MODAL_ID.PIN_ENTRY);
 	};
 
-	const handleHomeClick = (e: MouseEvent) => {
+	const handleHomeClick = async (e: MouseEvent) => {
 		if (!editingTiles()) {
 			// Not in edit mode — return to the root and discard the path that led here.
 			navigateHomeInProject();
@@ -60,13 +65,13 @@ const BottomNavigation: Component = () => {
 			setPendingEditModeAction(navigateHome);
 			setActiveModalId(MODAL_ID.SAVE_EDIT_MODE);
 		} else {
-			discardEditMode();
+			await discardEditMode();
 			exitEditModeClean();
 			navigateHome();
 		}
 	};
 
-	const handleEditClick = () => {
+	const handleEditClick = async () => {
 		if (editingTiles()) {
 			// Exiting edit mode
 			if (editModeHasChanges()) {
@@ -75,15 +80,20 @@ const BottomNavigation: Component = () => {
 				setActiveModalId(MODAL_ID.SAVE_EDIT_MODE);
 			} else {
 				// No changes — exit immediately
-				discardEditMode();
+				await discardEditMode();
 				exitEditModeClean();
 			}
 		} else {
 			// Entering edit mode. Leaving it is never gated — the lock exists to keep people out
 			// of edit mode, not to trap them in it.
 			gate('Enter your passcode to edit this board.', () => {
-				enterEditMode();
-				setEditingTiles(true);
+				setEntering(true);
+				void enterEditMode()
+					.then((entered) => {
+						if (entered) setEditingTiles(true);
+					})
+					.catch(() => alert('Could not save this board on your device. Please free some storage and try again.'))
+					.finally(() => setEntering(false));
 			});
 		}
 	};
@@ -91,9 +101,16 @@ const BottomNavigation: Component = () => {
 	// The dashboard is where projects can be renamed and deleted, so leaving the board for it is
 	// gated too. Navigating within the dashboard is not.
 	const handleDashboardClick = (e: MouseEvent) => {
+		if (!accessControlSettingsLoaded() || editingTiles()) {
+			e.preventDefault();
+			return;
+		}
 		if (inDashboard() || !pinLockActive()) return;
 		e.preventDefault();
-		gate('Enter your passcode to open the dashboard.', () => navigate('/app/dashboard/projects'));
+		gate('Enter your passcode to open the dashboard.', () => {
+			setDashboardUnlocked(true);
+			navigate('/app/dashboard/projects');
+		});
 	};
 
 	// URL is now just the project ID - page is managed via state.
@@ -128,7 +145,7 @@ const BottomNavigation: Component = () => {
 				class={cn('flex-1 rounded-md p-1 text-center transition-colors', {
 					'bg-blue-500': !location.pathname.startsWith('/app/dashboard') && editingTiles(),
 				})}
-				disabled={location.pathname.startsWith('/app/dashboard')}
+				disabled={inDashboard() || !accessControlSettingsLoaded() || projectLoading() || entering()}
 			>
 				<i class="bi bi-pencil-fill"></i>
 			</button>

@@ -23,6 +23,7 @@ export async function fetchFromAPI({
 	options?: {
 		parseResponseJson?: boolean;
 		timeoutMs?: number;
+		headers?: Record<string, string>;
 	};
 }) {
 	if (!navigator.onLine) {
@@ -31,10 +32,11 @@ export async function fetchFromAPI({
 
 	let headers: HeadersInit = {
 		'Content-Type': 'application/json',
+		...options?.headers,
 	};
 
 	try {
-		const authToken = `${token ? token : localStorage.getItem('token')}`;
+		const authToken = token ?? localStorage.getItem('token');
 
 		if (authToken) {
 			headers = {
@@ -48,6 +50,7 @@ export async function fetchFromAPI({
 
 	const response = await fetch(import.meta.env.VITE_API_URL + path, {
 		method,
+		cache: 'no-store',
 		headers,
 		body: JSON.stringify(body),
 		...(options?.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),

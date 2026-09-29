@@ -1,5 +1,7 @@
-import { createEffect, createRoot, createSignal } from 'solid-js';
+import { batch, createEffect, createRoot, createSignal, untrack } from 'solid-js';
+import { getHomePageId } from './board-resume';
 import type { ModalIdType } from './constants';
+import { deviceStorage } from './device-storage';
 import type {
 	AccessControlSettings,
 	LocalSettings,
@@ -35,6 +37,8 @@ export function findTileByPositionKey(tiles: Tile[], key: TilePositionKey): Tile
 export const [project, setProject] = createSignal<Project>(null as unknown as Project);
 export const [projectHomePageId, setProjectHomePageId] = createSignal('');
 export const [currentPageId, setCurrentPageId] = createSignal('');
+export const [boardScrollPosition, setBoardScrollPosition] = createSignal(0);
+export const [boardScrollReset, setBoardScrollReset] = createSignal(0);
 // Trail of previously visited page ids in the current project, most recent last
 export const [pageHistory, setPageHistory] = createSignal<string[]>([]);
 
@@ -43,6 +47,7 @@ export const [pageHistory, setPageHistory] = createSignal<string[]>([]);
 // User state
 export const [user, setUser] = createSignal<User | null>(null);
 export type SessionStatus = 'checking' | 'authenticated' | 'offline' | 'unauthenticated';
+export const [dashboardUnlocked, setDashboardUnlocked] = createSignal(false);
 export const [sessionStatus, setSessionStatus] = createSignal<SessionStatus>('checking');
 
 // Speech synthesis
@@ -94,7 +99,38 @@ export const [pageLoading, setPageLoading] = createSignal(false);
 
 // --- Blob state (offline-first sync) ---
 export type SyncStatus = 'synced' | 'syncing' | 'dirty' | 'conflict' | 'offline' | 'error';
-export const [projectBlob, setProjectBlob] = createSignal<ProjectBlob | null>(null);
+const [projectBlobSignal, setProjectBlobSignal] = createSignal<ProjectBlob | null>(null);
+export const projectBlob = projectBlobSignal;
+export function setProjectBlob(blob: ProjectBlob | null) {
+	return untrack(() =>
+		batch(() => {
+			setProjectBlobSignal(blob);
+			if (!blob) return blob;
+			const home = getHomePageId(blob);
+			setProjectHomePageId(home);
+			setProject({
+				id: blob.id,
+				userId: '',
+				name: blob.name,
+				description: blob.description,
+				imageUrl: blob.imageUrl,
+				columns: blob.columns,
+				rows: blob.rows,
+				isPublic: false,
+				isFavorite: false,
+				homePageId: home,
+				lastEditedAt: blob.lastEditedAt,
+				createdAt: blob.lastEditedAt,
+				updatedAt: blob.lastEditedAt,
+			});
+			if (currentPageId() && !blob.pages.some((page) => page.id === currentPageId())) {
+				setCurrentPageId(home);
+				setBoardScrollPosition(0);
+			}
+			return blob;
+		}),
+	);
+}
 export const [syncStatus, setSyncStatus] = createSignal<SyncStatus>('synced');
 export const [conflictServerBlob, setConflictServerBlob] = createSignal<ProjectBlob | null>(null);
 
@@ -134,6 +170,13 @@ export function getProjectPagesFromBlob(): { id: string; name: string }[] {
 
 // Reset all project-related state when switching projects
 export function resetProjectState() {
+	setProjectLoading(false);
+	setCurrentPageId('');
+	setProject(null as unknown as Project);
+	setProjectHomePageId('');
+	setBoardScrollPosition(0);
+	setConflictServerBlob(null);
+	setActiveModalId('');
 	setSentence([]);
 	setEditingTiles(false);
 	setEditingTilePositions([]);
@@ -216,33 +259,38 @@ export function runPinUnlockHandler() {
 // Initialize from localStorage and set up persistence
 if (typeof window !== 'undefined') {
 	// Enable third-party voice providers
-	const enableThirdPartyVoiceProvidersValue = localStorage.getItem('enableThirdPartyVoiceProviders');
+	const enableThirdPartyVoiceProvidersValue = deviceStorage.getItem('enableThirdPartyVoiceProviders');
 	if (enableThirdPartyVoiceProvidersValue) {
 		setEnableThirdPartyVoiceProviders(enableThirdPartyVoiceProvidersValue === 'true');
 	}
 
 	// ElevenLabs voice ID
-	const elevenLabsVoiceIdValue = localStorage.getItem('elevenLabsVoiceId');
+	const elevenLabsVoiceIdValue = deviceStorage.getItem('elevenLabsVoiceId');
 	if (elevenLabsVoiceIdValue) {
 		setElevenLabsVoiceId(elevenLabsVoiceIdValue);
 	}
 
 	// Offline voice URI
-	const offlineVoiceUriValue = localStorage.getItem('offlineVoiceUri');
+	const offlineVoiceUriValue = deviceStorage.getItem('offlineVoiceUri');
 	if (offlineVoiceUriValue) {
 		setOfflineVoiceUri(offlineVoiceUriValue);
 	}
 
 	// Enable sentence copy button
-	const enableSentenceCopyButtonValue = localStorage.getItem('enableSentenceCopyButton');
+	const enableSentenceCopyButtonValue = deviceStorage.getItem('enableSentenceCopyButton');
 	if (enableSentenceCopyButtonValue) {
 		setEnableSentenceCopyButton(enableSentenceCopyButtonValue === 'true');
 	}
 
 	// Local settings
-	const localSettingsValue = localStorage.getItem('localSettings');
+	const localSettingsValue = deviceStorage.getItem('localSettings');
 	if (localSettingsValue) {
-		const saved = JSON.parse(localSettingsValue) as Record<string, unknown>;
+		let saved: Record<string, unknown> = {};
+		try {
+			saved = JSON.parse(localSettingsValue) ?? {};
+		} catch {
+			/* Use defaults after corrupt storage. */
+		}
 		// Device-local PINs predate account-backed access controls. Do not let those legacy values
 		// reactivate a gate after the account defaults have deliberately reset every PIN to off.
 		for (const key of [
@@ -261,37 +309,37 @@ if (typeof window !== 'undefined') {
 	// Set up persistence effects inside createRoot to avoid warnings
 	createRoot(() => {
 		createEffect(() => {
-			localStorage.setItem('enableThirdPartyVoiceProviders', enableThirdPartyVoiceProviders().toString());
+			deviceStorage.setItem('enableThirdPartyVoiceProviders', enableThirdPartyVoiceProviders().toString());
 		});
 
 		createEffect(() => {
 			const value = elevenLabsVoiceId();
 			if (value) {
-				localStorage.setItem('elevenLabsVoiceId', value);
+				deviceStorage.setItem('elevenLabsVoiceId', value);
 			} else {
-				localStorage.removeItem('elevenLabsVoiceId');
+				deviceStorage.removeItem('elevenLabsVoiceId');
 			}
 		});
 
 		createEffect(() => {
 			const value = offlineVoiceUri();
 			if (value) {
-				localStorage.setItem('offlineVoiceUri', value);
+				deviceStorage.setItem('offlineVoiceUri', value);
 			} else {
-				localStorage.removeItem('offlineVoiceUri');
+				deviceStorage.removeItem('offlineVoiceUri');
 			}
 		});
 
 		createEffect(() => {
-			localStorage.setItem('enableSentenceCopyButton', enableSentenceCopyButton().toString());
+			deviceStorage.setItem('enableSentenceCopyButton', enableSentenceCopyButton().toString());
 		});
 
 		createEffect(() => {
 			const value = localSettings();
 			if (value) {
-				localStorage.setItem('localSettings', JSON.stringify(value));
+				deviceStorage.setItem('localSettings', JSON.stringify(value));
 			} else {
-				localStorage.removeItem('localSettings');
+				deviceStorage.removeItem('localSettings');
 			}
 		});
 	});

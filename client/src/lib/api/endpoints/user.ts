@@ -29,8 +29,9 @@ async function updateUser(body: {
 
 async function getAccessControls(): Promise<AccessControlSettings> {
 	const response = (await fetchFromAPI({
-		path: '/user/access-controls',
+		path: '/user/access-controls?sw-bypass=1',
 		method: 'GET',
+		options: { timeoutMs: 5000 },
 	})) as { settings?: AccessControlSettings; error?: string };
 
 	if (!response.settings) throw new Error(response.error || 'Could not load access controls');

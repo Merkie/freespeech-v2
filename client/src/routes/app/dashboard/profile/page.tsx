@@ -1,12 +1,11 @@
-import { useNavigate } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
 import { type Component, createSignal, Show } from 'solid-js';
 import api from '@/lib/api';
-import { clearCachedAccessControlSettings } from '@/lib/cache/access-control-cache';
-import { clearCachedAuth } from '@/lib/cache/meta-cache';
-import { resetAccessControlSettings } from '@/lib/pin';
+import { getDB } from '@/lib/cache/db';
 import { uploadFile } from '@/lib/presigned-uploads';
 import { resolveProfileImageUrl } from '@/lib/profile-image';
-import { setSessionStatus, setUser, user } from '@/lib/state';
+import { endSession } from '@/lib/session';
+import { setUser, user } from '@/lib/state';
 
 const ProfilePage: Component = () => {
 	const navigate = useNavigate();
@@ -44,17 +43,13 @@ const ProfilePage: Component = () => {
 	};
 
 	const logout = async () => {
-		const userId = user()?.id;
-		localStorage.removeItem('token');
-		await clearCachedAuth().catch(() => undefined);
-		if (userId) await clearCachedAccessControlSettings(userId).catch(() => undefined);
-		resetAccessControlSettings();
-		// The worker caches API responses keyed by URL alone, so they outlive the token unless it is
-		// told to drop them. Without this the next account on a shared iPad could be shown the
-		// previous one's project list while offline.
-		navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_API_CACHE' });
-		setUser(null);
-		setSessionStatus('unauthenticated');
+		const saved = await (await getDB()).getAll('projectBlobs');
+		if (
+			saved.some((entry) => entry.dirty || entry.draft) &&
+			!confirm('Some edits or drafts exist only on this device. Signing out will remove them. Sign out anyway?')
+		)
+			return;
+		await endSession();
 		navigate('/', { replace: true });
 	};
 
@@ -155,6 +150,10 @@ const ProfilePage: Component = () => {
 						</button>
 						<input ref={pictureInput} type="file" accept="image/*" onChange={onPictureChosen} class="hidden" />
 
+						<p class="flex gap-4 text-sm text-blue-500">
+							<A href="/privacy">Privacy</A>
+							<A href="/tos">Terms</A>
+						</p>
 						<Show when={pictureError()}>
 							<p class="text-sm text-red-500">{pictureError()}</p>
 						</Show>

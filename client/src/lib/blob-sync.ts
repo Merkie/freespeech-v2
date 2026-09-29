@@ -1,6 +1,13 @@
 import { createSignal } from 'solid-js';
 import api from './api';
-import { cacheBlob, getCachedBlobEntry, getDirtyBlobIds, reconcileCachedBlobAfterSync } from './cache/blob-cache';
+import {
+	cacheBlob,
+	cacheDraft,
+	cacheRemoteBlob,
+	getCachedBlobEntry,
+	getDirtyBlobIds,
+	reconcileCachedBlobAfterSync,
+} from './cache/blob-cache';
 import { MODAL_ID } from './constants';
 import {
 	conflictServerBlob,
@@ -9,350 +16,295 @@ import {
 	setConflictServerBlob,
 	setProjectBlob,
 	setSyncStatus,
-	syncStatus,
 } from './state';
 import type { ProjectBlob } from './types';
 
-// --- Background Sync registration ---
+let editModeActive = false;
+let editModeSnapshot: ProjectBlob | null = null;
+let generation = 0;
+let syncTimer: ReturnType<typeof setTimeout> | undefined;
+let writes: Promise<unknown> = Promise.resolve();
+const syncs = new Map<string, Promise<boolean>>();
+const acknowledgedVersions = new Map<string, { from: string; to: string }>();
+function rebaseOwnSave(blob: ProjectBlob): ProjectBlob {
+	const version = acknowledgedVersions.get(blob.id);
+	return version?.from === blob.lastEditedAt ? { ...blob, lastEditedAt: version.to } : blob;
+}
+export const [editModeHasChanges, setEditModeHasChanges] = createSignal(false);
+export const [draftRecovered, setDraftRecovered] = createSignal(false);
+export const [storageError, setStorageError] = createSignal(false);
+
+// Serialize writes so Save/Discard cannot be overtaken by an earlier draft write.
+function persist<T>(action: () => Promise<T>): Promise<T> {
+	const epoch = generation;
+	const next = writes
+		.catch(() => undefined)
+		.then(() => {
+			if (epoch !== generation) throw new Error('Session changed');
+			return action();
+		});
+	writes = next;
+	void next.then(
+		() => setStorageError(false),
+		() => setStorageError(true),
+	);
+	return next;
+}
+
 async function requestBackgroundSync() {
 	try {
 		const reg = await navigator.serviceWorker?.ready;
-		if (reg && 'sync' in reg) {
-			await (reg as any).sync.register('sync-dirty-blobs');
-		}
+		if (reg && 'sync' in reg) await (reg as any).sync.register('sync-dirty-blobs');
 	} catch {
-		// Background Sync not supported or failed — non-critical
+		/* Optional on platforms without Background Sync. */
 	}
 }
 
-// --- Debounce timer ---
-let syncTimer: ReturnType<typeof setTimeout> | null = null;
-const SYNC_DEBOUNCE_MS = 2000;
+export async function resetBlobSession() {
+	generation++;
+	clearTimeout(syncTimer);
+	exitEditModeAfterExternalUpdate();
+	await writes.catch(() => undefined);
+	syncs.clear();
+	acknowledgedVersions.clear();
+	setStorageError(false);
+}
 
-// --- Edit mode state ---
-let editModeActive = false;
-let editModeSnapshot: ProjectBlob | null = null;
-export const [editModeHasChanges, setEditModeHasChanges] = createSignal(false);
-
-export function enterEditMode(): void {
+export async function enterEditMode(): Promise<boolean> {
 	const current = projectBlob();
-	if (!current) return;
-	editModeSnapshot = structuredClone(current);
+	if (!current) return false;
+	await writes.catch(() => undefined);
+	const entry = await getCachedBlobEntry(current.id);
+	if (projectBlob()?.id !== current.id) return false;
+	if (!entry) await cacheBlob(current);
+	editModeSnapshot = entry?.blob ?? current;
 	editModeActive = true;
-	setEditModeHasChanges(false);
+	setDraftRecovered(!!entry?.draft);
+	setEditModeHasChanges(!!entry?.draft);
+	if (entry?.draft) setProjectBlob(entry.draft);
+	return true;
 }
 
 export async function saveEditMode(): Promise<void> {
 	const blob = projectBlob();
 	if (!blob) return;
-
-	// IndexedDB is the durability boundary. Wait for it before callers navigate or reload; the
-	// server sync can continue in the background after the edit-mode UI closes.
-	await cacheBlob(blob, true);
-	editModeActive = false;
-	editModeSnapshot = null;
-	setEditModeHasChanges(false);
+	await persist(() => cacheBlob(rebaseOwnSave(blob), true, true));
+	exitEditModeAfterExternalUpdate();
 	setSyncStatus('dirty');
-	void forceSyncNow().catch((err) => console.error('Sync failed:', err));
+	void forceSyncNow();
 }
 
-export function discardEditMode(): void {
-	editModeActive = false;
-	setEditModeHasChanges(false);
-
-	if (editModeSnapshot) {
-		setProjectBlob(editModeSnapshot);
+export async function discardEditMode(): Promise<void> {
+	const snapshot = editModeSnapshot;
+	if (snapshot) {
+		await persist(() => cacheDraft(snapshot.id));
+		if (projectBlob()?.id === snapshot.id) setProjectBlob(rebaseOwnSave(snapshot));
 	}
-	editModeSnapshot = null;
+	exitEditModeAfterExternalUpdate();
 }
 
-/** Clear edit-mode bookkeeping after a newer server blob has replaced the clean editor snapshot. */
 export function exitEditModeAfterExternalUpdate(): void {
 	editModeActive = false;
 	editModeSnapshot = null;
 	setEditModeHasChanges(false);
+	setDraftRecovered(false);
 }
 
 export function hasUnsavedEditChanges(): boolean {
 	return editModeActive && editModeHasChanges();
 }
 
-/** Makes the current board durable before an in-app update reloads the page. */
 export async function prepareForAppReload(): Promise<boolean> {
 	if (hasUnsavedEditChanges()) return false;
-
-	const blob = projectBlob();
-	if (blob && syncStatus() !== 'synced') {
-		// A fresh revision prevents an older in-flight response from marking this snapshot clean.
-		await cacheBlob(blob, true);
-	}
-
-	return true;
+	await writes.catch(() => undefined);
+	return !storageError();
 }
 
-// --- Load project blob ---
-// Returns true if loaded successfully (from cache or server)
-export async function loadProjectBlob(projectId: string): Promise<boolean> {
-	// 1. Try IndexedDB cache first for instant render
-	const cachedEntry = await getCachedBlobEntry(projectId);
-	const cached = cachedEntry?.blob ?? null;
+export async function loadProjectBlob(projectId: string, isCurrent = () => true): Promise<boolean> {
+	const epoch = generation;
+	const valid = () => epoch === generation && isCurrent();
+	const cached = await getCachedBlobEntry(projectId).catch(() => null);
+	if (!valid()) return false;
 	if (cached) {
-		setProjectBlob(cached);
-	}
-
-	// A dirty local blob is the newest copy we know about. Never replace it with a server GET on
-	// cold start; sync it first so the normal conflict flow can decide if another device also edited.
-	if (cachedEntry?.dirty) {
-		setSyncStatus(navigator.onLine ? 'dirty' : 'offline');
-		if (navigator.onLine) void syncBlobToServer().catch((err) => console.error('Sync failed:', err));
+		setProjectBlob(cached.blob);
+		setSyncStatus(navigator.onLine ? (cached.dirty ? 'dirty' : 'synced') : 'offline');
+		// The caller can render now. Revalidation has no place on the cached startup path.
 		return true;
 	}
-
-	// 2. Fetch from server
 	try {
-		const { blob, error } = await api.project.fetchBlob(projectId);
-		if (error || !blob) {
-			// If we had a cached version, keep using it
-			if (cached) return true;
-			return false;
-		}
-
-		setProjectBlob(blob);
-		await cacheBlob(blob, false);
+		const { blob, error, etag } = await api.project.fetchBlob(projectId);
+		if (!valid() || error || !blob) return false;
+		const stored = await cacheRemoteBlob(blob, 0, etag).catch(() => {
+			setStorageError(true);
+			return undefined;
+		});
+		const newer = stored === false ? await getCachedBlobEntry(projectId) : null;
+		if (!valid()) return false;
+		setProjectBlob(newer?.blob ?? blob);
+		if (newer?.dirty) setSyncStatus('dirty');
 		return true;
 	} catch {
-		// Network error — use cache if available
-		if (cached) {
-			setSyncStatus('offline');
-			return true;
-		}
 		return false;
 	}
 }
 
-// --- The single mutation pathway ---
 export function mutateBlob(mutator: (blob: ProjectBlob) => void): void {
 	const current = projectBlob();
 	if (!current) return;
-
 	const clone = structuredClone(current);
 	mutator(clone);
-
-	// Update in-memory signal (instant UI update)
 	setProjectBlob(clone);
-
-	// In edit mode: skip cache and server sync — changes are held in memory only
 	if (editModeActive) {
 		setEditModeHasChanges(true);
+		void persist(() => cacheDraft(clone.id, rebaseOwnSave(clone))).catch(() => undefined);
 		return;
 	}
-
-	// Persist to IndexedDB (dirty)
-	cacheBlob(clone, true)
-		.then(() => {
-			if (!navigator.onLine) return requestBackgroundSync();
-		})
-		.catch((err) => console.error('Failed to cache blob:', err));
-
-	// Update sync status
 	setSyncStatus('dirty');
-
-	// Debounce server sync
-	if (syncTimer) clearTimeout(syncTimer);
-	syncTimer = setTimeout(() => {
-		syncBlobToServer().catch((err) => console.error('Sync failed:', err));
-	}, SYNC_DEBOUNCE_MS);
+	void persist(() => cacheBlob(rebaseOwnSave(clone), true))
+		.then(() => {
+			clearTimeout(syncTimer);
+			syncTimer = setTimeout(() => void flushDirtyBlobs(), 2000);
+			if (!navigator.onLine) void requestBackgroundSync();
+		})
+		.catch(() => undefined);
 }
 
-// --- Push local blob to server ---
-let syncRequested = false;
-let syncLoopPromise: Promise<boolean> | null = null;
-
-async function syncLatestBlobOnce(): Promise<boolean> {
-	const blob = projectBlob();
-	if (!blob) return false;
-
-	// Persist exactly what this request is about and remember its revision. If another edit lands
-	// while the request is in flight, reconciliation keeps that newer revision dirty.
-	const revision = await cacheBlob(blob, true);
-	if (projectBlob() !== blob) {
-		syncRequested = true;
-		setSyncStatus('dirty');
+async function syncProject(id: string, force = false): Promise<boolean> {
+	const existing = syncs.get(id);
+	if (existing) return existing;
+	const epoch = generation;
+	const token = localStorage.getItem('token');
+	const valid = () => epoch === generation && token === localStorage.getItem('token');
+	const active = () => valid() && projectBlob()?.id === id;
+	const run = async () => {
+		for (let attempt = 0; attempt < 10; attempt++) {
+			await writes.catch(() => undefined);
+			if (!valid()) return false;
+			const entry = await getCachedBlobEntry(id);
+			if (!entry?.dirty) return true;
+			if (active()) setSyncStatus('syncing');
+			// Only the committed IndexedDB copy is ever sent. An open editor may contain a draft.
+			const result = await api.project.syncBlob(id, entry.blob, entry.blob.lastEditedAt, force);
+			force = false;
+			if (!valid()) return false;
+			if (result.serverBlob) {
+				if (active()) {
+					setConflictServerBlob(result.serverBlob);
+					setSyncStatus('conflict');
+					// Let an open editor finish Save/Discard before asking which committed copy to keep.
+					if (!editModeActive) setActiveModalId(MODAL_ID.SYNC_CONFLICT);
+				}
+				return false;
+			}
+			if (result.error || !result.lastEditedAt) {
+				if (active()) setSyncStatus('error');
+				return false;
+			}
+			const version = result.lastEditedAt;
+			acknowledgedVersions.set(id, { from: entry.blob.lastEditedAt, to: version });
+			await persist(async () => {
+				const reconciliation = await reconcileCachedBlobAfterSync(id, entry.revision, version);
+				if (!active() || !reconciliation) return;
+				const current = projectBlob();
+				// Rebase our own changes without copying an unsaved editor into the committed store.
+				if (current?.lastEditedAt === entry.blob.lastEditedAt) setProjectBlob({ ...current, lastEditedAt: version });
+				if (editModeSnapshot?.id === id && editModeSnapshot.lastEditedAt === entry.blob.lastEditedAt) {
+					editModeSnapshot = { ...editModeSnapshot, lastEditedAt: version };
+				}
+				setSyncStatus(reconciliation.needsAnotherSync ? 'dirty' : 'synced');
+			});
+		}
 		return true;
-	}
+	};
+	const promise = run()
+		.catch(() => {
+			if (active()) setSyncStatus(navigator.onLine ? 'error' : 'offline');
+			void requestBackgroundSync();
+			return false;
+		})
+		.finally(() => {
+			if (syncs.get(id) === promise) syncs.delete(id);
+		});
+	syncs.set(id, promise);
+	return promise;
+}
 
-	setSyncStatus('syncing');
+export function syncBlobToServer(): Promise<boolean> {
+	const id = projectBlob()?.id;
+	return id ? syncProject(id) : Promise.resolve(false);
+}
 
+export async function checkAndRevalidate(projectId: string): Promise<boolean> {
+	const epoch = generation;
+	const token = localStorage.getItem('token');
 	try {
-		const result = await api.project.syncBlob(blob.id, blob, blob.lastEditedAt);
-
-		if (result.error && result.serverBlob) {
-			// 409 conflict
-			setConflictServerBlob(result.serverBlob);
-			setSyncStatus('conflict');
-			setActiveModalId(MODAL_ID.SYNC_CONFLICT);
+		await writes.catch(() => undefined);
+		if (editModeActive || projectBlob()?.id !== projectId) return false;
+		const entry = await getCachedBlobEntry(projectId);
+		if (
+			epoch !== generation ||
+			token !== localStorage.getItem('token') ||
+			projectBlob()?.id !== projectId ||
+			editModeActive
+		)
+			return false;
+		if (entry?.dirty) {
+			await syncProject(projectId);
 			return false;
 		}
-
-		if (result.error) {
-			setSyncStatus('error');
-			return false;
-		}
-
-		if (!result.lastEditedAt) {
-			setSyncStatus('error');
-			return false;
-		}
-
-		const reconciliation = await reconcileCachedBlobAfterSync(blob.id, revision, result.lastEditedAt);
-		const current = projectBlob();
-
-		if (current?.id === blob.id && current !== blob) {
-			// The request saved blob A while the user created blob B. Rebase B onto A's server timestamp,
-			// persist it as dirty, and immediately drain one more sync instead of rolling the UI back.
-			const rebased = { ...current, lastEditedAt: result.lastEditedAt };
-			setProjectBlob(rebased);
-			await cacheBlob(rebased, true);
-			setSyncStatus('dirty');
-			syncRequested = true;
-		} else if (current === blob && reconciliation?.needsAnotherSync) {
-			// A newer IndexedDB revision landed while this request was in flight. Adopt it rather than
-			// overwriting it with the request's older snapshot.
-			setProjectBlob(reconciliation.entry.blob);
-			setSyncStatus('dirty');
-			syncRequested = true;
-		} else if (current === blob) {
-			setProjectBlob({ ...blob, lastEditedAt: result.lastEditedAt });
+		const before = projectBlob();
+		// Another tab or the closed-app worker may already have advanced the device copy.
+		if (
+			entry &&
+			before &&
+			(entry.blob.lastEditedAt !== before.lastEditedAt || entry.blob.imageUrl !== before.imageUrl)
+		) {
+			setProjectBlob(entry.blob);
 			setSyncStatus('synced');
+			return true;
 		}
-
+		const { blob, etag } = await api.project.fetchBlob(projectId, entry?.etag);
+		if (
+			!blob ||
+			generation !== epoch ||
+			token !== localStorage.getItem('token') ||
+			projectBlob() !== before ||
+			editModeActive
+		)
+			return false;
+		if (!(await cacheRemoteBlob(blob, entry?.revision ?? 0, etag))) return false;
+		if (projectBlob() !== before || editModeActive || generation !== epoch) return false;
+		setProjectBlob(blob);
+		setSyncStatus('synced');
 		return true;
 	} catch {
-		// Network error — register for background sync retry
-		requestBackgroundSync();
-		setSyncStatus('offline');
 		return false;
 	}
 }
 
-async function drainRequestedSyncs(): Promise<boolean> {
-	let result = true;
-	do {
-		syncRequested = false;
-		result = await syncLatestBlobOnce();
-	} while (result && syncRequested);
-	return result;
-}
-
-export function syncBlobToServer(): Promise<boolean> {
-	syncRequested = true;
-	if (!syncLoopPromise) {
-		syncLoopPromise = drainRequestedSyncs();
-		void syncLoopPromise
-			.finally(() => {
-				syncLoopPromise = null;
-			})
-			.catch(() => undefined);
-	}
-	return syncLoopPromise;
-}
-
-// --- Background revalidation ---
-export async function checkAndRevalidate(projectId: string): Promise<boolean> {
-	try {
-		if (hasUnsavedEditChanges() || (await getCachedBlobEntry(projectId))?.dirty) return false;
-		const beforeRequest = projectBlob();
-		const { lastEditedAt } = await api.project.syncCheck(projectId);
-		const current = projectBlob();
-
-		if (current === beforeRequest && current && lastEditedAt && lastEditedAt > current.lastEditedAt) {
-			// Server has newer data — re-download blob
-			const { blob } = await api.project.fetchBlob(projectId);
-			if (blob && projectBlob() === current && !(await getCachedBlobEntry(projectId))?.dirty) {
-				setProjectBlob(blob);
-				await cacheBlob(blob, false);
-				return true;
-			}
-		}
-	} catch {
-		// Network error — ignore, we have cached data
-	}
-	return false;
-}
-
-// --- Flush all dirty blobs (called on reconnect) ---
 export async function flushDirtyBlobs(): Promise<void> {
-	const dirtyIds = await getDirtyBlobIds();
-	for (const id of dirtyIds) {
-		if (projectBlob()?.id === id) {
-			await syncBlobToServer();
-			continue;
-		}
-
-		const cachedEntry = await getCachedBlobEntry(id);
-		if (!cachedEntry) continue;
-
-		try {
-			// Reconnect is not permission to overwrite another device. A 409 stays dirty until the
-			// project is opened and the existing conflict modal can ask the user what to keep.
-			const result = await api.project.syncBlob(id, cachedEntry.blob, cachedEntry.blob.lastEditedAt);
-			if (result.success && result.lastEditedAt) {
-				await reconcileCachedBlobAfterSync(id, cachedEntry.revision ?? 0, result.lastEditedAt);
-			}
-		} catch {
-			// Still offline — leave dirty
-		}
-	}
+	await writes.catch(() => undefined);
+	for (const id of await getDirtyBlobIds()) await syncProject(id);
 }
 
-// Force sync immediately (cancel debounce)
 export async function forceSyncNow(): Promise<boolean> {
-	if (syncTimer) {
-		clearTimeout(syncTimer);
-		syncTimer = null;
-	}
+	clearTimeout(syncTimer);
 	return syncBlobToServer();
 }
 
-// --- Conflict resolution ---
 export async function resolveConflictKeepLocal(): Promise<void> {
-	const blob = projectBlob();
-	if (!blob) return;
-
-	setConflictServerBlob(null);
+	const id = projectBlob()?.id;
+	if (!id || editModeActive) return;
 	setActiveModalId('');
-	setSyncStatus('syncing');
-
-	try {
-		const revision = await cacheBlob(blob, true);
-		const result = await api.project.syncBlob(blob.id, blob, blob.lastEditedAt, true);
-		if (result.lastEditedAt) {
-			const reconciliation = await reconcileCachedBlobAfterSync(blob.id, revision, result.lastEditedAt);
-			const current = projectBlob();
-			if (current === blob && !reconciliation?.needsAnotherSync) {
-				setProjectBlob({ ...blob, lastEditedAt: result.lastEditedAt });
-				setSyncStatus('synced');
-			} else if (current?.id === blob.id) {
-				const rebased = { ...current, lastEditedAt: result.lastEditedAt };
-				setProjectBlob(rebased);
-				await cacheBlob(rebased, true);
-				setSyncStatus('dirty');
-				void syncBlobToServer().catch((err) => console.error('Sync failed:', err));
-			}
-		} else {
-			setSyncStatus('error');
-		}
-	} catch {
-		setSyncStatus('error');
-	}
+	setConflictServerBlob(null);
+	await syncProject(id, true);
 }
 
 export async function resolveConflictUseServer(): Promise<void> {
 	const server = conflictServerBlob();
-	if (!server) return;
-
+	if (!server || projectBlob()?.id !== server.id || editModeActive) return;
+	await persist(() => cacheBlob(server, false));
 	setProjectBlob(server);
-	await cacheBlob(server, false);
 	setConflictServerBlob(null);
 	setActiveModalId('');
 	setSyncStatus('synced');

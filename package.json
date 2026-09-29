@@ -15,9 +15,14 @@
 		"db:studio": "cd server && bunx prisma studio",
 		"format": "bunx biome format --write .",
 		"lint": "bunx biome lint .",
-		"check": "bunx biome check --write ."
+		"check": "bunx biome check --write .",
+		"test:client": "bun test client/tests",
+		"test:e2e": "VITE_API_URL=http://127.0.0.1:5188 bun run --cwd client build --outDir dist-e2e && playwright test",
+		"test:sync": "bun test server/tests/project-sync.integration.test.ts"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.4"
+		"@biomejs/biome": "^2.4.4",
+		"@playwright/test": "^1.63.0",
+		"fake-indexeddb": "^6.2.5"
 	}
 }

@@ -1,6 +1,7 @@
 import { batch } from 'solid-js';
 import api from './api';
-import { loadProjectBlob } from './blob-sync';
+import { exitEditModeAfterExternalUpdate, loadProjectBlob } from './blob-sync';
+import { getHomePageId, readBoardResume, resolveResumePage } from './board-resume';
 import { getCachedProjects } from './cache/blob-cache';
 import { extendNavigationPath, resetNavigationPath, stepBackInNavigationPath } from './navigation-path';
 import { pickDefaultProject } from './project-order';
@@ -10,22 +11,23 @@ import {
 	pageHistory,
 	projectBlob,
 	resetProjectState,
+	setBoardScrollPosition,
+	setBoardScrollReset,
 	setCurrentPageId,
 	setLocalSettings,
 	setPageHistory,
-	setProject,
-	setProjectHomePageId,
 	setProjectLoading,
+	setSentence,
 } from './state';
 import { consumeSwReloadState } from './sw-update';
-import type { Project } from './types';
 
 // Helper to update last visited project/page in localStorage
 function trackVisit(projectId: string, pageId?: string) {
 	setLocalSettings({
 		...localSettings(),
 		lastVisitedProjectId: projectId,
-		...(pageId && { lastVisitedPageId: pageId }),
+		lastVisitedPageId:
+			pageId ?? (localSettings().lastVisitedProjectId === projectId ? localSettings().lastVisitedPageId : ''),
 	});
 }
 
@@ -53,6 +55,8 @@ export async function resolveStartProjectId(): Promise<string | null> {
 	const stored = lastVisitedProjectId();
 	if (stored) return stored;
 
+	const cached = pickDefaultProject(await getCachedProjects().catch(() => []));
+	if (cached) return cached.id;
 	try {
 		const { projects } = await api.project.list();
 		return pickDefaultProject(projects ?? [])?.id ?? null;
@@ -61,73 +65,46 @@ export async function resolveStartProjectId(): Promise<string | null> {
 	}
 }
 
-// Guard to prevent duplicate concurrent loads
-let currentlyLoadingProjectId: string | null = null;
+let loadGeneration = 0;
+export function cancelProjectLoad() {
+	loadGeneration++;
+}
 
-export async function loadProject(projectId: string, options?: { setHomePage?: boolean }): Promise<boolean> {
-	// Guard: prevent duplicate loads for same project
-	if (currentlyLoadingProjectId === projectId) {
-		return false;
-	}
-
-	currentlyLoadingProjectId = projectId;
+export async function loadProject(
+	projectId: string,
+	options?: { setHomePage?: boolean; pageId?: string },
+): Promise<boolean> {
+	const request = ++loadGeneration;
+	const resume = readBoardResume();
+	const savedPage = localSettings().lastVisitedProjectId === projectId ? localSettings().lastVisitedPageId : undefined;
+	exitEditModeAfterExternalUpdate();
+	resetProjectState();
 	setProjectLoading(true);
-
 	try {
-		// Reset state before loading new project
-		resetProjectState();
-
-		// Load the full project blob (IndexedDB first, then server)
-		const success = await loadProjectBlob(projectId);
-
-		if (!success) {
-			console.warn('Project not found');
-			return false;
-		}
-
+		const success = await loadProjectBlob(projectId, () => request === loadGeneration);
+		if (request !== loadGeneration) return false;
 		const blob = projectBlob();
-		if (!blob) return false;
-
-		// Build a lightweight Project object for backwards compatibility
-		const projectObj: Project = {
-			id: blob.id,
-			userId: '', // Not needed for display
-			name: blob.name,
-			description: blob.description,
-			imageUrl: blob.imageUrl,
-			columns: blob.columns,
-			rows: blob.rows,
-			isPublic: false,
-			isFavorite: false,
-			homePageId: blob.homePageId,
-			lastEditedAt: blob.lastEditedAt,
-			createdAt: blob.lastEditedAt,
-			updatedAt: blob.lastEditedAt,
-		};
-
-		const homePageId = getHomePageId(blob);
-
-		batch(() => {
-			setProject(projectObj);
-			setProjectHomePageId(homePageId);
-		});
-
-		// Track this project visit
-		trackVisit(projectId);
-
+		if (!success || !blob) return false;
 		if (options?.setHomePage) {
-			// A deliberate PWA update reload should return to the exact communication context rather
-			// than dumping the user at Home with an empty sentence builder.
-			navigateToPageInProject(consumeSwReloadState(projectId, blob) ?? homePageId);
-		}
-
+			batch(() => {
+				const page = resolveResumePage(
+					blob,
+					options.pageId ?? consumeSwReloadState(projectId, blob) ?? undefined,
+					savedPage,
+				);
+				navigateToPageInProject(page);
+				if (!options.pageId && resume?.projectId === projectId && resume.pageId === page) {
+					setSentence(resume.sentence);
+					setBoardScrollPosition(resume.scroll);
+				}
+			});
+		} else trackVisit(projectId);
 		return true;
 	} catch (error) {
 		console.error('Failed to load project:', error);
 		return false;
 	} finally {
-		currentlyLoadingProjectId = null;
-		setProjectLoading(false);
+		if (request === loadGeneration) setProjectLoading(false);
 	}
 }
 
@@ -153,7 +130,11 @@ export function navigateToPageInProject(pageId: string): boolean {
 		setPageHistory(extendNavigationPath(pageHistory(), from, pageId));
 	}
 
-	setCurrentPageId(pageId);
+	batch(() => {
+		setCurrentPageId(pageId);
+		setBoardScrollPosition(0);
+		setBoardScrollReset((value) => value + 1);
+	});
 
 	// Track this page visit
 	trackVisit(blob.id, pageId);
@@ -182,7 +163,11 @@ export function navigateHomeInProject(): boolean {
 		return false;
 	}
 
-	setCurrentPageId(homePageId);
+	batch(() => {
+		setCurrentPageId(homePageId);
+		setBoardScrollPosition(0);
+		setBoardScrollReset((value) => value + 1);
+	});
 	trackVisit(blob.id, homePageId);
 	return true;
 }
@@ -199,14 +184,11 @@ export function navigateBackInProject(): boolean {
 	setPageHistory(step.path);
 	if (!step.target) return false;
 
-	setCurrentPageId(step.target);
+	batch(() => {
+		setCurrentPageId(step.target!);
+		setBoardScrollPosition(0);
+		setBoardScrollReset((value) => value + 1);
+	});
 	trackVisit(blob.id, step.target);
 	return true;
-}
-
-// Get home page ID from blob
-function getHomePageId(blob: { homePageId: string | null; pages: { id: string; name: string }[] }): string {
-	if (blob.homePageId) return blob.homePageId;
-	const homePage = blob.pages.find((p) => p.name.toLowerCase().trim() === 'home');
-	return homePage?.id ?? blob.pages[0]?.id ?? '';
 }

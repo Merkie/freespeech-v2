@@ -39,13 +39,16 @@ export async function getCachedProjects(): Promise<Project[]> {
 	}));
 }
 
-export async function cacheBlob(blob: ProjectBlob, dirty = false): Promise<number> {
+export async function cacheBlob(blob: ProjectBlob, dirty = false, clearDraft = false): Promise<number> {
 	const db = await getDB();
 	const tx = db.transaction('projectBlobs', 'readwrite');
 	const existing = await tx.store.get(blob.id);
 	const revision = dirty ? (existing?.revision ?? 0) + 1 : (existing?.revision ?? 0);
 
 	await tx.store.put({
+		...existing,
+		...(clearDraft ? { draft: undefined } : {}),
+		etag: undefined,
 		id: blob.id,
 		blob,
 		cachedAt: Date.now(),
@@ -92,4 +95,30 @@ export async function isBlobCached(projectId: string): Promise<boolean> {
 export async function deleteCachedBlob(projectId: string): Promise<void> {
 	const db = await getDB();
 	await db.delete('projectBlobs', projectId);
+	const { removeBoardImages } = await import('../board-images');
+	await removeBoardImages(projectId);
+}
+
+/** Draft writes never alter the committed board or mark it eligible for sync. */
+export async function cacheDraft(projectId: string, draft?: ProjectBlob): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('projectBlobs', 'readwrite');
+	const entry = await tx.store.get(projectId);
+	if (!entry) throw new Error('Save the board on this device before editing.');
+	await tx.store.put({ ...entry, draft });
+	await tx.done;
+}
+
+/** A response may arrive after an edit in this window or another tab. Check inside the write transaction. */
+export async function cacheRemoteBlob(blob: ProjectBlob, revision: number, etag?: string): Promise<boolean> {
+	const db = await getDB();
+	const tx = db.transaction('projectBlobs', 'readwrite');
+	const entry = await tx.store.get(blob.id);
+	if (entry?.dirty || (entry?.revision ?? 0) !== revision) {
+		await tx.done;
+		return false;
+	}
+	await tx.store.put({ ...entry, id: blob.id, blob, cachedAt: Date.now(), dirty: false, revision, etag });
+	await tx.done;
+	return true;
 }

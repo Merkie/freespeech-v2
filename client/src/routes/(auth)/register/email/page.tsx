@@ -1,9 +1,7 @@
 import { A, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import api from '@/lib/api';
-import { cacheAuthToken, cacheAuthUser } from '@/lib/cache/meta-cache';
-import { hydrateAccessControlSettings } from '@/lib/pin';
-import { setSessionStatus, setUser } from '@/lib/state';
+import { startSession } from '@/lib/session';
 
 function Page() {
 	const navigate = useNavigate();
@@ -40,17 +38,12 @@ function Page() {
 			});
 
 			if (data.token) {
-				localStorage.setItem('token', data.token);
-				cacheAuthToken(data.token).catch(() => {});
-
 				const userData = await api.auth.me(data.token);
 				if (userData.user) {
-					await hydrateAccessControlSettings(userData.user.id);
-					setUser(userData.user);
-					setSessionStatus('authenticated');
-					cacheAuthUser(userData.user).catch(() => {});
+					await startSession(data.token, userData.user);
 				}
 
+				if (!userData.user) throw new Error('Could not load account');
 				navigate('/app/dashboard/projects', { replace: true });
 			} else if (data.error) {
 				setError(data.error);
