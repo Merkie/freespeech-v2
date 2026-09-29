@@ -7,6 +7,7 @@ import { validateSchema } from '@/middleware/validate-schema';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
+import { nextProjectVersion, withLockedProject } from '@/utils/locked-project';
 import { projectAccessWhere } from '@/utils/project-access';
 import type { PageBlob } from '@/utils/project-blob';
 
@@ -65,7 +66,11 @@ export const POST = [
 
 		// Filter to media host URLs and skip already-processed (current -512 or legacy -optimized)
 		const tilesToOptimize = tilesWithImages.filter((tile) => {
-			if (!tile.image.includes(MEDIA_HOST)) return false;
+			try {
+				if (new URL(tile.image).hostname !== MEDIA_HOST) return false;
+			} catch {
+				return false;
+			}
 			if (isAlreadyProcessed(tile.image)) return false;
 			return true;
 		});
@@ -85,9 +90,9 @@ export const POST = [
 		let newTotalSize = 0;
 
 		// Track updates by pageId → tileIndex → newUrl
-		const updatesByPage = new Map<string, Map<number, string>>();
+		const replacements = new Map<string, string>();
 
-		for (const tile of tilesToOptimize) {
+		for (const tile of [...new Map(tilesToOptimize.map((tile) => [tile.image, tile])).values()]) {
 			try {
 				const imageResponse = await fetch(tile.image);
 				if (!imageResponse.ok) {
@@ -121,10 +126,7 @@ export const POST = [
 					}),
 				);
 
-				if (!updatesByPage.has(tile.pageId)) {
-					updatesByPage.set(tile.pageId, new Map());
-				}
-				updatesByPage.get(tile.pageId)!.set(tile.tileIndex, `https://${MEDIA_HOST}/${newKey}`);
+				replacements.set(tile.image, `https://${MEDIA_HOST}/${newKey}`);
 				optimized++;
 			} catch (error) {
 				console.error(`Failed to optimize image:`, error);
@@ -132,22 +134,31 @@ export const POST = [
 			}
 		}
 
-		// Apply updates to the blob
-		if (updatesByPage.size > 0) {
-			for (const page of pages) {
-				const pageUpdates = updatesByPage.get(page.id);
-				if (!pageUpdates) continue;
-				for (const [tileIndex, newUrl] of pageUpdates) {
-					page.tiles[tileIndex].image = newUrl;
+		// Read the latest board only after the slow image work. Match by source URL rather than
+		// old tile indexes: pages and tiles may have moved, changed, or been deleted meanwhile.
+		if (replacements.size > 0) {
+			await withLockedProject(projectId, async (tx) => {
+				const latest = await tx.project.findFirst({ where: projectAccessWhere(projectId, req.userId!) });
+				if (!latest) return;
+				const latestBlob = latest.blob as unknown as { pages: PageBlob[] };
+				let changed = false;
+				for (const page of latestBlob.pages) {
+					for (const tile of page.tiles) {
+						const replacement = tile.image && replacements.get(tile.image);
+						if (replacement) {
+							tile.image = replacement;
+							changed = true;
+						}
+					}
 				}
-			}
-
-			await prisma.project.update({
-				where: { id: projectId },
-				data: {
-					blob: { ...blob, pages },
-					lastEditedAt: new Date(),
-				},
+				if (changed)
+					await tx.project.update({
+						where: { id: projectId },
+						data: {
+							blob: latestBlob,
+							lastEditedAt: nextProjectVersion(latest.lastEditedAt),
+						},
+					});
 			});
 		}
 

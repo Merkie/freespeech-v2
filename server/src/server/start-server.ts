@@ -18,8 +18,8 @@ export default async function StartServer() {
 	const app: Express = express();
 	const port = parseInt(PORT, 10);
 
-	app.use(cors({ exposedHeaders: ['x-app-version'] }));
-	app.options('*', cors({ exposedHeaders: ['x-app-version'] }));
+	app.use(cors({ exposedHeaders: ['x-app-version', 'ETag'] }));
+	app.options('*', cors({ exposedHeaders: ['x-app-version', 'ETag'] }));
 
 	app.use(express.json({ limit: '100mb' }));
 

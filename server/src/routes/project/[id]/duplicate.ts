@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import prisma from '@/resources/prisma';
@@ -20,7 +21,7 @@ export const POST = [
 		if (!source) return res.status(404).json({ error: 'Project not found' });
 
 		const name = `${source.name} Copy`;
-		const blob = structuredClone(source.blob) as Record<string, unknown>;
+		const blob = structuredClone(source.blob) as Prisma.JsonObject;
 		delete blob.id;
 		delete blob.lastEditedAt;
 		blob.name = name;

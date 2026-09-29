@@ -1,13 +1,18 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { authenticateRequest } from '@/middleware/authenticate-request';
-import { ProjectBlobSchema, applyProjectBlob } from '@/utils/project-blob';
+import { applyProjectBlob, ProjectBlobSchema } from '@/utils/project-blob';
 
 export const POST = [
 	authenticateRequest(),
 	async (req: Request, res: Response) => {
 		const { blob, lastEditedAt, force } = req.body;
 
-		if (!blob || !lastEditedAt) {
+		if (
+			!blob ||
+			!z.string().datetime().safeParse(lastEditedAt).success ||
+			(force !== undefined && typeof force !== 'boolean')
+		) {
 			return res.status(400).json({ error: 'Missing blob or lastEditedAt' });
 		}
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import prisma from '@/resources/prisma';
 import { projectAccessWhere } from '@/utils/project-access';
+import { nextProjectVersion, withLockedProject } from './locked-project';
 
 // --- Types ---
 
@@ -114,44 +115,50 @@ export async function applyProjectBlob(
 	expectedLastEditedAt: string,
 	force = false,
 ): Promise<{ success: boolean; conflict?: boolean; serverBlob?: ProjectBlob; newLastEditedAt?: string }> {
-	const project = await prisma.project.findFirst({
-		where: projectAccessWhere(projectId, userId),
-		select: { id: true, lastEditedAt: true, imageUrl: true },
+	return withLockedProject(projectId, async (tx) => {
+		const project = await tx.project.findFirst({
+			where: projectAccessWhere(projectId, userId),
+			select: { id: true, lastEditedAt: true, imageUrl: true, blob: true },
+		});
+
+		if (!project) {
+			return { success: false };
+		}
+
+		// Conflict check
+		if (!force && project.lastEditedAt.toISOString() !== expectedLastEditedAt) {
+			const serverBlob = ProjectBlobSchema.parse({
+				...(project.blob as object),
+				id: project.id,
+				lastEditedAt: project.lastEditedAt.toISOString(),
+			});
+			return { success: false, conflict: true, serverBlob };
+		}
+
+		const now = nextProjectVersion(project.lastEditedAt);
+
+		// Store full blob (minus transient id/lastEditedAt) and sync columns.
+		// The stored blob keeps the server's imageUrl (not the client's) so pulled
+		// and offline-cached blobs always carry the current thumbnail URL.
+		const blobData = {
+			name: blob.name,
+			description: blob.description,
+			imageUrl: project.imageUrl,
+			columns: blob.columns,
+			rows: blob.rows,
+			homePageId: blob.homePageId,
+			pages: blob.pages,
+		};
+
+		await tx.project.update({
+			where: { id: projectId },
+			data: {
+				...getRecordSyncData(blob),
+				blob: blobData,
+				lastEditedAt: now,
+			},
+		});
+
+		return { success: true, newLastEditedAt: now.toISOString() };
 	});
-
-	if (!project) {
-		return { success: false };
-	}
-
-	// Conflict check
-	if (!force && project.lastEditedAt.toISOString() > expectedLastEditedAt) {
-		const serverBlob = await buildProjectBlob(projectId, userId);
-		return { success: false, conflict: true, serverBlob: serverBlob ?? undefined };
-	}
-
-	const now = new Date();
-
-	// Store full blob (minus transient id/lastEditedAt) and sync columns.
-	// The stored blob keeps the server's imageUrl (not the client's) so pulled
-	// and offline-cached blobs always carry the current thumbnail URL.
-	const blobData = {
-		name: blob.name,
-		description: blob.description,
-		imageUrl: project.imageUrl,
-		columns: blob.columns,
-		rows: blob.rows,
-		homePageId: blob.homePageId,
-		pages: blob.pages,
-	};
-
-	await prisma.project.update({
-		where: { id: projectId },
-		data: {
-			...getRecordSyncData(blob),
-			blob: blobData,
-			lastEditedAt: now,
-		},
-	});
-
-	return { success: true, newLastEditedAt: now.toISOString() };
 }
