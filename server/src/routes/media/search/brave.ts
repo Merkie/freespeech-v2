@@ -35,7 +35,7 @@ async function searchImages(query: string) {
 
 		const response = await fetch(url, {
 			headers: {
-				'Accept': 'application/json',
+				Accept: 'application/json',
 				'X-Subscription-Token': BRAVE_SEARCH_API_KEY,
 			},
 		});

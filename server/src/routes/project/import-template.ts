@@ -1,14 +1,14 @@
-import { GetObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'node:crypto';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { TEMPLATES, templateBlobKey } from '@/data/templates';
 import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
-import { TEMPLATES, templateBlobKey } from '@/data/templates';
 import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
-import { ProjectBlobSchema, type PageBlob, type ProjectBlob } from '@/utils/project-blob';
+import { type PageBlob, type ProjectBlob, ProjectBlobSchema } from '@/utils/project-blob';
 
 const schema = z.object({
 	slug: z.string().min(1),
@@ -66,9 +66,7 @@ export const POST = [
 ];
 
 async function loadTemplateBlob(slug: string): Promise<ProjectBlob> {
-	const resp = await s3.send(
-		new GetObjectCommand({ Bucket: R2_BUCKET, Key: templateBlobKey(slug) }),
-	);
+	const resp = await s3.send(new GetObjectCommand({ Bucket: R2_BUCKET, Key: templateBlobKey(slug) }));
 	if (!resp.Body) throw new Error('Template blob body empty');
 	const chunks: Buffer[] = [];
 	for await (const chunk of resp.Body as AsyncIterable<Uint8Array>) {
@@ -80,10 +78,7 @@ async function loadTemplateBlob(slug: string): Promise<ProjectBlob> {
 	return ProjectBlobSchema.parse(raw);
 }
 
-function rekeyPages(
-	pages: PageBlob[],
-	oldHomePageId: string | null,
-): { pages: PageBlob[]; homePageId: string | null } {
+function rekeyPages(pages: PageBlob[], oldHomePageId: string | null): { pages: PageBlob[]; homePageId: string | null } {
 	const idMap = new Map<string, string>();
 	for (const page of pages) {
 		idMap.set(page.id, crypto.randomUUID());

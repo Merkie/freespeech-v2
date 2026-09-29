@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import { authenticateRequest } from '@/middleware/authenticate-request';
 import { TEMPLATES, templateBlobUrl, templateThumbnailUrl } from '@/data/templates';
+import { authenticateRequest } from '@/middleware/authenticate-request';
 
 export const GET = [
 	authenticateRequest(),
