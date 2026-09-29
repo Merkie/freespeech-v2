@@ -8,6 +8,7 @@ import { authenticateRequest } from '@/middleware/authenticate-request';
 import { validateSchema } from '@/middleware/validate-schema';
 import s3 from '@/resources/s3';
 import { R2_BUCKET } from '@/utils/env';
+import { safeFetch } from '@/utils/safe-fetch';
 
 const schema = z.object({
 	image_url: z.string().url(),
@@ -48,8 +49,9 @@ export const POST = [
 		if (!image?.url) throw new Error('Background removal returned no image');
 
 		// Fetch the image and trim transparent pixels
-		const imageResponse = await fetch(image.url);
-		const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+		const imageResponse = await safeFetch(image.url, { timeoutMs: 30_000 });
+		if (!imageResponse.ok) throw new Error('Could not download the background-removed image');
+		const imageBuffer = imageResponse.body;
 
 		const trimmedImage = await sharp(imageBuffer).trim().png().toBuffer();
 

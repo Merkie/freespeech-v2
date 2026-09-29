@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import JSZip from 'jszip';
 import sharp from 'sharp';
 import type { OBFButton, OBFGrid, OBFImage, OBFPage, OBZManifest } from './open-board-format';
+import { safeFetch } from './safe-fetch';
 
 export const TILE_IMAGE_SIZE = 512;
 export const WEBP_QUALITY = 85;
@@ -300,10 +301,11 @@ async function resolveImageUncached(
 	// proper transparent versions).
 	if (preferRemote && image.url) {
 		try {
-			const res = await fetch(image.url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+			// Board files are user uploads, so their image URLs get the same SSRF checks as pasted links.
+			const res = await safeFetch(image.url, { timeoutMs: FETCH_TIMEOUT_MS });
 			if (res.ok) {
-				bytes = Buffer.from(await res.arrayBuffer());
-				if (!contentType) contentType = res.headers.get('content-type') || inferContentTypeFromPath(image.url);
+				bytes = res.body;
+				if (!contentType) contentType = res.contentType || inferContentTypeFromPath(image.url);
 			}
 		} catch {
 			// Fall through to the archive copy.
@@ -330,10 +332,11 @@ async function resolveImageUncached(
 	// local copy.
 	if (!bytes && !preferRemote && image.url) {
 		try {
-			const res = await fetch(image.url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+			// Board files are user uploads, so their image URLs get the same SSRF checks as pasted links.
+			const res = await safeFetch(image.url, { timeoutMs: FETCH_TIMEOUT_MS });
 			if (res.ok) {
-				bytes = Buffer.from(await res.arrayBuffer());
-				if (!contentType) contentType = res.headers.get('content-type') || inferContentTypeFromPath(image.url);
+				bytes = res.body;
+				if (!contentType) contentType = res.contentType || inferContentTypeFromPath(image.url);
 			}
 		} catch {
 			// Give up on this image.

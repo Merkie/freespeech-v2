@@ -6,6 +6,7 @@ import prisma from '@/resources/prisma';
 import s3 from '@/resources/s3';
 import { CLIENT_HOST, R2_BUCKET } from '@/utils/env';
 import { projectAccessWhere } from '@/utils/project-access';
+import { isPublicHost } from '@/utils/safe-fetch';
 import slugify from '@/utils/slugify';
 import { generateToken } from '@/utils/token';
 
@@ -41,6 +42,31 @@ export const POST = [
 
 		const browser = await getBrowserInstance();
 		const page = await browser.newPage();
+
+		// Tile images are user-supplied URLs, and this browser runs on the server. Let the app and
+		// public hosts load; refuse anything that resolves to a private or loopback address.
+		const clientOrigin = new URL(CLIENT_HOST).origin;
+		const hostChecks = new Map<string, Promise<boolean>>();
+		await page.setRequestInterception(true);
+		page.on('request', (request) => {
+			void (async () => {
+				try {
+					const url = new URL(request.url());
+					if (url.protocol === 'data:' || url.protocol === 'blob:' || url.origin === clientOrigin)
+						return await request.continue();
+					if (url.protocol !== 'http:' && url.protocol !== 'https:') return await request.abort('blockedbyclient');
+					let allowed = hostChecks.get(url.hostname);
+					if (!allowed) {
+						allowed = isPublicHost(url.hostname);
+						hostChecks.set(url.hostname, allowed);
+					}
+					if (await allowed) await request.continue();
+					else await request.abort('blockedbyclient');
+				} catch {
+					/* The request was already handled or the page closed. */
+				}
+			})();
+		});
 
 		const token = generateToken(req.userId!).token;
 

@@ -10,6 +10,7 @@ import { R2_BUCKET } from '@/utils/env';
 import { nextProjectVersion, withLockedProject } from '@/utils/locked-project';
 import { projectAccessWhere } from '@/utils/project-access';
 import type { PageBlob } from '@/utils/project-blob';
+import { safeFetch } from '@/utils/safe-fetch';
 
 const schema = z.object({
 	dryRun: z.boolean(),
@@ -94,13 +95,13 @@ export const POST = [
 
 		for (const tile of [...new Map(tilesToOptimize.map((tile) => [tile.image, tile])).values()]) {
 			try {
-				const imageResponse = await fetch(tile.image);
+				const imageResponse = await safeFetch(tile.image, { timeoutMs: 15_000 });
 				if (!imageResponse.ok) {
 					failed++;
 					continue;
 				}
 
-				const originalBuffer = Buffer.from(await imageResponse.arrayBuffer());
+				const originalBuffer = imageResponse.body;
 				oldTotalSize += originalBuffer.length;
 
 				const optimizedBuffer = await sharp(originalBuffer)
