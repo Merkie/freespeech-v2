@@ -109,7 +109,6 @@ client/src/
     page-actions.ts       # loadProject(), navigateToPageInProject()
     types.ts              # TypeScript types (blob types, Tile, Project, etc.)
     constants.ts          # MODAL_ID enum
-    toast.ts              # Signal-based toast store (showToast)
     speak.ts              # TTS (ElevenLabs + Web Speech API fallback)
     sw-update.ts          # Service worker update prompt (workbox-window)
     version-check.ts      # API version mismatch detection
@@ -120,7 +119,6 @@ client/src/
     cache/meta-cache.ts   # Auth token cache (for SW background sync)
   components/
     Modal/                # Modal system (registry pattern)
-    ToastContainer.tsx    # Toast notifications (bottom of screen)
     UpdateBanner.tsx      # SW update / API version mismatch banner
     OfflineBanner.tsx     # Offline/reconnect status banner
     InstallPrompt.tsx     # PWA install prompt
@@ -175,20 +173,13 @@ getTemplateForPage(pageId)              // Linked template or null
 3. Register in `modal-registry.tsx`
 4. Open: `setActiveModalId(MODAL_ID.YOUR_MODAL)`
 
-### Toast notifications
-
-```typescript
-import { showToast } from '@/lib/toast';
-showToast('Message', 'info' | 'success' | 'error');  // auto-dismiss 4s
-```
-
 ### Image uploads
 
 All uploads (device picker + online image search) funnel through `uploadFile()` in `client/src/lib/presigned-uploads.ts`, which runs `compressImage()` first (`client/src/lib/image-compress.ts`) before presigning.
 
 - **Client-side compression**: resize to **512px longest side**, encode as **WebP @ 0.85** (fallback: JPEG @ 0.85 on old Safari where `canvas.toBlob('image/webp')` returns null). Uses `createImageBitmap` + `OffscreenCanvas` when available, with `HTMLImageElement` + `HTMLCanvasElement` fallback for broad device support.
 - **Naming scheme**: compressed uploads get a `-512.{webp|jpg}` suffix so future variants (e.g. `-original.*`) can be added without ambiguity.
-- **Size limit**: 2MB cap enforced client-side (toast on reject) and server-side via Zod in `server/src/routes/media/upload/presign.ts`. After 512px WebP compression, real uploads are typically 20–100KB — the cap exists as a guardrail, not the common path.
+- **Size limit**: 2MB cap enforced client-side (message on reject) and server-side via Zod in `server/src/routes/media/upload/presign.ts`. After 512px WebP compression, real uploads are typically 20–100KB — the cap exists as a guardrail, not the common path.
 - **Passthrough**: SVG/GIF skip compression (vector / animated). Decode errors pass through to preserve originals.
 - **Templates share URLs**: template pages reference the same R2 URLs — no image duplication when a template is linked to another page.
 
@@ -214,7 +205,7 @@ Pre-built vocabulary sets (CommuniKate, Quick Core, Vocal Flair, Sequoia, Projec
 
 ### Offline awareness
 
-`fetchFromAPI()` throws `OfflineError` when `navigator.onLine` is false. Catch it in UI code to show user-friendly toasts. TTS auto-falls back to Web Speech API offline.
+`fetchFromAPI()` throws `OfflineError` when `navigator.onLine` is false. Catch it in UI code to show user-friendly messages. TTS auto-falls back to Web Speech API offline.
 
 Cold offline launches keep a stored session unless `/auth/me` returns a definitive 401/403/404; transport failures never delete the token. A safe subset of the last authenticated user is cached in IndexedDB so the app shell can render without the API. The projects dashboard falls back to summaries built from `projectBlobs`, so it shows only boards that can actually open offline rather than a stale full server list or an indefinite loading state.
 
@@ -242,6 +233,28 @@ cleanup or older editors will break after worker takeover.
 
 See `docs/v2-release-fixes.md` for tests, deployment state, server backup verification, and the iPad
 check before release. Use Bun; `test:e2e` builds against a local synthetic API.
+
+### Account data, sign-in limits, and outbound fetches (September 2026)
+
+- **Delete account / Download my data** live on the profile page. `POST /user/delete-account`
+  confirms with the password, or the typed email for Google-only accounts, then removes owned
+  boards, all `ProjectCollaborator` rows touching the account, and the `User` row in one
+  transaction; the client calls `endSession()` to clear device boards, drafts, and caches.
+  `GET /user/export` returns account fields (secrets only as present/absent) plus owned blobs.
+- **Media cleanup** (`utils/account-data.ts`) is best effort and deletes only keys under the
+  account's own prefixes (`{name-slug}-{userId}/`, `user-imports/{userId}/`) that no remaining
+  board or profile references. `User.importedFromV1At` (set by the migration script) skips R2
+  entirely: copied accounts share media keys with the live original account.
+- **Rate limits** (`utils/rate-limit.ts`, in memory): generous per address, tight per email (10
+  sign-in attempts per 15 minutes, cleared on success). `trust proxy` accepts X-Forwarded-For
+  hops only from loopback nginx and Cloudflare (`utils/ip.ts`), so `req.ip` is the visitor.
+- **Outbound fetches of user-supplied URLs** must use `safeFetch` (`utils/safe-fetch.ts`):
+  http/https only, public addresses checked in the socket lookup and on every redirect, a
+  deadline, and a 10 MB limit. Do not use `net.BlockList` in Bun (it misclassifies public
+  addresses). The thumbnail browser aborts requests to non-public hosts.
+- **PIN verifier**: still sent to the owner's devices for offline entry. A 4-digit PIN cannot be
+  protected from brute force by any locally checkable verifier, and the same device already holds
+  the API token; the gate remains a soft UI control.
 
 ### Board collaboration
 

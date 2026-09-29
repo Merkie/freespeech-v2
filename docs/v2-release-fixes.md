@@ -34,13 +34,16 @@ A fresh `/var/backups/postgresql/freespeech_v2_2026-09-08.dump` was restored suc
 
 ## Verification and release
 
-Run `bun run test:client` and `bun test server/src/utils/prepare-speech-text.test.ts` for the unit tests. Run `bun run test:e2e` for production-build browser tests with synthetic accounts and a local fixture API. The test build uses `client/dist-e2e` so the regular production build stays separate. Install test browsers with `bunx playwright install chromium webkit` first.
+Run `bun run test:client` and `bun run test:server` for the unit tests. Run `bun run test:e2e` for production-build browser tests with synthetic accounts and a local fixture API. The test build uses `client/dist-e2e` so the regular production build stays separate. Install test browsers with `bunx playwright install chromium webkit` first.
 
 The integration test intentionally refuses non-local or non-test databases. Provision a local PostgreSQL database named `freespeech_v2_test`, push the existing Prisma schema to that database, and run:
 
 ```sh
-DATABASE_URL=postgresql://postgres@127.0.0.1:55436/freespeech_v2_test JWT_SECRET=local-test-only bun run test:sync
+DATABASE_URL=postgresql://postgres@127.0.0.1:55436/freespeech_v2_test JWT_SECRET=local-test-only bun run test:integration
 ```
+
+`bun run test:server` runs the server unit tests (SSRF address rules and fetch limits, proxy trust,
+rate limiter, speech text) without a database.
 
 Verification: 36 unit tests and 4 PostgreSQL integration tests pass. Browser verification passes 18 cases, with two Chromium-only service-worker cases skipped in WebKit. Client production build and server `tsc --noEmit` checks pass. Biome reports existing accessibility warnings in touched legacy UI; no errors. Browser tests exercise held API responses, saved page/sentence/scroll restoration, deep links, draft recovery, Home selection, storage quota failures, 230 offline images, and older deferred chunks. Full service-worker offline navigation and takeover tests run in Chromium: [Playwright supports service-worker automation only in Chromium](https://playwright.dev/docs/service-workers).
 
@@ -49,3 +52,27 @@ On this Mac, a synthetic cached 230-page board appeared in tens of milliseconds 
 Before deploying, use the test iPad to check an installed launch after force-quit, airplane-mode speech and images on an unvisited page, resumed scroll/sentence, PIN entry, drag/drop, recovered draft Save/Discard, and an app update with an open editor. Deploy application changes using the repository's `deploy.sh` after they are merged to main. There are no schema changes in this branch.
 
 This pass covers the V2 web release. Native packaging, Apple sign-in, account deletion including shared-media cleanup, final store privacy disclosures, store enrollment, and original-to-V2 migration remain separate release work. The privacy/terms routes now provide working links to the existing published policies and explain V2's local storage behavior; they are not a replacement for updated store policies.
+
+## Compliance and parity pass — September 29, 2026
+
+Merged to `main` with the reliability work above and deployed with `deploy.sh`.
+
+- Profile: Download my data (JSON export of account fields and full boards; no password hash,
+  ElevenLabs key, or PIN verifier) and Delete account (password, or typed email for Google-only
+  accounts). Deletion removes owned boards and collaboration rows in one transaction, then signs
+  the device out and clears its boards, drafts, and caches. Owned R2 media is deleted best effort;
+  shared, template, and imported-from-original-app media is kept.
+- Sign-in, registration, and password reset are rate limited per address (generous) and per email
+  (tight), keyed on the real visitor address behind Cloudflare and nginx. The UI shows the 429
+  message.
+- Server-side fetches of user-supplied URLs (image proxy, fetch-from-url, board import images, image
+  optimizer, background removal, thumbnail browser) refuse private, loopback, link-local, CGNAT,
+  and local IPv6 addresses after DNS resolution and on every redirect, with a deadline and size cap.
+- Parity: projects can be renamed and resized from the dashboard; `/auth/me` no longer returns the
+  encrypted ElevenLabs key; folder tiles speak on tap when speak-on-tap is on.
+- Schema: nullable `User.importedFromV1At` (additive `prisma db push`). The existing copied test
+  accounts were marked after deploy.
+
+Remaining parity notes: new boards are capped at 12 × 12 in the client (the original allowed larger);
+the original's tile pop-in animation toggle was not carried over; the native app's `state=app`
+Google sign-in handoff is not implemented.
